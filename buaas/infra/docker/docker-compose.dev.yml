@@ -1,0 +1,10 @@
+version: '3.9'
+
+services:
+  postgres:
+    environment:
+      POSTGRES_MULTIPLE_DATABASES: buaas_db,buaas_test_db
+
+  kafka:
+    environment:
+      KAFKA_LOG_RETENTION_HOURS: 1
