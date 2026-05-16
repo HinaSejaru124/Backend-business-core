@@ -27,3 +27,10 @@ Thumbs.db
 # Docker
 infra/docker/volumes/
 infra/docker/.env
+
+# Maven build output
+**/target/
+*.jar
+*.war
+*.class
+**/target/
