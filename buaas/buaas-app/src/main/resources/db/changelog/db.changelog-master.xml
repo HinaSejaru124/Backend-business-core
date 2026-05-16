@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        BuaaS — Changelog principal
+        Les migrations sont organisées par version et par domaine.
+        Format : v{version}/{domaine}/{description}.xml
+    -->
+
+    <!-- Version 1.0.0 — Bootstrap -->
+    <include file="db/changelog/v1.0.0/001-create-schema.xml"
+             relativeToChangelogFile="false"/>
+
+</databaseChangeLog>
