@@ -212,3 +212,13 @@ services:
     networks:
       - buaas-network
 
+  
+  nexus:
+    image: sonatype/nexus3:latest
+    container_name: bcaas-nexus
+    ports:
+      - "8081:8081"
+    volumes:
+      - nexus_data:/nexus-data
+    networks:
+      - buaas-network
