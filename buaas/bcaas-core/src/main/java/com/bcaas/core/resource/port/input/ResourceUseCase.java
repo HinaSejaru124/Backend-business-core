@@ -3,7 +3,7 @@ package com.bcaas.core.resource.port.input;
 import com.bcaas.core.context.domain.BusinessContext;
 import com.bcaas.core.resource.domain.model.Resource;
 import com.bcaas.core.resource.domain.model.ResourceContent;
-import com.bcaas.core.resource.domain.model.ResourceStatus;
+// import com.bcaas.core.resource.domain.model.ResourceStatus;
 import com.bcaas.core.resource.domain.model.ResourceType;
 import com.bcaas.core.shared.domain.ResourceId;
 import com.bcaas.core.shared.domain.TenantId;
