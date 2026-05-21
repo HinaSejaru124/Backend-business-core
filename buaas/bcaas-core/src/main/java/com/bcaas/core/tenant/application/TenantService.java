@@ -1,7 +1,7 @@
 package com.bcaas.core.tenant.application;
 
 import com.bcaas.core.context.domain.BusinessContext;
-import com.bcaas.core.shared.domain.ActorId;
+// import com.bcaas.core.shared.domain.ActorId;
 import com.bcaas.core.shared.domain.TenantId;
 import com.bcaas.core.tenant.domain.model.Tenant;
 import com.bcaas.core.tenant.domain.model.TenantPlan;

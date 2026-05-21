@@ -1,6 +1,6 @@
 package com.bcaas.core.infrastructure.persistence.resource;
 
-import com.bcaas.core.resource.domain.model.ResourceStatus;
+// import com.bcaas.core.resource.domain.model.ResourceStatus;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;

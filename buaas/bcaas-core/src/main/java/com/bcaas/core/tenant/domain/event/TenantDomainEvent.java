@@ -2,7 +2,7 @@ package com.bcaas.core.tenant.domain.event;
 
 import com.bcaas.core.shared.domain.TenantId;
 import java.time.Instant;
-import java.util.UUID;
+// import java.util.UUID;
 
 /**
  * Interface de base pour tous les événements domaine du Tenant.
