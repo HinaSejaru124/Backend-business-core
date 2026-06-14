@@ -1,0 +1,88 @@
+package com.yowyob.businesscore.adapter.in.security;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Sécurité réactive du Business Core (Barrière 1 + en-têtes + CORS).
+ *
+ * <p>Authentification par clé Business Core via un {@link AuthenticationWebFilter} (converter +
+ * manager) ; en succès, {@link BusinessContextWebFilter} propage le BusinessContext dans le Reactor
+ * Context. Routes publiques : santé, inscription, documentation OpenAPI. Tout le reste exige une clé.
+ */
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
+
+    private static final String[] ROUTES_PUBLIQUES = {
+            "/health",
+            "/actuator/health",
+            "/v1/registration",
+            "/swagger-ui.html",
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/webjars/**"
+    };
+
+    @Bean
+    public SecurityWebFilterChain securityWebFilterChain(
+            ServerHttpSecurity http,
+            ApiKeyAuthenticationConverter converter,
+            ApiKeyReactiveAuthenticationManager authenticationManager,
+            CorsConfigurationSource corsConfigurationSource,
+            ProblemAuthenticationEntryPoint authenticationEntryPoint,
+            ProblemAccessDeniedHandler accessDeniedHandler) {
+
+        AuthenticationWebFilter apiKeyFilter = new AuthenticationWebFilter(authenticationManager);
+        apiKeyFilter.setServerAuthenticationConverter(converter);
+
+        return http
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers(ROUTES_PUBLIQUES).permitAll()
+                        .anyExchange().authenticated())
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
+                .addFilterAt(apiKeyFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                .addFilterAfter(new BusinessContextWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+                .build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${businesscore.security.cors.allowed-origins:*}") String allowedOrigins) {
+        CorsConfiguration config = new CorsConfiguration();
+        List<String> origins = Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList();
+        config.setAllowedOriginPatterns(origins);
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Inclut tous les changelogs du dossier features/, triés par nom de fichier.
+      _socle.xml (préfixe '_') s'applique en premier : conventions, rôle applicatif, tables socle.
+      Chaque dev ajoute SON fichier feature ici (business-types.xml, offers-actors.xml, rules.xml,
+      operations.xml) et ne modifie JAMAIS un changelog existant.
+      errorIfMissingOrEmpty=false : tolère l'absence de fichiers features au démarrage du socle.
+    -->
+    <includeAll path="db/changelog/features/" errorIfMissingOrEmpty="false"/>
+
+</databaseChangeLog>

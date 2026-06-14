@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Socle (lead). Tables partagées + convention multi-tenant + RLS.
+      Préfixe d'IDs : socle-xxx. NE JAMAIS modifier ce fichier dans une feature ; ajouter le sien.
+    -->
+
+    <!-- developer_account : registre des développeurs. DÉFINIT le tenant, donc PAS de tenant_id ni de RLS. -->
+    <changeSet id="socle-001-developer-account" author="socle">
+        <createTable tableName="developer_account">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="bc_client_id" type="varchar(64)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="bc_api_key_hash" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="kernel_client_id" type="varchar(128)"/>
+            <column name="kernel_secret_encrypted" type="text"/>
+            <column name="plan" type="varchar(32)" defaultValue="FREE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="varchar(16)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- type_metier : coquille socle (Dev 2 enrichit le domaine/API). Tenant-owned -> tenant_id + RLS. -->
+    <changeSet id="socle-002-type-metier" author="socle">
+        <createTable tableName="type_metier">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="business_domain_id" type="uuid"/>
+            <column name="code" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="nom" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="statut" type="varchar(16)" defaultValue="BROUILLON">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="type_metier" columnNames="tenant_id,code"
+                             constraintName="uq_type_metier_tenant_code"/>
+    </changeSet>
+
+    <!-- version_type : versions immuables d'un type. Tenant-owned -> tenant_id + RLS. -->
+    <changeSet id="socle-003-version-type" author="socle">
+        <createTable tableName="version_type">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type_metier_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="numero" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="immuable" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="publiee_le" type="timestamptz"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="version_type" baseColumnNames="type_metier_id"
+                                 referencedTableName="type_metier" referencedColumnNames="id"
+                                 constraintName="fk_version_type_type_metier"/>
+        <addUniqueConstraint tableName="version_type" columnNames="type_metier_id,numero"
+                             constraintName="uq_version_type_type_numero"/>
+    </changeSet>
+
+    <!--
+      Barrière 3 — RLS sur les tables tenant-owned du socle.
+      ENABLE + FORCE (le propriétaire lui-même est soumis), policy USING (lecture/maj/suppression)
+      + WITH CHECK (empêche un INSERT cross-tenant).
+      NULLIF(current_setting('app.current_tenant', true), '') : le 2e argument 'true' évite l'erreur
+      si la variable n'est jamais posée (renvoie NULL) ; NULLIF(...,'') ramène aussi la chaîne vide à
+      NULL (set_config sur un GUC custom laisse '' plutôt que NULL). Résultat : fail closed dans tous
+      les cas (aucune ligne visible, aucun INSERT possible) tant que le contexte tenant n'est pas posé.
+      Snippet de référence : les features doivent reproduire ce bloc pour CHACUNE de leurs tables tenant.
+    -->
+    <changeSet id="socle-004-rls-type-metier" author="socle">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE type_metier ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE type_metier FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON type_metier
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON type_metier;
+                ALTER TABLE type_metier NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE type_metier DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="socle-005-rls-version-type" author="socle">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE version_type ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE version_type FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON version_type
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON version_type;
+                ALTER TABLE version_type NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE version_type DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

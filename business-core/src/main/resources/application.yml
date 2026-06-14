@@ -1,0 +1,89 @@
+spring:
+  application:
+    name: business-core
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  # Runtime réactif (non bloquant)
+  r2dbc:
+    url: ${BC_R2DBC_URL:r2dbc:postgresql://localhost:5432/businesscore}
+    username: ${BC_DB_APP_USER:bc_app}
+    password: ${BC_DB_APP_PASSWORD:bc_app}
+    pool:
+      initial-size: 5
+      max-size: 20
+
+  # Migrations au démarrage (JDBC, distinct du runtime R2DBC)
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    url: ${BC_JDBC_URL:jdbc:postgresql://localhost:5432/businesscore}
+    user: ${BC_DB_OWNER_USER:bc_owner}
+    password: ${BC_DB_OWNER_PASSWORD:bc_owner}
+
+  data:
+    redis:
+      host: ${BC_REDIS_HOST:localhost}
+      port: ${BC_REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${BC_KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: business-core
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+# Configuration propre au Business Core
+businesscore:
+  kernel:
+    base-url: ${BC_KERNEL_BASE_URL:http://kernel-core.yowyob.com}
+    timeout-ms: 5000
+    max-retries: 2
+  security:
+    # Clé maîtresse de chiffrement des secrets kernel (AES-256-GCM). Jamais en clair dans le repo.
+    encryption-key: ${BC_ENCRYPTION_KEY:}
+    cors:
+      allowed-origins: ${BC_CORS_ORIGINS:*}
+  events:
+    topic-prefix: business-core
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    com.yowyob.businesscore: ${BC_LOG_LEVEL:INFO}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+businesscore:
+  kernel:
+    base-url: ${BC_KERNEL_BASE_URL:http://localhost:8089}
+  security:
+    encryption-key: ${BC_ENCRYPTION_KEY:dev-only-insecure-key-change-me-32b}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  liquibase:
+    enabled: true
+businesscore:
+  kernel:
+    base-url: http://localhost:8089
+  security:
+    encryption-key: test-only-insecure-key-change-me-32
