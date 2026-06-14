@@ -30,5 +30,10 @@ gouvernance des accès.
 - La connaissance du kernel (URL, clés, traduction d'API) est **confinée à `adapter/out/kernel/`** ;
   le reste du projet l'ignore. Changer l'URL du kernel (mock WireMock en dev → kernel réel en prod) ne
   touche qu'une propriété.
+- **Modèle d'auth réel du kernel** (confirmé par la doc d'exploitation) : chaque appel `/api/**` porte
+  `X-Client-Id` + `X-Api-Key` (la ClientApplication), plus `Authorization: Bearer` sur les endpoints
+  protégés et `X-Organization-Id` pour les opérations d'entreprise. Deux identités côté Business Core :
+  une ClientApplication **plateforme** (`KERNEL_CLIENT_ID`/`KERNEL_CLIENT_SECRET`, pour provisionner) et
+  une ClientApplication **par développeur** (pour agir en son nom). Géré par `KernelClient`.
 - L'adapter **traduit** la richesse du domaine vers le kernel (ex. une offre STOCKABLE → produit avec
   gestion de stock ; une offre SUR_DEVIS → produit sans prix fixe).

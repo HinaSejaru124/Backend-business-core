@@ -26,6 +26,9 @@ façade hexagonale au-dessus du kernel RT-Comops.
 ### API
 - [Spécification OpenAPI](api/business-core-openapi.yaml) — l'API exposée (importable dans Swagger / Postman).
 
+### Exploitation
+- [Déploiement sur l'infra yowyob](deploiement.md) — GitLab CI, réseau `yowyob`, Traefik, variables.
+
 ## Démarrage rapide
 
 Voir le [README racine](../../README.md) pour lancer l'infrastructure et l'application en local.

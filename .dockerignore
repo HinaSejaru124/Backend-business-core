@@ -1,0 +1,12 @@
+# Réduire le contexte de build envoyé au démon Docker.
+.git/
+.github/
+**/target/
+**/docs/
+*.md
+**/.env
+**/.env.*
+!business-core/.env.example
+business-core/docker-compose.yml
+business-core/infra/
+.vscode/

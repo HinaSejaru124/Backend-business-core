@@ -1,0 +1,65 @@
+# ============================================================================
+#  .gitlab-ci.yml — build + déploiement auto du Business Core sur le serveur yowyob
+# ============================================================================
+#  Push sur `main` => build de l'image SUR le serveur (runner local, pas de registry)
+#  PUIS déploiement auto via SSH. La compilation se fait dans le Dockerfile : un échec
+#  de build bloque le déploiement.
+#
+#  Variables GitLab requises (Settings > CI/CD, idéalement au niveau GROUPE) :
+#    - SSH_KEY    : clé privée SSH de déploiement
+#    - HOST_ADDR  : 173.212.216.20
+#    - HOST_USER  : gi
+#  + un runner avec le tag `kernel-core`.
+#
+#  Le `.env` (secrets) est déposé MANUELLEMENT sur le serveur dans $DEPLOY_DIR.
+# ============================================================================
+
+stages:
+  - build
+  - deploy
+
+variables:
+  GIT_DEPTH: "0"
+  IMAGE: "business-core/backend"
+  DEPLOY_DIR: "/home/gi/business-core"
+  IMMUTABLE_TAG: "${CI_COMMIT_BRANCH}_${CI_COMMIT_SHORT_SHA}"
+
+# ── 1) BUILD : compile + construit l'image (la compilation Maven est dans le Dockerfile)
+Build-image:
+  stage: build
+  tags: [kernel-core]
+  image: docker:27
+  variables:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    DOCKER_BUILDKIT: "1"
+  script:
+    - docker build -t "$IMAGE:$IMMUTABLE_TAG" -t "$IMAGE:$CI_COMMIT_BRANCH" .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ── 2) DEPLOY : recopie le compose puis (re)lance le service avec l'image fraîche
+deploy:
+  stage: deploy
+  tags: [kernel-core]
+  image: alpine:latest
+  before_script:
+    - which ssh-agent || apk add --no-cache openssh
+    - eval $(ssh-agent -s)
+    - echo "$SSH_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan "$HOST_ADDR" >> ~/.ssh/known_hosts 2>/dev/null
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    # Le dépôt est la SOURCE DE VÉRITÉ : on recopie le compose à chaque déploiement.
+    - scp -o StrictHostKeyChecking=no docker-compose.prod.yml "${HOST_USER}@${HOST_ADDR}:${DEPLOY_DIR}/docker-compose.prod.yml"
+    - |
+      ssh "${HOST_USER}@${HOST_ADDR}" "
+        set -e
+        cd '${DEPLOY_DIR}'
+        export APP_IMAGE='$IMAGE:$IMMUTABLE_TAG'
+        docker compose -f docker-compose.prod.yml up -d
+        docker compose -f docker-compose.prod.yml ps
+        docker image prune -f
+      "
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

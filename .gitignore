@@ -1,0 +1,14 @@
+# Secrets — jamais commités (déposés manuellement sur le serveur)
+.env
+*.env
+!**/.env.example
+
+# Build
+target/
+*.class
+
+# Outils / éditeurs
+.idea/
+*.iml
+.vscode/
+*.log

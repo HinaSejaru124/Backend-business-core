@@ -1,7 +1,9 @@
 package com.yowyob.businesscore.adapter.out.kernel.clientapp;
 
+import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
 import com.yowyob.businesscore.domain.port.out.KernelClientCredentials;
 import com.yowyob.businesscore.domain.port.out.ProvisionnerAccesDev;
+import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -14,9 +16,12 @@ import java.util.UUID;
 
 /**
  * Implémentation socle de {@link ProvisionnerAccesDev}.
- * À l'inscription d'un développeur, crée une ClientApplication kernel dédiée (clientId + secret
- * générés par le Business Core) via POST /api/client-applications. Appelé hors contexte tenant
- * (l'inscription précède l'existence du tenant), donc sans JWT par tenant.
+ *
+ * <p>À l'inscription d'un développeur, crée une ClientApplication kernel dédiée via
+ * {@code POST /api/client-applications}. Cet appel est fait <b>avant</b> que le développeur n'ait de
+ * credentials kernel : il s'authentifie donc avec la <b>ClientApplication plateforme</b> du Business
+ * Core ({@code KERNEL_CLIENT_ID}/{@code KERNEL_CLIENT_SECRET}) via {@code X-Client-Id}/{@code X-Api-Key}.
+ * Il n'utilise pas le {@link KernelClient} (qui résout les credentials du développeur courant).
  */
 @Component
 public class ProvisionnerAccesDevAdapter implements ProvisionnerAccesDev {
@@ -24,9 +29,12 @@ public class ProvisionnerAccesDevAdapter implements ProvisionnerAccesDev {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final WebClient kernelWebClient;
+    private final KernelProperties kernelProperties;
 
-    public ProvisionnerAccesDevAdapter(@Qualifier("kernelWebClient") WebClient kernelWebClient) {
+    public ProvisionnerAccesDevAdapter(@Qualifier("kernelWebClient") WebClient kernelWebClient,
+                                       KernelProperties kernelProperties) {
         this.kernelWebClient = kernelWebClient;
+        this.kernelProperties = kernelProperties;
     }
 
     @Override
@@ -43,6 +51,7 @@ public class ProvisionnerAccesDevAdapter implements ProvisionnerAccesDev {
 
         return kernelWebClient.post()
                 .uri("/api/client-applications")
+                .headers(this::authentifierPlateforme)
                 .bodyValue(request)
                 .retrieve()
                 .toBodilessEntity()
@@ -53,9 +62,18 @@ public class ProvisionnerAccesDevAdapter implements ProvisionnerAccesDev {
     public Mono<KernelClientCredentials> roterSecret(String kernelClientId) {
         return kernelWebClient.post()
                 .uri("/api/client-applications/{id}/rotate-secret", kernelClientId)
+                .headers(this::authentifierPlateforme)
                 .retrieve()
                 .bodyToMono(Map.class)
                 .map(response -> new KernelClientCredentials(kernelClientId, extraireSecret(response)));
+    }
+
+    /** Authentifie l'appel avec la ClientApplication plateforme du Business Core (si configurée). */
+    private void authentifierPlateforme(org.springframework.http.HttpHeaders headers) {
+        if (kernelProperties.aDesCredentialsPlateforme()) {
+            headers.set(KernelClient.HEADER_CLIENT_ID, kernelProperties.clientId());
+            headers.set(KernelClient.HEADER_API_KEY, kernelProperties.clientSecret());
+        }
     }
 
     @SuppressWarnings("unchecked")

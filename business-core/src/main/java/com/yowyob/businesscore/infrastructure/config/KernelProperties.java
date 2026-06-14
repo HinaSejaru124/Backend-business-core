@@ -3,11 +3,25 @@ package com.yowyob.businesscore.infrastructure.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Configuration de l'accès au kernel RT-Comops. En dev/test, {@code baseUrl} pointe vers un mock
- * (WireMock) ; en prod, vers http://kernel-core.yowyob.com. Changer de cible = changer une propriété.
+ * Configuration de l'accès au kernel RT-Comops.
+ *
+ * <p>{@code baseUrl} : en dev/test, un mock (WireMock) ; en prod sur le réseau yowyob, l'hôte interne
+ * {@code http://kernel-core-kernel-layer-1:8080} (et non l'URL publique). Changer de cible = changer
+ * une propriété (variable d'env {@code KERNEL_BASE_URL}).
+ *
+ * <p>{@code clientId}/{@code clientSecret} : la <b>ClientApplication plateforme</b> du Business Core
+ * (variables {@code KERNEL_CLIENT_ID}/{@code KERNEL_CLIENT_SECRET}). Elle sert à provisionner les
+ * ClientApplications dédiées des développeurs ({@code POST /api/client-applications}) — appel qui
+ * exige lui-même une ClientApplication valide via {@code X-Client-Id}/{@code X-Api-Key}.
  */
 @ConfigurationProperties(prefix = "businesscore.kernel")
-public record KernelProperties(String baseUrl, long timeoutMs, int maxRetries) {
+public record KernelProperties(
+        String baseUrl,
+        long timeoutMs,
+        int maxRetries,
+        String clientId,
+        String clientSecret
+) {
 
     public KernelProperties {
         if (baseUrl == null || baseUrl.isBlank()) {
@@ -19,5 +33,11 @@ public record KernelProperties(String baseUrl, long timeoutMs, int maxRetries) {
         if (maxRetries < 0) {
             maxRetries = 0;
         }
+        clientId = clientId == null ? "" : clientId;
+        clientSecret = clientSecret == null ? "" : clientSecret;
+    }
+
+    public boolean aDesCredentialsPlateforme() {
+        return !clientId.isBlank() && !clientSecret.isBlank();
     }
 }
