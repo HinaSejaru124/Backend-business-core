@@ -1,0 +1,49 @@
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.0.xsd">
+
+    <changeSet id="rule-001" author="dev4">
+        <sql>
+            CREATE TABLE regle_metier (
+                id                         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                tenant_id                  UUID NOT NULL,
+                version_type_id            UUID,
+                entreprise_id              UUID,
+                declencheur                VARCHAR(100) NOT NULL,
+                condition                  TEXT NOT NULL,
+                effet                      VARCHAR(50)  NOT NULL,
+                roles_autorises_a_deroger  TEXT[]       NOT NULL DEFAULT '{}',
+                created_at                 TIMESTAMPTZ  NOT NULL DEFAULT now(),
+                updated_at                 TIMESTAMPTZ  NOT NULL DEFAULT now(),
+
+                CONSTRAINT ck_regle_appartenance CHECK (
+                    (version_type_id IS NOT NULL AND entreprise_id IS NULL)
+                    OR
+                    (version_type_id IS NULL AND entreprise_id IS NOT NULL)
+                )
+            );
+
+            CREATE INDEX idx_regle_declencheur_type
+                ON regle_metier (declencheur, version_type_id)
+                WHERE version_type_id IS NOT NULL;
+
+            CREATE INDEX idx_regle_declencheur_entreprise
+                ON regle_metier (declencheur, entreprise_id)
+                WHERE entreprise_id IS NOT NULL;
+        </sql>
+    </changeSet>
+
+    <changeSet id="rule-002" author="dev4">
+        <sql>
+            ALTER TABLE regle_metier ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE regle_metier FORCE ROW LEVEL SECURITY;
+
+            CREATE POLICY regle_metier_tenant_isolation
+                ON regle_metier
+                USING (tenant_id = current_setting('app.tenant_id')::UUID);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
