@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : business-types (Dev 2).
+      Préfixe des IDs : bt-xxx. NE JAMAIS modifier _socle.xml.
+      Tables ajoutées ici : parametre_config uniquement
+      (type_metier et version_type sont déjà dans _socle.xml).
+    -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         bt-001 — Table parametre_config
+         Paramètres de réglage à deux niveaux :
+           - niveau TYPE       : versionTypeId rempli,  entreprise_id null
+           - niveau ENTREPRISE : entreprise_id rempli, version_type_id null
+         Contrainte CHECK garantit l'exclusivité des deux FK (XOR).
+         Tenant-owned → tenant_id + RLS (copie exacte du snippet socle).
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="bt-001-parametre-config" author="dev2">
+        <createTable tableName="parametre_config">
+
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Isolation tenant (RLS) -->
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- FK niveau TYPE — null si niveau ENTREPRISE -->
+            <column name="version_type_id" type="uuid"/>
+
+            <!-- FK niveau ENTREPRISE — null si niveau TYPE -->
+            <column name="entreprise_id" type="uuid"/>
+
+            <!-- La clé du paramètre ex: "devise", "taux_tva", "remise_max" -->
+            <column name="cle" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- La valeur stockée toujours en texte -->
+            <column name="valeur" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- true = l'entreprise ne peut pas surcharger ce paramètre -->
+            <column name="verrouille" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+
+        </createTable>
+
+        <!-- FK vers version_type -->
+        <addForeignKeyConstraint
+                baseTableName="parametre_config"
+                baseColumnNames="version_type_id"
+                referencedTableName="version_type"
+                referencedColumnNames="id"
+                constraintName="fk_parametre_config_version_type"
+                onDelete="CASCADE"/>
+
+        <!-- Unicité : une seule valeur par clé par version -->
+        <addUniqueConstraint
+                tableName="parametre_config"
+                columnNames="version_type_id, cle"
+                constraintName="uq_parametre_config_version_cle"/>
+
+        <!-- Unicité : une seule surcharge par clé par entreprise -->
+        <addUniqueConstraint
+                tableName="parametre_config"
+                columnNames="entreprise_id, cle"
+                constraintName="uq_parametre_config_entreprise_cle"/>
+
+        <!-- Index pour les lectures fréquentes par tenant -->
+        <createIndex tableName="parametre_config"
+                     indexName="idx_parametre_config_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+
+        <!-- CHECK XOR : exactement un FK rempli (jamais les deux, jamais aucun) -->
+        <sql>
+            ALTER TABLE parametre_config
+            ADD CONSTRAINT chk_parametre_config_niveau
+            CHECK (
+                (version_type_id IS NOT NULL AND entreprise_id IS NULL)
+                OR
+                (version_type_id IS NULL AND entreprise_id IS NOT NULL)
+            );
+        </sql>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS parametre_config;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         bt-002 — RLS sur parametre_config
+         Copie exacte du snippet socle (Barrière 3).
+         Fail closed : aucune ligne visible tant que le contexte tenant
+         n'est pas posé via set_config('app.current_tenant', ...).
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="bt-002-rls-parametre-config" author="dev2">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE parametre_config ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE parametre_config FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON parametre_config
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON parametre_config;
+                ALTER TABLE parametre_config NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE parametre_config DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         bt-003 — Index sur version_type pour les lookups fréquents
+         (lectures par type_metier_id — use case listerParTypeMetier)
+         Ajout d'un index que le socle n'a pas créé.
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="bt-003-index-version-type" author="dev2">
+        <createIndex tableName="version_type"
+                     indexName="idx_version_type_type_metier_id">
+            <column name="type_metier_id"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="version_type"
+                       indexName="idx_version_type_type_metier_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

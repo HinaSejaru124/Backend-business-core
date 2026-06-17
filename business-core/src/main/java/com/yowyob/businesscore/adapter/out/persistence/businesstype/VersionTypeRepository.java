@@ -2,14 +2,12 @@ package com.yowyob.businesscore.adapter.out.persistence.businesstype;
 
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-/** Repository des versions de type (tenant-filtré par RLS). */
-public interface VersionTypeRepository extends ReactiveCrudRepository<VersionTypeEntity, UUID> {
+/** Repository des versions de type métier. RLS garantit l'isolation tenant. */
+public interface VersionTypeRepository
+        extends ReactiveCrudRepository<VersionTypeEntity, UUID> {
 
-    Flux<VersionTypeEntity> findByTypeMetierIdOrderByNumeroAsc(UUID typeMetierId);
-
-    Mono<VersionTypeEntity> findByTypeMetierIdAndNumero(UUID typeMetierId, int numero);
+    Flux<VersionTypeEntity> findAllByTypeMetierId(UUID typeMetierId);
 }
