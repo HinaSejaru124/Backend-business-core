@@ -6,6 +6,13 @@ import com.yowyob.businesscore.domain.shared.Effet;
 
 import java.util.UUID;
 
+/**
+ * Résultat enrichi d'une évaluation de règle.
+ *
+ * <p><b>Conservé volontairement pour le Niveau 2 (N2) — non utilisé au Niveau 1.</b> Le flux
+ * d'évaluation actuel retourne des {@code com.yowyob.businesscore.domain.port.internal.EffetAAppliquer}.
+ * Ce record préfigure un résultat d'évaluation plus riche (N2).
+ */
 public record ResultatEvaluation(
         UUID idRegle,
         Effet effet,

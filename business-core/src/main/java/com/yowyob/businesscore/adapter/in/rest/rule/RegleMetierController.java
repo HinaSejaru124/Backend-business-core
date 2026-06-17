@@ -23,6 +23,15 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import reactor.core.publisher.Mono;
 
+/**
+ * API REST de la brique Règles. Deux points d'entrée de création :
+ * <ul>
+ *   <li>règle de Type : {@code POST /v1/business-types/{typeId}/versions/{versionN}/rules} ;</li>
+ *   <li>règle locale : {@code POST /v1/businesses/{businessId}/rules}.</li>
+ * </ul>
+ * Le {@code BusinessContext} (donc le tenant) est injecté par le socle ; le corps est validé
+ * ({@code @Valid}) avant d'atteindre le use case.
+ */
 @RestController
 @RequestMapping("/v1")
 public class RegleMetierController {
@@ -42,8 +51,10 @@ public class RegleMetierController {
             @Valid @RequestBody CreerRegleRequest body,
             BusinessContext ctx) {
 
+        // L'URL est la source de vérité : la version cible est résolue depuis typeId + versionN.
         return creerRegle.creerRegleDeType(
-                body.versionTypeId(),
+                typeId,
+                versionN,
                 body.declencheur(),
                 body.condition(),
                 body.effet(),
@@ -72,8 +83,11 @@ public class RegleMetierController {
 
     // --- DTOs ---
 
+    /**
+     * Corps aligné sur le schéma OpenAPI {@code CreateRule} : pas d'identifiant de version
+     * (la version cible provient de l'URL). {@code declencheur} et {@code effet} obligatoires.
+     */
     public record CreerRegleRequest(
-            @NotNull  UUID        versionTypeId,
             @NotNull  Declencheur declencheur,
             @NotBlank String      condition,      // ex. "CATEGORIE_EGALE:valeur=medicament"
             @NotNull  Effet       effet,
@@ -85,7 +99,8 @@ public class RegleMetierController {
             String       declencheur,
             String       condition,
             String       effet,
-            List<String> rolesAutorisesADeroger
+            List<String> rolesAutorisesADeroger,
+            String       portee          // TYPE | ENTREPRISE (cf. schéma OpenAPI Rule)
     ) {
         public static RegleMetierResponse de(RegleMetier r) {
             return new RegleMetierResponse(
@@ -93,7 +108,8 @@ public class RegleMetierController {
                     r.getDeclencheur().name(),
                     r.getCondition(),
                     r.getEffet().name(),
-                    r.getRolesAutorisesADeroger()
+                    r.getRolesAutorisesADeroger(),
+                    r.estDeType() ? "TYPE" : "ENTREPRISE"
             );
         }
     }

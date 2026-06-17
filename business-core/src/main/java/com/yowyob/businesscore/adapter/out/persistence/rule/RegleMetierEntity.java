@@ -9,6 +9,14 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Projection R2DBC de la table {@code regle_metier}.
+ *
+ * <p>{@code declencheur} et {@code effet} sont stockés sous forme de chaîne (le nom de l'enum) ;
+ * {@code condition} est la condition N1 brute (« TYPE:param=val ») ; {@code rolesAutorisesADeroger}
+ * est mappé sur une colonne PostgreSQL {@code text[]}. La table porte une colonne {@code tenant_id}
+ * soumise à la Row-Level Security (isolation par tenant).
+ */
 @Table("regle_metier")
 public class RegleMetierEntity {
 

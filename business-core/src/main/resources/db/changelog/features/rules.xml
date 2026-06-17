@@ -35,15 +35,29 @@
         </sql>
     </changeSet>
 
+    <!--
+      Barrière 3 — RLS sur regle_metier (table tenant-owned). DOIT reproduire la convention du socle
+      (cf. _socle.xml) : ENABLE + FORCE, policy USING (lecture/maj/suppression) + WITH CHECK (bloque
+      l'INSERT cross-tenant). La variable de session est 'app.current_tenant', posée par
+      TenantConnectionPoolFactory — et NON 'app.tenant_id'. NULLIF(current_setting('app.current_tenant',
+      true), '') : le 2e argument 'true' évite l'erreur si la variable n'est jamais posée (renvoie NULL),
+      et NULLIF(...,'') ramène la chaîne vide à NULL -> fail closed (aucune ligne, aucun INSERT) hors contexte.
+    -->
     <changeSet id="rule-002" author="dev4">
-        <sql>
+        <sql splitStatements="true" endDelimiter=";">
             ALTER TABLE regle_metier ENABLE ROW LEVEL SECURITY;
             ALTER TABLE regle_metier FORCE ROW LEVEL SECURITY;
-
-            CREATE POLICY regle_metier_tenant_isolation
-                ON regle_metier
-                USING (tenant_id = current_setting('app.tenant_id')::UUID);
+            CREATE POLICY regle_metier_tenant_isolation ON regle_metier
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
         </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS regle_metier_tenant_isolation ON regle_metier;
+                ALTER TABLE regle_metier NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE regle_metier DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
     </changeSet>
 
 </databaseChangeLog>

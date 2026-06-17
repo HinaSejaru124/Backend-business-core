@@ -10,6 +10,14 @@ import reactor.core.publisher.Flux;
 
 import java.util.UUID;
 
+/**
+ * Adapter de persistance implémentant le port socle {@link RegistreDeRegles}.
+ *
+ * <p>Pour un déclencheur donné, fusionne deux ensembles de règles applicables :
+ * les règles <b>de Type</b> (toutes celles du tenant courant, isolées par la RLS) et les règles
+ * <b>locales</b> de l'entreprise ciblée si un {@code entrepriseId} est fourni. Le résultat est projeté
+ * en {@link RegleChargee}, vue minimale et stable consommée par l'évaluateur.
+ */
 @Component
 public class RegistreDeReglesAdapter implements RegistreDeRegles {
 

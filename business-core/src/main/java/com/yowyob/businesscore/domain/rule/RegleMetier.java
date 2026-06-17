@@ -7,6 +7,18 @@ import java.util.UUID;
 import com.yowyob.businesscore.domain.shared.Declencheur;
 import com.yowyob.businesscore.domain.shared.Effet;
 
+/**
+ * Règle métier (modèle de domaine pur, sans dépendance technique).
+ *
+ * <p>Invariant de portée : une règle est <b>soit</b> une règle de Type (rattachée à un
+ * {@code versionTypeId}, héritée par toutes les entreprises de ce type), <b>soit</b> une règle locale
+ * (rattachée à un {@code entrepriseId}) — jamais les deux, jamais aucune. Le constructeur garantit cet
+ * « ou exclusif » (reflété en base par la contrainte CHECK {@code ck_regle_appartenance}).
+ *
+ * <p>La {@code condition} est encodée en format Niveau 1 : {@code "TYPE:param=val[,param=val]"}
+ * (interprété par {@code EvaluateurConditionN1}). {@code rolesAutorisesADeroger} liste les rôles
+ * habilités à lever un effet {@link Effet#DEROGER} (liste vide = personne).
+ */
 public class RegleMetier {
 
     private final UUID id;

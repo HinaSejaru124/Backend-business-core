@@ -14,6 +14,21 @@ import com.yowyob.businesscore.domain.port.out.RegleChargee;
 
 import reactor.core.publisher.Mono;
 
+/**
+ * Applique les effets produits par l'évaluateur de règles à un point d'ancrage donné.
+ *
+ * <p>Aiguillage par famille d'effet (cf. {@link com.yowyob.businesscore.domain.shared.Effet}) :
+ * <ul>
+ *   <li><b>Bloquants</b> (BLOQUER / EXIGER / VALIDER) : le premier rencontré lève une
+ *       {@link ProblemException} et court-circuite tout le reste — la requête métier n'aboutit pas.</li>
+ *   <li><b>Mutateur</b> (AJUSTER) : jamais silencieux, systématiquement tracé via l'audit.</li>
+ *   <li><b>Traçants</b> (ALERTER / DEROGER) : effets de bord (événement, audit) sans interrompre,
+ *       sauf si la dérogation n'est pas autorisée pour l'acteur courant.</li>
+ * </ul>
+ *
+ * <p>Conçu pour être invoqué par la brique Opérations (Dev 5) après l'évaluation des règles ;
+ * il n'est volontairement branché à aucun endpoint dans la brique Règles.
+ */
 @Component
 public class GestionnaireEffets {
 
@@ -101,6 +116,15 @@ public class GestionnaireEffets {
                 java.util.Map.of("regleId", e.regleId().toString(), "message", e.message()));
     }
 
+    /**
+     * Cascade de la dérogation, du plus restrictif au plus permissif :
+     * <ol>
+     *   <li>aucun rôle autorisé sur la règle → équivaut à BLOQUER ;</li>
+     *   <li>l'acteur courant n'a aucun des rôles autorisés → retombe sur VALIDER (approbation) ;</li>
+     *   <li>acteur autorisé mais motif absent → on exige le motif ;</li>
+     *   <li>acteur autorisé + motif fourni → dérogation acceptée et archivée dans l'audit.</li>
+     * </ol>
+     */
     private Mono<Void> appliquerDeroger(
             EffetAAppliquer e, BusinessContext ctx, RegleChargee regle) {
 

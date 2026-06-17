@@ -29,9 +29,14 @@ public class EvaluateurDeRegleN1 implements EvaluateurDeRegle {
         this.evaluateurCondition = evaluateurCondition;
     }
 
+    /**
+     * Pipeline réactif en trois temps : <b>charger</b> les règles du déclencheur (Type + locales),
+     * <b>filtrer</b> celles dont la condition N1 est satisfaite par le contexte, puis <b>convertir</b>
+     * chaque règle retenue en effet à appliquer. Une règle non satisfaite ne produit aucun effet.
+     */
     @Override
     public Flux<EffetAAppliquer> evaluer(Declencheur declencheur, ContexteEvaluation contexte) {
-        // entrepriseId est dans les valeurs du contexte si fourni
+        // entrepriseId facultatif : transmis dans les valeurs du contexte, accepté en UUID ou en String.
         Object entrepriseIdObj = contexte.get("entrepriseId");
         java.util.UUID entrepriseId = entrepriseIdObj instanceof java.util.UUID u ? u
                 : entrepriseIdObj != null ? java.util.UUID.fromString(entrepriseIdObj.toString())

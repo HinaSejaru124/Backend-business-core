@@ -7,6 +7,12 @@ import java.util.UUID;
 /**
  * Les valeurs passées PAR la couche application à l'évaluateur.
  * La règle ne va jamais chercher des données elle-même.
+ *
+ * <p><b>Conservé volontairement pour le Niveau 2 (N2) — non utilisé au Niveau 1.</b> Le contrat
+ * réellement consommé aujourd'hui par les évaluateurs est le port homonyme
+ * {@code com.yowyob.businesscore.domain.port.internal.ContexteEvaluation} (simple porteur de
+ * {@code Map<String,Object>}). Ce record, plus structuré, préfigure l'évaluation N2 ; ne pas le
+ * confondre avec le port.
  */
 public record ContexteEvaluation(
     UUID tenantId,
