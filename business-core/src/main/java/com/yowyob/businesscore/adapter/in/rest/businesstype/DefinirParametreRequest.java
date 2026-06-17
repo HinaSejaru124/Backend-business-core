@@ -2,7 +2,7 @@ package com.yowyob.businesscore.adapter.in.rest.businesstype;
 
 import jakarta.validation.constraints.NotBlank;
 
-/** Corps de POST /v1/business-types/{typeId}/versions/{versionId}/config */
+/** Corps de POST /v1/business-types/{typeId}/versions/{versionNumber}/config */
 public record DefinirParametreRequest(
         @NotBlank(message = "cle est obligatoire")   String cle,
         @NotBlank(message = "valeur est obligatoire") String valeur,

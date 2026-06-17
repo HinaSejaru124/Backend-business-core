@@ -1,6 +1,5 @@
 package com.yowyob.businesscore.adapter.out.persistence.businesstype;
 
-import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.businesstype.TypeMetier;
 import com.yowyob.businesscore.domain.port.out.PersisterTypeMetier;
 import com.yowyob.businesscore.domain.shared.StatutType;
@@ -26,8 +25,14 @@ public class TypeMetierPersistenceAdapter implements PersisterTypeMetier {
 
     @Override
     public Mono<TypeMetier> sauvegarder(TypeMetier type) {
-        TypeMetierEntity entity = versEntity(type);
-        return repository.save(entity).map(this::versDomaine);
+        // INSERT pour une création, UPDATE pour une transition (publier/archiver) :
+        // on recharge la ligne existante (isNew()=false → UPDATE) et on préserve created_at
+        // (colonne NOT NULL absente du modèle de domaine). Absente → fabrique d'insertion.
+        return repository.findById(type.id())
+                .map(existant -> appliquer(existant, type))
+                .switchIfEmpty(Mono.fromSupplier(() -> versEntityNouveau(type)))
+                .flatMap(repository::save)
+                .map(this::versDomaine);
     }
 
     @Override
@@ -53,8 +58,9 @@ public class TypeMetierPersistenceAdapter implements PersisterTypeMetier {
 
     // ─── Mapping domaine ↔ entity ─────────────────────────────────────────
 
-    private TypeMetierEntity versEntity(TypeMetier type) {
-        TypeMetierEntity e = TypeMetierEntity.nouveau(
+    /** Nouvelle ligne (isNew()=true → INSERT). */
+    private TypeMetierEntity versEntityNouveau(TypeMetier type) {
+        return TypeMetierEntity.nouveau(
                 type.id(),
                 type.tenantId(),
                 type.businessDomainId(),
@@ -62,6 +68,14 @@ public class TypeMetierPersistenceAdapter implements PersisterTypeMetier {
                 type.nom(),
                 type.statut().name()
         );
+    }
+
+    /** Applique les champs modifiables du domaine sur une ligne existante (isNew()=false → UPDATE). */
+    private TypeMetierEntity appliquer(TypeMetierEntity e, TypeMetier type) {
+        e.setBusinessDomainId(type.businessDomainId());
+        e.setCode(type.code());
+        e.setNom(type.nom());
+        e.setStatut(type.statut().name());
         return e;
     }
 

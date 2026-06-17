@@ -66,7 +66,7 @@ public record VersionType(
     public VersionType publier(Instant maintenant) {
         if (this.immuable) {
             throw ProblemException.conflict(
-                "La version " + this.numero + " est déjà publiée et immuable."
+                "La version " + this.numero + " est déjà publiée et immuable (RG-03)."
             ).violatedRule("RG-03");
         }
         return new VersionType(

@@ -15,6 +15,9 @@ public interface PersisterVersionType {
 
     Mono<VersionType> trouverParId(UUID id);
 
+    /** Résout une version par (type, numéro) — adressage REST par numéro de version. */
+    Mono<VersionType> trouverParTypeEtNumero(UUID typeMetierId, int numero);
+
     Flux<VersionType> listerParTypeMetier(UUID typeMetierId);
 
     /** Retourne le numéro de la dernière version, 0 si aucune version. */

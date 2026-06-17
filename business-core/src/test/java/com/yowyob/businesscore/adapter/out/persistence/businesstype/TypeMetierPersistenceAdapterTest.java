@@ -101,4 +101,23 @@ class TypeMetierPersistenceAdapterTest {
         )
         .verifyComplete();
     }
+
+    @Test
+    @DisplayName("sauvegarder deux fois le même type doit faire un UPDATE (publier après création), pas un doublon")
+    void sauvegarder_deux_fois_fait_un_update() {
+        TypeMetier brouillon = TypeMetier.creer(TENANT, "NOTAIRE", "Office notarial", null);
+
+        StepVerifier.create(
+                // 1) INSERT du BROUILLON, 2) rechargement, 3) transition PUBLIE, 4) re-save (UPDATE même id)
+                adapter.sauvegarder(brouillon)
+                       .flatMap(saved -> adapter.trouverParId(saved.id()))
+                       .flatMap(recharge -> adapter.sauvegarder(recharge.publier()))
+                       .flatMap(maj -> adapter.trouverParId(maj.id()))
+        )
+        .assertNext(found -> {
+            assertThat(found.id()).isEqualTo(brouillon.id());
+            assertThat(found.statut()).isEqualTo(StatutType.PUBLIE);
+        })
+        .verifyComplete();
+    }
 }

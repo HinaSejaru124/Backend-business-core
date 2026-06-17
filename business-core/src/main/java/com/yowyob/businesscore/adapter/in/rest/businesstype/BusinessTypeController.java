@@ -1,6 +1,5 @@
 package com.yowyob.businesscore.adapter.in.rest.businesstype;
 
-import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.usecase.businesstype.TypeMetierService;
 import com.yowyob.businesscore.application.usecase.businesstype.VersionTypeService;
@@ -27,10 +26,10 @@ import java.util.UUID;
  *   POST   /v1/business-types/{typeId}/archive              → archiver un type
  *   POST   /v1/business-types/{typeId}/versions             → créer une version
  *   GET    /v1/business-types/{typeId}/versions             → lister les versions
- *   GET    /v1/business-types/{typeId}/versions/{versionId} → voir une version
- *   POST   /v1/business-types/{typeId}/versions/{versionId}/publish → publier une version
- *   POST   /v1/business-types/{typeId}/versions/{versionId}/config  → définir un paramètre
- *   GET    /v1/business-types/{typeId}/versions/{versionId}/config  → lister les paramètres
+ *   GET    /v1/business-types/{typeId}/versions/{versionNumber} → voir une version
+ *   POST   /v1/business-types/{typeId}/versions/{versionNumber}/publish → publier une version
+ *   POST   /v1/business-types/{typeId}/versions/{versionNumber}/config  → définir un paramètre
+ *   GET    /v1/business-types/{typeId}/versions/{versionNumber}/config  → lister les paramètres
  */
 @RestController
 @RequestMapping("/v1/business-types")
@@ -119,21 +118,21 @@ public class BusinessTypeController {
                 .map(VersionTypeResponse::depuis);
     }
 
-    /** GET /v1/business-types/{typeId}/versions/{versionId} — Voir une version */
-    @GetMapping("/{typeId}/versions/{versionId}")
+    /** GET /v1/business-types/{typeId}/versions/{versionNumber} — Voir une version */
+    @GetMapping("/{typeId}/versions/{versionNumber}")
     public Mono<VersionTypeResponse> trouverVersion(@PathVariable UUID typeId,
-                                                    @PathVariable UUID versionId) {
+                                                    @PathVariable int versionNumber) {
         return BusinessContextHolder.currentContext()
-                .flatMap(ctx -> versionService.trouverParId(versionId, ctx))
+                .flatMap(ctx -> versionService.trouverParNumero(typeId, versionNumber, ctx))
                 .map(VersionTypeResponse::depuis);
     }
 
-    /** POST /v1/business-types/{typeId}/versions/{versionId}/publish — Publier une version */
-    @PostMapping("/{typeId}/versions/{versionId}/publish")
+    /** POST /v1/business-types/{typeId}/versions/{versionNumber}/publish — Publier une version */
+    @PostMapping("/{typeId}/versions/{versionNumber}/publish")
     public Mono<VersionTypeResponse> publierVersion(@PathVariable UUID typeId,
-                                                    @PathVariable UUID versionId) {
+                                                    @PathVariable int versionNumber) {
         return BusinessContextHolder.currentContext()
-                .flatMap(ctx -> versionService.publierVersion(typeId, versionId, ctx))
+                .flatMap(ctx -> versionService.publierVersion(typeId, versionNumber, ctx))
                 .map(VersionTypeResponse::depuis);
     }
 
@@ -141,24 +140,27 @@ public class BusinessTypeController {
     // Configuration
     // ══════════════════════════════════════════════════════════════════════
 
-    /** POST /v1/business-types/{typeId}/versions/{versionId}/config — Définir un paramètre */
-    @PostMapping("/{typeId}/versions/{versionId}/config")
+    /** POST /v1/business-types/{typeId}/versions/{versionNumber}/config — Définir un paramètre */
+    @PostMapping("/{typeId}/versions/{versionNumber}/config")
     @ResponseStatus(HttpStatus.CREATED)
-    public Mono<String> definirParametre(@PathVariable UUID typeId,
-                                         @PathVariable UUID versionId,
-                                         @Valid @RequestBody DefinirParametreRequest req) {
+    public Mono<ParametreConfigResponse> definirParametre(@PathVariable UUID typeId,
+                                                          @PathVariable int versionNumber,
+                                                          @Valid @RequestBody DefinirParametreRequest req) {
+        // Résolution numéro → version (revérifie aussi l'appartenance au tenant) avant d'écrire le paramètre.
         return BusinessContextHolder.currentContext()
-                .flatMap(ctx -> configService.definirPourType(
-                        versionId, req.cle(), req.valeur(), req.verrouille(), ctx))
-                .map(p -> "Paramètre '" + p.cle() + "' défini → " + p.libelle());
+                .flatMap(ctx -> versionService.trouverParNumero(typeId, versionNumber, ctx)
+                        .flatMap(v -> configService.definirPourType(
+                                v.id(), req.cle(), req.valeur(), req.verrouille(), ctx)))
+                .map(ParametreConfigResponse::depuis);
     }
 
-    /** GET /v1/business-types/{typeId}/versions/{versionId}/config — Lister les paramètres */
-    @GetMapping("/{typeId}/versions/{versionId}/config")
-    public Flux<String> listerParametres(@PathVariable UUID typeId,
-                                          @PathVariable UUID versionId) {
-        return configService.listerParVersion(versionId)
-                .map(p -> p.cle() + "=" + p.valeur()
-                        + (p.verrouille() ? " [verrouillé]" : ""));
+    /** GET /v1/business-types/{typeId}/versions/{versionNumber}/config — Lister les paramètres */
+    @GetMapping("/{typeId}/versions/{versionNumber}/config")
+    public Flux<ParametreConfigResponse> listerParametres(@PathVariable UUID typeId,
+                                                          @PathVariable int versionNumber) {
+        return BusinessContextHolder.currentContext()
+                .flatMapMany(ctx -> versionService.trouverParNumero(typeId, versionNumber, ctx)
+                        .flatMapMany(v -> configService.listerParVersion(v.id())))
+                .map(ParametreConfigResponse::depuis);
     }
 }

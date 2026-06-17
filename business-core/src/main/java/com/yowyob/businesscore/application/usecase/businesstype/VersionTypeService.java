@@ -6,9 +6,11 @@ import com.yowyob.businesscore.domain.businesstype.VersionType;
 import com.yowyob.businesscore.domain.port.internal.HorlogeSysteme;
 import com.yowyob.businesscore.domain.port.out.PersisterTypeMetier;
 import com.yowyob.businesscore.domain.port.out.PersisterVersionType;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import java.util.UUID;
 
@@ -50,16 +52,22 @@ public class VersionTypeService {
                     // Vérifier appartenance et statut
                     type.verifierAppartenance(ctx.tenantId());
                     type.verifierPeutVersionner();
-
-                    // Calculer le prochain numéro
-                    return depotVersion.dernierNumero(typeId)
-                            .map(dernierNum -> dernierNum + 1)
-                            .flatMap(prochaineNum -> {
-                                VersionType version = VersionType.creer(
-                                        typeId, ctx.tenantId(), prochaineNum);
-                                return depotVersion.sauvegarder(version);
-                            });
+                    return creerProchaineVersion(typeId, ctx.tenantId());
                 });
+    }
+
+    /**
+     * Calcule le prochain numéro (dernier + 1) puis persiste. Si deux créations concurrentes
+     * tombent sur le même numéro, la contrainte unique (type, numéro) rejette l'une d'elles
+     * ({@link DataIntegrityViolationException}) : on recalcule et on réessaie (jusqu'à 3 fois).
+     */
+    private Mono<VersionType> creerProchaineVersion(UUID typeId, UUID tenantId) {
+        return depotVersion.dernierNumero(typeId)
+                .map(dernierNum -> dernierNum + 1)
+                .flatMap(prochaineNum -> depotVersion.sauvegarder(
+                        VersionType.creer(typeId, tenantId, prochaineNum)))
+                .retryWhen(Retry.max(3)
+                        .filter(e -> e instanceof DataIntegrityViolationException));
     }
 
     // ─── Publier une version ──────────────────────────────────────────────
@@ -68,17 +76,17 @@ public class VersionTypeService {
      * Publie une version : la rend immuable et l'horodate.
      * Après cette opération, RG-03 s'applique — aucune modification possible.
      */
-    public Mono<VersionType> publierVersion(UUID typeId, UUID versionId,
+    public Mono<VersionType> publierVersion(UUID typeId, int numero,
                                             BusinessContext ctx) {
         return depotType.trouverParId(typeId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                     "Type Métier introuvable : " + typeId)))
                 .flatMap(type -> {
                     type.verifierAppartenance(ctx.tenantId());
-                    return depotVersion.trouverParId(versionId);
+                    return depotVersion.trouverParTypeEtNumero(typeId, numero);
                 })
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                    "Version introuvable : " + versionId)))
+                    "Version " + numero + " introuvable pour le type " + typeId)))
                 .flatMap(version -> {
                     version.verifierAppartenance(ctx.tenantId());
                     // Appliquer la transition — lance erreur si déjà immuable
@@ -103,6 +111,14 @@ public class VersionTypeService {
         return depotVersion.trouverParId(versionId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                     "Version introuvable : " + versionId)))
+                .doOnNext(v -> v.verifierAppartenance(ctx.tenantId()));
+    }
+
+    /** Récupère une version par (type, numéro) — adressage REST par numéro. */
+    public Mono<VersionType> trouverParNumero(UUID typeId, int numero, BusinessContext ctx) {
+        return depotVersion.trouverParTypeEtNumero(typeId, numero)
+                .switchIfEmpty(Mono.error(ProblemException.notFound(
+                    "Version " + numero + " introuvable pour le type " + typeId)))
                 .doOnNext(v -> v.verifierAppartenance(ctx.tenantId()));
     }
 }
