@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : entreprise (version minimale fournie par Dev 5 pour faire fonctionner les Opérations).
+      Périmètre Dev 3 — destinée à être complétée/fusionnée avec offers-actors. Préfixe d'IDs : ent-xxx.
+      NE JAMAIS modifier _socle.xml. Table tenant-owned -> tenant_id + RLS (copie exacte du snippet socle).
+    -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         ent-001 — Table entreprise (instance d'un Type Métier, version épinglée)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="ent-001-entreprise" author="dev5">
+        <createTable tableName="entreprise">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Isolation tenant (RLS) -->
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="type_metier_id" type="uuid"/>
+
+            <!-- Version de Type sur laquelle l'entreprise est épinglée -->
+            <column name="version_type_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="numero_version" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Référence Organization kernel (optionnelle au stade minimal) -->
+            <column name="organization_id" type="uuid"/>
+
+            <column name="nom" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="cycle_vie" type="varchar(16)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="entreprise"
+                baseColumnNames="version_type_id"
+                referencedTableName="version_type"
+                referencedColumnNames="id"
+                constraintName="fk_entreprise_version_type"/>
+
+        <createIndex tableName="entreprise" indexName="idx_entreprise_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS entreprise;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         ent-002 — RLS sur entreprise (Barrière 3, copie exacte du snippet socle)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="ent-002-rls-entreprise" author="dev5">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE entreprise ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE entreprise FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON entreprise
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON entreprise;
+                ALTER TABLE entreprise NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE entreprise DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
