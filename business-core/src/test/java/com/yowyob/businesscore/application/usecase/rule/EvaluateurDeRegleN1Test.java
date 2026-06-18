@@ -44,7 +44,7 @@ class EvaluateurDeRegleN1Test {
 
     @Test
     void effet_BLOQUER_condition_toujours_vrai() {
-        when(registre.chargerPourDeclencheur(any(), any()))
+        when(registre.chargerPourDeclencheur(any(), any(), any()))
                 .thenReturn(Flux.just(regle(Effet.BLOQUER, "TOUJOURS_VRAI")));
 
         StepVerifier.create(evaluateur.evaluer(Declencheur.AVANT_VENTE, ctx(Map.of())))
@@ -54,7 +54,7 @@ class EvaluateurDeRegleN1Test {
 
     @Test
     void effet_EXIGER_condition_categorie_egale_satisfaite() {
-        when(registre.chargerPourDeclencheur(any(), any()))
+        when(registre.chargerPourDeclencheur(any(), any(), any()))
                 .thenReturn(Flux.just(regle(Effet.EXIGER,
                         "CATEGORIE_EGALE:valeur=medicament_prescription")));
 
@@ -66,7 +66,7 @@ class EvaluateurDeRegleN1Test {
 
     @Test
     void condition_non_satisfaite_ne_produit_aucun_effet() {
-        when(registre.chargerPourDeclencheur(any(), any()))
+        when(registre.chargerPourDeclencheur(any(), any(), any()))
                 .thenReturn(Flux.just(regle(Effet.BLOQUER, "MONTANT_SUPERIEUR:seuil=1000")));
 
         // montant 500 < seuil 1000 → condition non satisfaite → Flux vide
@@ -77,7 +77,7 @@ class EvaluateurDeRegleN1Test {
 
     @Test
     void effet_ALERTER_passe_sans_bloquer() {
-        when(registre.chargerPourDeclencheur(any(), any()))
+        when(registre.chargerPourDeclencheur(any(), any(), any()))
                 .thenReturn(Flux.just(regle(Effet.ALERTER, "TOUJOURS_VRAI")));
 
         StepVerifier.create(evaluateur.evaluer(Declencheur.AVANT_VENTE, ctx(Map.of())))
@@ -87,7 +87,7 @@ class EvaluateurDeRegleN1Test {
 
     @Test
     void effet_VALIDER_condition_satisfaite() {
-        when(registre.chargerPourDeclencheur(any(), any()))
+        when(registre.chargerPourDeclencheur(any(), any(), any()))
                 .thenReturn(Flux.just(regle(Effet.VALIDER, "TOUJOURS_VRAI")));
 
         StepVerifier.create(evaluateur.evaluer(Declencheur.AVANT_VENTE, ctx(Map.of())))
@@ -108,7 +108,7 @@ class EvaluateurDeRegleN1Test {
 
     @Test
     void effet_AJUSTER_details_contiennent_ancienne_valeur() {
-        when(registre.chargerPourDeclencheur(any(), any()))
+        when(registre.chargerPourDeclencheur(any(), any(), any()))
                 .thenReturn(Flux.just(regle(Effet.AJUSTER, "TOUJOURS_VRAI")));
 
         StepVerifier.create(evaluateur.evaluer(Declencheur.AVANT_VENTE,
@@ -125,7 +125,7 @@ class EvaluateurDeRegleN1Test {
         RegleChargee regleSatisfaite = regle(Effet.ALERTER, "TOUJOURS_VRAI");
         RegleChargee regleNonSatisfaite = regle(Effet.BLOQUER, "MONTANT_SUPERIEUR:seuil=9999");
 
-        when(registre.chargerPourDeclencheur(any(), any()))
+        when(registre.chargerPourDeclencheur(any(), any(), any()))
                 .thenReturn(Flux.just(regleSatisfaite, regleNonSatisfaite));
 
         // montant 100 < 9999 → seule ALERTER passe

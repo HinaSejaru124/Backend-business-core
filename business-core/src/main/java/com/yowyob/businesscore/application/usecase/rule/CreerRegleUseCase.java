@@ -12,6 +12,7 @@ import com.yowyob.businesscore.adapter.out.persistence.rule.RegleMetierEntity;
 import com.yowyob.businesscore.adapter.out.persistence.rule.RegleMetierRepository;
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.error.ProblemException;
+import com.yowyob.businesscore.domain.enterprise.spi.LireEntreprise;
 import com.yowyob.businesscore.domain.rule.RegleMetier;
 import com.yowyob.businesscore.domain.shared.Declencheur;
 import com.yowyob.businesscore.domain.shared.Effet;
@@ -30,10 +31,13 @@ public class CreerRegleUseCase {
 
     private final RegleMetierRepository repo;
     private final VersionTypeRepository versionTypeRepo;
+    private final LireEntreprise lireEntreprise;
 
-    public CreerRegleUseCase(RegleMetierRepository repo, VersionTypeRepository versionTypeRepo) {
+    public CreerRegleUseCase(RegleMetierRepository repo, VersionTypeRepository versionTypeRepo,
+                             LireEntreprise lireEntreprise) {
         this.repo = repo;
         this.versionTypeRepo = versionTypeRepo;
+        this.lireEntreprise = lireEntreprise;
     }
 
     /**
@@ -76,13 +80,17 @@ public class CreerRegleUseCase {
 
         UUID tenantId = ctx.tenantId();
 
-        RegleMetier regle = new RegleMetier(
-                UUID.randomUUID(), tenantId,
-                null, entrepriseId,
-                declencheur, condition,
-                effet, rolesAutorisesADeroger);
-
-        return sauvegarder(regle);
+        return lireEntreprise.parId(entrepriseId)
+                .switchIfEmpty(Mono.error(ProblemException.notFound(
+                        "Entreprise introuvable : " + entrepriseId)))
+                .flatMap(entreprise -> {
+                    RegleMetier regle = new RegleMetier(
+                            UUID.randomUUID(), tenantId,
+                            null, entrepriseId,
+                            declencheur, condition,
+                            effet, rolesAutorisesADeroger);
+                    return sauvegarder(regle);
+                });
     }
 
     private Mono<RegleMetier> sauvegarder(RegleMetier regle) {

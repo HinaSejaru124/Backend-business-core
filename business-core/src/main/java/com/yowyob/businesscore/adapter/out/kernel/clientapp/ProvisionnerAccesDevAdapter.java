@@ -76,7 +76,7 @@ public class ProvisionnerAccesDevAdapter implements ProvisionnerAccesDev {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    
     private String extraireSecret(Map<?, ?> response) {
         Object data = response.get("data");
         if (data instanceof Map<?, ?> dataMap && dataMap.get("clientSecret") != null) {

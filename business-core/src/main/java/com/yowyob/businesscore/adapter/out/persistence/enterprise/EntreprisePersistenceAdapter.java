@@ -4,6 +4,7 @@ import com.yowyob.businesscore.domain.enterprise.Entreprise;
 import com.yowyob.businesscore.domain.enterprise.spi.DepotEntreprise;
 import com.yowyob.businesscore.domain.operation.spi.EntrepriseResolue;
 import com.yowyob.businesscore.domain.operation.spi.ResoudreEntreprise;
+import com.yowyob.businesscore.domain.enterprise.spi.LireEntreprise;
 import com.yowyob.businesscore.domain.shared.CycleVie;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -12,11 +13,12 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 /**
- * Adapter R2DBC — implémente {@link DepotEntreprise} (persistance locale) et {@link ResoudreEntreprise}
- * (point de contact pour la feature Opérations). RLS isole le tenant.
+ * Adapter R2DBC — implémente {@link DepotEntreprise} (persistance locale), {@link ResoudreEntreprise}
+ * (point de contact pour la feature Opérations) et {@link LireEntreprise} (lecture cross-feature, brique
+ * Acteurs). RLS isole le tenant.
  */
 @Component
-public class EntreprisePersistenceAdapter implements DepotEntreprise, ResoudreEntreprise {
+public class EntreprisePersistenceAdapter implements DepotEntreprise, ResoudreEntreprise, LireEntreprise {
 
     private final EntrepriseRepository repository;
 
@@ -47,6 +49,11 @@ public class EntreprisePersistenceAdapter implements DepotEntreprise, ResoudreEn
     public Mono<EntrepriseResolue> resoudre(UUID entrepriseId) {
         return repository.findById(entrepriseId)
                 .map(e -> new EntrepriseResolue(e.getId(), e.getVersionTypeId(), e.getOrganizationId()));
+    }
+
+    @Override
+    public Mono<Entreprise> parId(UUID id) {
+        return repository.findById(id).map(this::versDomaine);
     }
 
     // ─── Mapping ──────────────────────────────────────────────────────────

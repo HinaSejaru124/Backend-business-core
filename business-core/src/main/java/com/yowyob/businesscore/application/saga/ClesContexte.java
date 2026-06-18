@@ -14,6 +14,7 @@ public final class ClesContexte {
     // ─── Entrées (posées par la couche application depuis le payload / l'entreprise) ───
     public static final String TENANT_ID = "tenantId";
     public static final String ENTREPRISE_ID = "entrepriseId";
+    public static final String VERSION_TYPE_ID = "versionTypeId";
     public static final String ORGANIZATION_ID = "organizationId";
     public static final String OPERATION_NOM = "operationNom";
     public static final String DECLENCHEUR = "declencheur";   // Declencheur pour EVALUER_REGLES
@@ -22,6 +23,7 @@ public final class ClesContexte {
     public static final String QUANTITE = "quantite";
     public static final String BENEFICIAIRE_ID = "beneficiaireId";
     public static final String CATEGORIE = "categorie";       // pour la condition de règle CATEGORIE_EGALE
+    public static final String MOTIF = "motif";               // motif de dérogation (effet DEROGER)
     public static final String DOCUMENT_NOM = "documentNom";
     public static final String DOCUMENT_CONTENT_TYPE = "documentContentType";
     public static final String DOCUMENT_CONTENU = "documentContenu"; // byte[] ou base64

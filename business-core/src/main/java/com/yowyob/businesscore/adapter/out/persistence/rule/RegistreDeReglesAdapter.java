@@ -28,10 +28,11 @@ public class RegistreDeReglesAdapter implements RegistreDeRegles {
     }
 
     @Override
-    public Flux<RegleChargee> chargerPourDeclencheur(UUID entrepriseId, Declencheur declencheur) {
-        // Règles de Type (porteeType=true) + règles locales de cette entreprise
-        Flux<RegleMetierEntity> deType = repo.findByDeclencheurAndVersionTypeIdNotNull(
-                declencheur.name());
+    public Flux<RegleChargee> chargerPourDeclencheur(UUID entrepriseId, UUID versionTypeId, Declencheur declencheur) {
+        // Règles de Type de la version épinglée + règles locales de cette entreprise.
+        Flux<RegleMetierEntity> deType = versionTypeId != null
+                ? repo.findByDeclencheurAndVersionTypeId(declencheur.name(), versionTypeId)
+                : Flux.empty();
 
         Flux<RegleMetierEntity> locales = entrepriseId != null
                 ? repo.findByDeclencheurAndEntrepriseId(declencheur.name(), entrepriseId)

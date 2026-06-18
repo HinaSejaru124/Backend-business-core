@@ -1,5 +1,6 @@
 package com.yowyob.businesscore.application.saga;
 
+import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.port.internal.FournisseurDeCapacite;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
 import org.springframework.stereotype.Component;
@@ -29,7 +30,7 @@ public class FournisseurDeCapaciteDispatcher {
     public Mono<Void> activer(TypeCapacite type, UUID offreId) {
         FournisseurDeCapacite fournisseur = parType.get(type);
         if (fournisseur == null) {
-            return Mono.error(new IllegalStateException("Aucun FournisseurDeCapacite enregistré pour " + type));
+            return Mono.error(ProblemException.unprocessable("Capacité non encore supportée : " + type));
         }
         return fournisseur.activer(offreId);
     }

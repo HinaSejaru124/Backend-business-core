@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : offers-actors (Dev 3). Briques 2 (Offre) + 3 (Acteurs métier).
+      Préfixe d'IDs : oa-xxx. NE JAMAIS modifier _socle.xml ni le master.
+      Tables tenant-owned -> tenant_id + RLS (copie exacte du snippet socle, Barrière 3).
+      Tables : definition_offre, capacite, role_metier, acteur_metier.
+      L'entité entreprise est créée par enterprise.xml (appliqué avant, ordre alphabétique).
+    -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         oa-001 — Table definition_offre (offre = unité de valeur)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="oa-001-definition-offre" author="dev3">
+        <createTable tableName="definition_offre">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Version de Type sous laquelle l'offre est déclarée -->
+            <column name="version_type_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="nom" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="forme_prix" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="prix" type="numeric(19,4)"/>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="definition_offre"
+                baseColumnNames="version_type_id"
+                referencedTableName="version_type"
+                referencedColumnNames="id"
+                constraintName="fk_definition_offre_version_type"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="definition_offre" indexName="idx_definition_offre_version">
+            <column name="version_type_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS definition_offre;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         oa-002 — Table capacite (capacités activables d'une offre)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="oa-002-capacite" author="dev3">
+        <createTable tableName="capacite">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="definition_offre_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="type" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="capacite"
+                baseColumnNames="definition_offre_id"
+                referencedTableName="definition_offre"
+                referencedColumnNames="id"
+                constraintName="fk_capacite_definition_offre"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="capacite" indexName="idx_capacite_offre">
+            <column name="definition_offre_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS capacite;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         oa-003 — Table role_metier (rôle métier d'une version de Type)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="oa-003-role-metier" author="dev3">
+        <createTable tableName="role_metier">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="version_type_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="code" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="categorie" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="role_metier"
+                baseColumnNames="version_type_id"
+                referencedTableName="version_type"
+                referencedColumnNames="id"
+                constraintName="fk_role_metier_version_type"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="role_metier" indexName="idx_role_metier_version">
+            <column name="version_type_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS role_metier;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         oa-004 — Table acteur_metier (personne + rôle + entreprise)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="oa-004-acteur-metier" author="dev3">
+        <createTable tableName="acteur_metier">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="entreprise_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="role_metier_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Référence kernel : Actor (opérateur) ou Tiers (bénéficiaire) -->
+            <column name="acteur_kernel_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="valide_depuis" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="valide_jusqua" type="timestamptz"/>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="acteur_metier"
+                baseColumnNames="entreprise_id"
+                referencedTableName="entreprise"
+                referencedColumnNames="id"
+                constraintName="fk_acteur_metier_entreprise"
+                onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="acteur_metier"
+                baseColumnNames="role_metier_id"
+                referencedTableName="role_metier"
+                referencedColumnNames="id"
+                constraintName="fk_acteur_metier_role"/>
+
+        <createIndex tableName="acteur_metier" indexName="idx_acteur_metier_entreprise">
+            <column name="entreprise_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS acteur_metier;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         oa-005..008 — RLS (Barrière 3, copie exacte du snippet socle)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="oa-005-rls-definition-offre" author="dev3">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE definition_offre ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE definition_offre FORCE ROW LEVEL SECURITY;
+            CREATE POLICY definition_offre_tenant_isolation ON definition_offre
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS definition_offre_tenant_isolation ON definition_offre;
+                ALTER TABLE definition_offre NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE definition_offre DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="oa-006-rls-capacite" author="dev3">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE capacite ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE capacite FORCE ROW LEVEL SECURITY;
+            CREATE POLICY capacite_tenant_isolation ON capacite
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS capacite_tenant_isolation ON capacite;
+                ALTER TABLE capacite NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE capacite DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="oa-007-rls-role-metier" author="dev3">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE role_metier ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE role_metier FORCE ROW LEVEL SECURITY;
+            CREATE POLICY role_metier_tenant_isolation ON role_metier
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS role_metier_tenant_isolation ON role_metier;
+                ALTER TABLE role_metier NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE role_metier DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="oa-008-rls-acteur-metier" author="dev3">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE acteur_metier ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE acteur_metier FORCE ROW LEVEL SECURITY;
+            CREATE POLICY acteur_metier_tenant_isolation ON acteur_metier
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS acteur_metier_tenant_isolation ON acteur_metier;
+                ALTER TABLE acteur_metier NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE acteur_metier DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

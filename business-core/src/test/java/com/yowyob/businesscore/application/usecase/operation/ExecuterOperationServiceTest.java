@@ -5,6 +5,7 @@ import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.saga.ClesContexte;
 import com.yowyob.businesscore.application.saga.MoteurOperation;
 import com.yowyob.businesscore.application.saga.ResultatMoteur;
+import com.yowyob.businesscore.application.usecase.actor.ResoudreRolesMetier;
 import com.yowyob.businesscore.domain.operation.DefinitionOperation;
 import com.yowyob.businesscore.domain.operation.spi.EntrepriseResolue;
 import com.yowyob.businesscore.domain.operation.spi.PersisterOperation;
@@ -61,6 +62,7 @@ class ExecuterOperationServiceTest {
     @Mock PublierEvenement publierEvenement;
     @Mock HorlogeSysteme horloge;
     @Mock ObjectMapper objectMapper;
+    @Mock ResoudreRolesMetier resoudreRolesMetier;
 
     ExecuterOperationService service;
 
@@ -77,7 +79,7 @@ class ExecuterOperationServiceTest {
     @BeforeEach
     void setUp() {
         service = new ExecuterOperationService(resoudreEntreprise, persisterOperation, planificateur,
-                moteur, persisterTrace, verrou, publierEvenement, horloge, objectMapper);
+                moteur, persisterTrace, verrou, publierEvenement, horloge, objectMapper, resoudreRolesMetier);
     }
 
     private DefinitionOperation definition(boolean differe) {
@@ -100,6 +102,7 @@ class ExecuterOperationServiceTest {
         when(planificateur.planifier(any(UUID.class)))
                 .thenReturn(Flux.just(TypeEtape.ENREGISTRER_VENTE, TypeEtape.ENCAISSER));
         when(horloge.maintenant()).thenReturn(Instant.parse("2026-06-17T10:00:00Z"));
+        when(resoudreRolesMetier.rolesActifs(any(), any())).thenReturn(Mono.just(Set.of("caissier")));
     }
 
     @Test
@@ -203,6 +206,7 @@ class ExecuterOperationServiceTest {
         when(horloge.maintenant()).thenReturn(Instant.parse("2026-06-17T10:00:00Z"));
         when(persisterTrace.sauvegarder(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(publierEvenement.publier(anyString(), any())).thenReturn(Mono.empty());
+        when(resoudreRolesMetier.rolesActifs(any(), any())).thenReturn(Mono.just(Set.of()));
 
         StepVerifier.create(service.executer(ENTREPRISE, "commande", "cle-4", Map.of(), ctx))
                 .assertNext(resultat -> {
