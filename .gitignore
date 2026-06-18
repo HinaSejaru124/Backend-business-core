@@ -7,6 +7,9 @@
 target/
 *.class
 
+# Dépôt Maven local (ne jamais committer ; utiliser ~/.m2)
+.m2/
+
 # Outils / éditeurs
 .idea/
 *.iml

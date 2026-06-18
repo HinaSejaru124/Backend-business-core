@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : operations (Dev 5). Briques 5 (Opérations) + 6 (Transactions/Trace).
+      Préfixe d'IDs : op-xxx. NE JAMAIS modifier _socle.xml ni le master.
+      Tables tenant-owned -> tenant_id + RLS (copie exacte du snippet socle, Barrière 3).
+      Tables : definition_operation, etape_operation, trace_operation.
+    -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         op-001 — Table definition_operation (en-tête du workflow déclaré)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="op-001-definition-operation" author="dev5">
+        <createTable tableName="definition_operation">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Version de Type sous laquelle l'opération est déclarée -->
+            <column name="version_type_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="nom" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="role_declencheur" type="varchar(128)"/>
+
+            <!-- Point d'ancrage des règles évaluées par l'étape EVALUER_REGLES -->
+            <column name="declencheur_regles" type="varchar(64)" defaultValue="AVANT_OPERATION">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="differe" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="definition_operation"
+                baseColumnNames="version_type_id"
+                referencedTableName="version_type"
+                referencedColumnNames="id"
+                constraintName="fk_definition_operation_version_type"
+                onDelete="CASCADE"/>
+
+        <!-- Un nom d'opération unique par version -->
+        <addUniqueConstraint
+                tableName="definition_operation"
+                columnNames="version_type_id, nom"
+                constraintName="uq_definition_operation_version_nom"/>
+
+        <createIndex tableName="definition_operation" indexName="idx_definition_operation_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS definition_operation;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="op-002-rls-definition-operation" author="dev5">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE definition_operation ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE definition_operation FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON definition_operation
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON definition_operation;
+                ALTER TABLE definition_operation NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE definition_operation DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         op-003 — Table etape_operation (séquence ordonnée d'étapes-types)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="op-003-etape-operation" author="dev5">
+        <createTable tableName="etape_operation">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="operation_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="ordre" type="int">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Étape-type du catalogue fermé (TypeEtape) -->
+            <column name="type_etape" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="etape_operation"
+                baseColumnNames="operation_id"
+                referencedTableName="definition_operation"
+                referencedColumnNames="id"
+                constraintName="fk_etape_operation_definition"
+                onDelete="CASCADE"/>
+
+        <addUniqueConstraint
+                tableName="etape_operation"
+                columnNames="operation_id, ordre"
+                constraintName="uq_etape_operation_operation_ordre"/>
+
+        <createIndex tableName="etape_operation" indexName="idx_etape_operation_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS etape_operation;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="op-004-rls-etape-operation" author="dev5">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE etape_operation ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE etape_operation FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON etape_operation
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON etape_operation;
+                ALTER TABLE etape_operation NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE etape_operation DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         op-005 — Table trace_operation (idempotence + compensation + audit)
+         entreprise_id : référence logique (uuid simple, pas de FK) pour ne pas
+         coupler la feature à la table d'une autre brique.
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="op-005-trace-operation" author="dev5">
+        <createTable tableName="trace_operation">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="entreprise_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="operation_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="operation_nom" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Idempotence : empêche le double traitement -->
+            <column name="cle_idempotence" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Compensation : dit quoi annuler côté kernel -->
+            <column name="transaction_kernel_id" type="uuid"/>
+
+            <column name="statut" type="varchar(16)" defaultValue="EN_COURS">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Audit : effets de règles appliqués (JSON) -->
+            <column name="resultat_regles" type="text"/>
+
+            <column name="cree_le" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="resolu_le" type="timestamptz"/>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="trace_operation"
+                baseColumnNames="operation_id"
+                referencedTableName="definition_operation"
+                referencedColumnNames="id"
+                constraintName="fk_trace_operation_definition"/>
+
+        <!-- Idempotence par tenant : la même clé ne crée pas de doublon -->
+        <addUniqueConstraint
+                tableName="trace_operation"
+                columnNames="tenant_id, cle_idempotence"
+                constraintName="uq_trace_operation_tenant_cle"/>
+
+        <createIndex tableName="trace_operation" indexName="idx_trace_operation_entreprise">
+            <column name="entreprise_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS trace_operation;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="op-006-rls-trace-operation" author="dev5">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE trace_operation ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE trace_operation FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON trace_operation
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON trace_operation;
+                ALTER TABLE trace_operation NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE trace_operation DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

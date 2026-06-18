@@ -29,7 +29,9 @@ services:
       retries: 10
 
   kafka:
-    image: apache/kafka:3.9.0
+    # 3.9.1 corrige KAFKA-18281 (3.9.0 validait à tort le listener CONTROLLER non-advertised
+    # en 0.0.0.0 au format du stockage KRaft -> "advertised.listeners cannot use 0.0.0.0").
+    image: apache/kafka:3.9.1
     container_name: bc-kafka
     ports:
       - "${BC_KAFKA_PORT:-9092}:9092"

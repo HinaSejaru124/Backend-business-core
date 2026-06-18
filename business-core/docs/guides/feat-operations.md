@@ -3,6 +3,17 @@
 > **Dev 5.** Briques 5 (Opérations) et 6 (Transactions). Le moteur qui met tout en mouvement.
 > Lis d'abord `README.md`. Donne les deux fichiers à ton IA de code.
 
+
+## ⚠️ Alignement sur le socle réel (lis ceci en premier)
+
+Le socle est **déjà livré** (Spring Boot 4.0.7, package `com.yowyob.businesscore`). Avant de coder, lis **`CONVENTIONS-SOCLE.md`** : il décrit les patrons réels (entité `Persistable`, repository sans `WHERE tenant_id`, `KernelClient`, `ProblemException`, controller `/v1`).
+
+**RLS obligatoire.** Tes tables tenant (`definition_operation`, `etape_operation`, `trace_operation`) doivent porter `tenant_id uuid NOT NULL` + le bloc RLS (`ENABLE`/`FORCE`/`CREATE POLICY`) du socle. Un test garde-fou (`RlsCoverageGuardTest`) **fait échouer la CI** si une table tenant n'a pas son RLS — ce n'est pas optionnel.
+
+**Appels kernel.** Utilise `KernelClient` (l'auth `X-Client-Id`/`X-Api-Key`/`Bearer` est automatique). Pour une opération liée à une organisation, utilise `postForOrganization`/`getForOrganization` (ajoute `X-Organization-Id`).
+
+---
+
 ## Ta mission en une phrase
 
 Tu construis **le moteur d'exécution** : les workflows métier (opérations) et la trace des échanges de valeur (transactions). Ta brique orchestre toutes les autres via les ports.

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.yowyob.businesscore.application.context.BusinessContext;
+import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.usecase.rule.CreerRegleUseCase;
 import com.yowyob.businesscore.domain.rule.RegleMetier;
 import com.yowyob.businesscore.domain.shared.Declencheur;
@@ -48,19 +48,20 @@ public class RegleMetierController {
     public Mono<RegleMetierResponse> creerRegleDeType(
             @PathVariable UUID typeId,
             @PathVariable int versionN,
-            @Valid @RequestBody CreerRegleRequest body,
-            BusinessContext ctx) {
+            @Valid @RequestBody CreerRegleRequest body) {
 
         // L'URL est la source de vérité : la version cible est résolue depuis typeId + versionN.
-        return creerRegle.creerRegleDeType(
-                typeId,
-                versionN,
-                body.declencheur(),
-                body.condition(),
-                body.effet(),
-                body.rolesAutorisesADeroger(),
-                ctx
-        ).map(RegleMetierResponse::de);
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> creerRegle.creerRegleDeType(
+                        typeId,
+                        versionN,
+                        body.declencheur(),
+                        body.condition(),
+                        body.effet(),
+                        body.rolesAutorisesADeroger(),
+                        ctx
+                ))
+                .map(RegleMetierResponse::de);
     }
 
     /** POST /v1/businesses/{businessId}/rules */
@@ -68,17 +69,18 @@ public class RegleMetierController {
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<RegleMetierResponse> creerRegleLocale(
             @PathVariable UUID businessId,
-            @Valid @RequestBody CreerRegleRequest body,
-            BusinessContext ctx) {
+            @Valid @RequestBody CreerRegleRequest body) {
 
-        return creerRegle.creerRegleLocale(
-                businessId,
-                body.declencheur(),
-                body.condition(),
-                body.effet(),
-                body.rolesAutorisesADeroger(),
-                ctx
-        ).map(RegleMetierResponse::de);
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> creerRegle.creerRegleLocale(
+                        businessId,
+                        body.declencheur(),
+                        body.condition(),
+                        body.effet(),
+                        body.rolesAutorisesADeroger(),
+                        ctx
+                ))
+                .map(RegleMetierResponse::de);
     }
 
     // --- DTOs ---

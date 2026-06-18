@@ -13,15 +13,16 @@ import reactor.core.publisher.Mono;
 @Service
 public class AuthorizationService {
 
-    /** Complète si le rôle est présent, sinon échoue en 403 RFC 7807. */
+    /** Complète si le rôle est présent, sinon échoue en 403 RFC 7807. Fail-closed si contexte absent. */
     public Mono<Void> exigerRole(String role) {
         return BusinessContextHolder.currentContext()
+                .switchIfEmpty(Mono.error(ProblemException.forbidden("Contexte d'autorisation absent")))
                 .flatMap(ctx -> ctx.hasRole(role)
                         ? Mono.empty()
                         : Mono.error(ProblemException.forbidden("Rôle métier requis : " + role)));
     }
 
-    /** Vrai si l'acteur courant porte au moins un des rôles donnés. */
+    /** Vrai si l'acteur courant porte au moins un des rôles donnés. Fail-closed (false) si contexte absent. */
     public Mono<Boolean> aLUnDesRoles(String... roles) {
         return BusinessContextHolder.currentContext()
                 .map(ctx -> {
@@ -31,6 +32,7 @@ public class AuthorizationService {
                         }
                     }
                     return false;
-                });
+                })
+                .defaultIfEmpty(false);
     }
 }

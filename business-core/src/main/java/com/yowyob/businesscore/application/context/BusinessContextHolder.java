@@ -26,12 +26,21 @@ public final class BusinessContextHolder {
         return context.put(CONTEXT_KEY, businessContext);
     }
 
-    /** Lit le contexte courant ; erreur si absent (route non authentifiée mal configurée). */
+    /**
+     * Lit le contexte courant, ou {@link Mono#empty()} s'il est absent.
+     *
+     * <p>Volontairement non bloquant/non erroné : sur les routes authentifiées, le filtre de sécurité
+     * garantit la présence du contexte, donc l'absence ne survient en pratique que lors de la
+     * re-souscription interne de WebFlux à la finalisation de la réponse (drain de
+     * {@code ChannelSendOperator}), avec un Reactor Context vide. Renvoyer {@code empty} y court-circuite
+     * proprement le {@code flatMap} des controllers (aucune ré-exécution, aucune erreur parasite loguée).
+     * L'autorisation reste <b>fail-closed</b> : {@code AuthorizationService} refuse explicitement sur absence.
+     */
     public static Mono<BusinessContext> currentContext() {
         return Mono.deferContextual(ctx ->
                 ctx.hasKey(CONTEXT_KEY)
                         ? Mono.just(ctx.get(CONTEXT_KEY))
-                        : Mono.error(new IllegalStateException("Aucun BusinessContext dans le contexte réactif")));
+                        : Mono.empty());
     }
 
     /** Lit le tenant courant s'il existe, sans erreur (utilisé par la couche de persistance/RLS). */
