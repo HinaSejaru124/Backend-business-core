@@ -1,6 +1,7 @@
 package com.yowyob.businesscore.application.saga;
 
 import com.yowyob.businesscore.domain.port.internal.ContexteEtape;
+import com.yowyob.businesscore.domain.port.internal.EtapeCompensable;
 import com.yowyob.businesscore.domain.port.internal.ExecuteurDEtape;
 import com.yowyob.businesscore.domain.shared.TypeEtape;
 import org.springframework.stereotype.Component;
@@ -32,5 +33,17 @@ public class ExecuteurDEtapeDispatcher {
             return Mono.error(new IllegalStateException("Aucun ExecuteurDEtape enregistré pour l'étape " + type));
         }
         return executeur.executer(contexte);
+    }
+
+    /**
+     * Annule l'effet d'une étape déjà jouée (compensation). No-op si l'étape n'est pas
+     * {@link EtapeCompensable} (ex. lecture de stock) : rien à défaire.
+     */
+    public Mono<Void> compenser(TypeEtape type, ContexteEtape contexte) {
+        ExecuteurDEtape executeur = parType.get(type);
+        if (executeur instanceof EtapeCompensable compensable) {
+            return compensable.compenser(contexte);
+        }
+        return Mono.empty();
     }
 }

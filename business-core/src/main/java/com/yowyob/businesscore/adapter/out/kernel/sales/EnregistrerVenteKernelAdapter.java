@@ -18,8 +18,8 @@ import java.util.UUID;
  *   <li>{@code POST /api/sales/orders/{orderId}/confirm} — la confirme,</li>
  *   <li>{@code GET /api/cashier/bills/{orderId}} — lit la facture produite (montant, devise).</li>
  * </ol>
- * Tous les appels passent par {@link KernelClient} (auth automatique). Renvoie la référence de
- * transaction kernel (id de facture) qui servira de point de compensation.
+ * Tous les appels passent par {@link KernelClient} (auth automatique). Renvoie l'id de commande
+ * (point de compensation via {@code /cancel}) et l'id de facture.
  */
 @Component
 public class EnregistrerVenteKernelAdapter implements EnregistrerVente {
@@ -36,8 +36,15 @@ public class EnregistrerVenteKernelAdapter implements EnregistrerVente {
         return kernel.post("/api/sales/orders", requete, CommandeResponse.class)
                 .flatMap(commande -> kernel
                         .post("/api/sales/orders/" + commande.id() + "/confirm", null, Void.class)
-                        .then(kernel.get("/api/cashier/bills/" + commande.id(), FactureResponse.class)))
-                .map(facture -> new VenteEnregistree(facture.id(), facture.amount(), facture.currency()));
+                        .then(kernel.get("/api/cashier/bills/" + commande.id(), FactureResponse.class))
+                        .map(facture -> new VenteEnregistree(
+                                commande.id(), facture.id(), facture.amount(), facture.currency())));
+    }
+
+    @Override
+    public Mono<Void> annuler(UUID commandeId) {
+        // Compensation : le kernel n'a pas de moteur Saga, on annule la commande de vente directement.
+        return kernel.post("/api/sales/orders/" + commandeId + "/cancel", null, Void.class).then();
     }
 }
 

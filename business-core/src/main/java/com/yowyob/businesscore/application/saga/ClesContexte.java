@@ -32,7 +32,8 @@ public final class ClesContexte {
     public static final String STOCK = "stock";
     public static final String MONTANT = "montant";
     public static final String DEVISE = "devise";
-    public static final String TRANSACTION_KERNEL_ID = "transactionKernelId"; // point de compensation
+    public static final String TRANSACTION_KERNEL_ID = "transactionKernelId"; // id facture (cashier bill)
+    public static final String COMMANDE_ID = "commandeId"; // id commande vente (order) — point de compensation
     public static final String MOUVEMENT_ID = "mouvementId";
     public static final String DOCUMENT_ID = "documentId";
     public static final String RESULTAT_REGLES = "resultatRegles"; // List<EffetAAppliquer> (audit)

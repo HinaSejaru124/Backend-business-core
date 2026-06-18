@@ -22,6 +22,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -76,6 +77,7 @@ class EnregistrerVenteKernelAdapterTest {
 
         StepVerifier.create(adapter.enregistrer(UUID.randomUUID(), 2, UUID.randomUUID()))
                 .assertNext(vente -> {
+                    assertThat(vente.commandeId().toString()).isEqualTo(orderId);
                     assertThat(vente.transactionKernelId().toString()).isEqualTo(billId);
                     assertThat(vente.montant()).isEqualByComparingTo("1500");
                     assertThat(vente.devise()).isEqualTo("XAF");
@@ -85,5 +87,17 @@ class EnregistrerVenteKernelAdapterTest {
         wireMock.verify(postRequestedFor(urlEqualTo("/api/sales/orders")));
         wireMock.verify(postRequestedFor(urlEqualTo("/api/sales/orders/" + orderId + "/confirm")));
         wireMock.verify(getRequestedFor(urlEqualTo("/api/cashier/bills/" + orderId)));
+    }
+
+    @Test
+    @DisplayName("annuler() appelle le cancel de la commande de vente (compensation)")
+    void annuler_appelle_cancel() {
+        UUID commandeId = UUID.randomUUID();
+        wireMock.stubFor(post(urlPathEqualTo("/api/sales/orders/" + commandeId + "/cancel"))
+                .willReturn(aResponse().withStatus(200)));
+
+        StepVerifier.create(adapter.annuler(commandeId)).verifyComplete();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/sales/orders/" + commandeId + "/cancel")));
     }
 }

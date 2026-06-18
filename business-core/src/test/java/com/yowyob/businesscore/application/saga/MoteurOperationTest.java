@@ -1,7 +1,6 @@
 package com.yowyob.businesscore.application.saga;
 
 import com.yowyob.businesscore.domain.port.internal.ContexteEtape;
-import com.yowyob.businesscore.domain.port.out.ExecuterWorkflow;
 import com.yowyob.businesscore.domain.shared.TypeEtape;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,29 +22,30 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests du moteur saga local : chaînage des étapes et compensation de l'effet engagé en cas d'échec.
+ * Tests de la saga orchestrée locale : chaînage des étapes et compensation en ordre inverse (LIFO)
+ * des étapes déjà réussies en cas d'échec. La compensation est déléguée au dispatcher (no-op pour les
+ * étapes non compensables) — ici le dispatcher est mocké.
  */
 @ExtendWith(MockitoExtension.class)
 class MoteurOperationTest {
 
     @Mock ExecuteurDEtapeDispatcher dispatcher;
-    @Mock ExecuterWorkflow executerWorkflow;
 
     MoteurOperation moteur;
 
-    private static final UUID TX = UUID.randomUUID();
+    private static final UUID COMMANDE = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        moteur = new MoteurOperation(dispatcher, executerWorkflow);
+        moteur = new MoteurOperation(dispatcher);
     }
 
     @Test
-    @DisplayName("toutes les étapes réussissent → succès, pas de compensation")
+    @DisplayName("toutes les étapes réussissent → succès, aucune compensation")
     void chaine_complete_sans_compensation() {
         when(dispatcher.executer(eq(TypeEtape.ENREGISTRER_VENTE), any()))
                 .thenAnswer(inv -> Mono.just(((ContexteEtape) inv.getArgument(1))
-                        .avec(ClesContexte.TRANSACTION_KERNEL_ID, TX)));
+                        .avec(ClesContexte.COMMANDE_ID, COMMANDE)));
         when(dispatcher.executer(eq(TypeEtape.ENCAISSER), any()))
                 .thenAnswer(inv -> Mono.just(inv.getArgument(1)));
 
@@ -53,22 +53,22 @@ class MoteurOperationTest {
                         List.of(TypeEtape.ENREGISTRER_VENTE, TypeEtape.ENCAISSER), ContexteEtape.vide()))
                 .assertNext(resultat -> {
                     assertThat(resultat.succes()).isTrue();
-                    assertThat(resultat.contexte().get(ClesContexte.TRANSACTION_KERNEL_ID)).isEqualTo(TX);
+                    assertThat(resultat.contexte().get(ClesContexte.COMMANDE_ID)).isEqualTo(COMMANDE);
                 })
                 .verifyComplete();
 
-        verify(executerWorkflow, never()).compenser(any());
+        verify(dispatcher, never()).compenser(any(), any());
     }
 
     @Test
-    @DisplayName("échec après un effet engagé → compense la transaction kernel")
-    void echec_apres_effet_compense() {
+    @DisplayName("échec après un effet engagé → compense la vente, pas l'étape échouée")
+    void echec_apres_effet_compense_en_ordre_inverse() {
         when(dispatcher.executer(eq(TypeEtape.ENREGISTRER_VENTE), any()))
                 .thenAnswer(inv -> Mono.just(((ContexteEtape) inv.getArgument(1))
-                        .avec(ClesContexte.TRANSACTION_KERNEL_ID, TX)));
+                        .avec(ClesContexte.COMMANDE_ID, COMMANDE)));
         when(dispatcher.executer(eq(TypeEtape.ENCAISSER), any()))
                 .thenReturn(Mono.error(new RuntimeException("cashier KO")));
-        when(executerWorkflow.compenser(TX.toString())).thenReturn(Mono.empty());
+        when(dispatcher.compenser(eq(TypeEtape.ENREGISTRER_VENTE), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(moteur.executer(
                         List.of(TypeEtape.ENREGISTRER_VENTE, TypeEtape.ENCAISSER), ContexteEtape.vide()))
@@ -78,7 +78,31 @@ class MoteurOperationTest {
                 })
                 .verifyComplete();
 
-        verify(executerWorkflow).compenser(TX.toString());
+        // L'étape réussie est compensée ; l'étape qui a échoué n'a rien engagé → pas de compensation.
+        verify(dispatcher).compenser(eq(TypeEtape.ENREGISTRER_VENTE), any());
+        verify(dispatcher, never()).compenser(eq(TypeEtape.ENCAISSER), any());
+    }
+
+    @Test
+    @DisplayName("compensation best-effort : une annulation en échec ne masque pas l'erreur d'origine")
+    void compensation_best_effort() {
+        when(dispatcher.executer(eq(TypeEtape.ENREGISTRER_VENTE), any()))
+                .thenAnswer(inv -> Mono.just(((ContexteEtape) inv.getArgument(1))
+                        .avec(ClesContexte.COMMANDE_ID, COMMANDE)));
+        when(dispatcher.executer(eq(TypeEtape.ENCAISSER), any()))
+                .thenReturn(Mono.error(new RuntimeException("cashier KO")));
+        when(dispatcher.compenser(eq(TypeEtape.ENREGISTRER_VENTE), any()))
+                .thenReturn(Mono.error(new RuntimeException("cancel KO")));
+
+        StepVerifier.create(moteur.executer(
+                        List.of(TypeEtape.ENREGISTRER_VENTE, TypeEtape.ENCAISSER), ContexteEtape.vide()))
+                .assertNext(resultat -> {
+                    assertThat(resultat.succes()).isFalse();
+                    assertThat(resultat.erreur()).hasMessage("cashier KO");
+                })
+                .verifyComplete();
+
+        verify(dispatcher).compenser(eq(TypeEtape.ENREGISTRER_VENTE), any());
     }
 
     @Test
@@ -91,6 +115,6 @@ class MoteurOperationTest {
                 .assertNext(resultat -> assertThat(resultat.succes()).isFalse())
                 .verifyComplete();
 
-        verify(executerWorkflow, never()).compenser(any());
+        verify(dispatcher, never()).compenser(any(), any());
     }
 }
