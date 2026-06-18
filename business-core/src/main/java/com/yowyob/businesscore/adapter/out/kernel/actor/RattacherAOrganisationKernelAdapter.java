@@ -1,7 +1,7 @@
 package com.yowyob.businesscore.adapter.out.kernel.actor;
 
-import com.yowyob.businesscore.domain.port.out.actor.RattacherAOrganisation;
-import com.yowyob.businesscore.shared.kernel.KernelClient;
+import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
+import com.yowyob.businesscore.domain.port.out.RattacherAOrganisation;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -21,12 +21,12 @@ public class RattacherAOrganisationKernelAdapter implements RattacherAOrganisati
     record Ack(boolean ok) {}
 
     @Override
-    public Mono<Void> rattacher(UUID organizationId, UUID acteurKernelId) {
+    public Mono<Void> rattacher(UUID organizationId, UUID actorId) {
         return kernel.postForOrganization(
-                        organizationId,
                         "/api/organizations/" + organizationId + "/actors",
-                        Map.of("actorId", acteurKernelId),
-                        Ack.class)
+                        Map.of("actorId", actorId),
+                        Ack.class,
+                        organizationId)
                 .then();
     }
 }

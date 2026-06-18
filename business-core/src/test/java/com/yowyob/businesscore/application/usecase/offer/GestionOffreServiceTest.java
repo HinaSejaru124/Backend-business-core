@@ -1,40 +1,34 @@
-package com.yowyob.businesscore.application.offer;
+package com.yowyob.businesscore.application.usecase.offer;
 
-import com.yowyob.businesscore.application.capacite.RegistreCapacites;
-import com.yowyob.businesscore.application.usecase.offer.GestionOffreService;
-import com.yowyob.businesscore.domain.offer.DefinitionOffre;
-import com.yowyob.businesscore.domain.port.in.offer.GestionOffre.DeclarerOffreCommande;
-import com.yowyob.businesscore.domain.port.internal.offer.FournisseurDeCapacite;
-import com.yowyob.businesscore.domain.port.out.offer.DepotOffre;
+import com.yowyob.businesscore.application.error.ProblemException;
+import com.yowyob.businesscore.application.saga.FournisseurDeCapaciteDispatcher;
+import com.yowyob.businesscore.domain.offer.spi.DepotOffre;
 import com.yowyob.businesscore.domain.shared.FormePrix;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
-import com.yowyob.businesscore.shared.error.ProblemException;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class GestionOffreServiceTest {
 
     private final DepotOffre depot = mock(DepotOffre.class);
-    private final RegistreCapacites registre = mock(RegistreCapacites.class);
-    private final GestionOffreService service = new GestionOffreService(depot, registre);
+    private final FournisseurDeCapaciteDispatcher capacites = mock(FournisseurDeCapaciteDispatcher.class);
+    private final GestionOffreService service = new GestionOffreService(depot, capacites);
 
     @Test
     void declarer_offre_stockable_active_la_strategie_correspondante() {
         when(depot.enregistrer(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
-        FournisseurDeCapacite stockable = mock(FournisseurDeCapacite.class);
-        when(stockable.activer(any())).thenReturn(Mono.empty());
-        when(registre.pour(TypeCapacite.STOCKABLE)).thenReturn(Optional.of(stockable));
+        when(capacites.activer(eq(TypeCapacite.STOCKABLE), any(UUID.class))).thenReturn(Mono.empty());
 
-        DeclarerOffreCommande cmd = new DeclarerOffreCommande(
+        GestionOffreService.DeclarerOffreCommande cmd = new GestionOffreService.DeclarerOffreCommande(
                 UUID.randomUUID(), "Bouteille de gaz", FormePrix.FIXE,
                 new BigDecimal("5000"), Set.of(TypeCapacite.STOCKABLE));
 
@@ -45,15 +39,16 @@ class GestionOffreServiceTest {
                 })
                 .verifyComplete();
 
-        verify(stockable, times(1)).activer(any(DefinitionOffre.class));
+        verify(capacites, times(1)).activer(eq(TypeCapacite.STOCKABLE), any(UUID.class));
     }
 
     @Test
     void declarer_offre_avec_capacite_non_supportee_echoue_en_422() {
         when(depot.enregistrer(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
-        when(registre.pour(TypeCapacite.PLANIFIABLE)).thenReturn(Optional.empty());
+        when(capacites.activer(eq(TypeCapacite.PLANIFIABLE), any(UUID.class)))
+                .thenReturn(Mono.error(ProblemException.unprocessable("Capacité non encore supportée : PLANIFIABLE")));
 
-        DeclarerOffreCommande cmd = new DeclarerOffreCommande(
+        GestionOffreService.DeclarerOffreCommande cmd = new GestionOffreService.DeclarerOffreCommande(
                 UUID.randomUUID(), "Consultation", FormePrix.GRATUIT,
                 null, Set.of(TypeCapacite.PLANIFIABLE));
 
@@ -67,7 +62,7 @@ class GestionOffreServiceTest {
     @Test
     void offre_fixe_sans_prix_est_rejetee_par_invariant_domaine() {
         when(depot.enregistrer(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
-        DeclarerOffreCommande cmd = new DeclarerOffreCommande(
+        GestionOffreService.DeclarerOffreCommande cmd = new GestionOffreService.DeclarerOffreCommande(
                 UUID.randomUUID(), "Offre cassée", FormePrix.FIXE, null, Set.of());
 
         StepVerifier.create(service.declarer(cmd))

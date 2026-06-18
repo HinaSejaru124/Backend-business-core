@@ -1,4 +1,4 @@
-package com.yowyob.businesscore.domain.port.out.enterprise;
+package com.yowyob.businesscore.domain.enterprise.spi;
 
 import com.yowyob.businesscore.domain.enterprise.Entreprise;
 import reactor.core.publisher.Mono;

@@ -1,4 +1,4 @@
-package com.yowyob.businesscore.domain.port.out.actor;
+package com.yowyob.businesscore.domain.actor.spi;
 
 import com.yowyob.businesscore.domain.actor.ActeurMetier;
 import com.yowyob.businesscore.domain.actor.RoleMetier;

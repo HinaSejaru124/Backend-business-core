@@ -5,6 +5,7 @@ import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.saga.ClesContexte;
 import com.yowyob.businesscore.application.saga.MoteurOperation;
 import com.yowyob.businesscore.application.saga.Valeurs;
+import com.yowyob.businesscore.application.usecase.actor.ResoudreRolesMetier;
 import com.yowyob.businesscore.domain.operation.DefinitionOperation;
 import com.yowyob.businesscore.domain.operation.ResultatExecution;
 import com.yowyob.businesscore.domain.operation.spi.EntrepriseResolue;
@@ -25,8 +26,10 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -59,6 +62,7 @@ public class ExecuterOperationService {
     private final PublierEvenement publierEvenement;
     private final HorlogeSysteme horloge;
     private final ObjectMapper objectMapper;
+    private final ResoudreRolesMetier resoudreRolesMetier;
 
     public ExecuterOperationService(ResoudreEntreprise resoudreEntreprise,
                                     PersisterOperation persisterOperation,
@@ -68,7 +72,8 @@ public class ExecuterOperationService {
                                     VerrouDIdempotence verrou,
                                     PublierEvenement publierEvenement,
                                     HorlogeSysteme horloge,
-                                    ObjectMapper objectMapper) {
+                                    ObjectMapper objectMapper,
+                                    ResoudreRolesMetier resoudreRolesMetier) {
         this.resoudreEntreprise = resoudreEntreprise;
         this.persisterOperation = persisterOperation;
         this.planificateur = planificateur;
@@ -78,6 +83,7 @@ public class ExecuterOperationService {
         this.publierEvenement = publierEvenement;
         this.horloge = horloge;
         this.objectMapper = objectMapper;
+        this.resoudreRolesMetier = resoudreRolesMetier;
     }
 
     public Mono<ResultatExecution> executer(UUID entrepriseId, String nom, String cleIdempotenceHeader,
@@ -138,29 +144,53 @@ public class ExecuterOperationService {
                         .trouverParVersionEtNom(entreprise.versionTypeId(), nom)
                         .switchIfEmpty(Mono.error(ProblemException.notFound(
                                 "Opération '" + nom + "' introuvable pour cette entreprise.")))
-                        .flatMap(definition -> {
-                            ContexteEtape contexte = contexteInitial(definition, entreprise, parametres, ctx);
-                            return definition.differe()
-                                    ? executerDiffere(definition, entreprise, cle, ctx.tenantId(), parametres)
-                                    : executerImmediat(definition, entreprise, cle, ctx.tenantId(), contexte);
-                        }));
+                        .flatMap(definition -> resoudreRolesMetier
+                                .rolesActifs(entreprise.entrepriseId(), ctx.actorId())
+                                .flatMap(rolesActeur -> {
+                                    Set<String> roles = fusionnerRoles(ctx, rolesActeur);
+                                    if (definition.roleDeclencheur() != null
+                                            && !roles.contains(definition.roleDeclencheur())) {
+                                        return Mono.error(ProblemException.forbidden(
+                                                        "Rôle requis pour déclencher l'opération : "
+                                                                + definition.roleDeclencheur())
+                                                .violatedRule("ROLE_DECLENCHEUR_REQUIS"));
+                                    }
+                                    ContexteEtape contexte = contexteInitial(
+                                            definition, entreprise, parametres, ctx, roles);
+                                    return definition.differe()
+                                            ? executerDiffere(definition, entreprise, cle, ctx.tenantId(), parametres)
+                                            : executerImmediat(definition, entreprise, cle, ctx.tenantId(), contexte);
+                                })));
+    }
+
+    /** Rôles effectifs = rôles du contexte d'auth (futurs) ∪ rôles métier résolus depuis les acteurs. */
+    private static Set<String> fusionnerRoles(BusinessContext ctx, Set<String> rolesActeur) {
+        Set<String> roles = new HashSet<>();
+        if (ctx.roles() != null) {
+            roles.addAll(ctx.roles());
+        }
+        if (rolesActeur != null) {
+            roles.addAll(rolesActeur);
+        }
+        return roles;
     }
 
     private ContexteEtape contexteInitial(DefinitionOperation definition, EntrepriseResolue entreprise,
-                                          Map<String, Object> parametres, BusinessContext ctx) {
+                                          Map<String, Object> parametres, BusinessContext ctx, Set<String> roles) {
         Map<String, Object> donnees = new HashMap<>();
         if (parametres != null) {
             donnees.putAll(parametres);
         }
         donnees.put(ClesContexte.TENANT_ID, ctx.tenantId());
         donnees.put(ClesContexte.ENTREPRISE_ID, entreprise.entrepriseId());
+        donnees.put(ClesContexte.VERSION_TYPE_ID, entreprise.versionTypeId());
         if (entreprise.organizationId() != null) {
             donnees.put(ClesContexte.ORGANIZATION_ID, entreprise.organizationId());
         }
         donnees.put(ClesContexte.OPERATION_NOM, definition.nom());
         donnees.put(ClesContexte.DECLENCHEUR, definition.declencheurRegles());
-        if (ctx.roles() != null && !ctx.roles().isEmpty()) {
-            donnees.put(ClesContexte.ROLES, ctx.roles());
+        if (roles != null && !roles.isEmpty()) {
+            donnees.put(ClesContexte.ROLES, roles);
         }
         return new ContexteEtape(donnees);
     }
@@ -243,7 +273,7 @@ public class ExecuterOperationService {
     }
 
     /** Sérialise les effets de règles appliqués (audit) ; null si aucun ou en cas d'échec de sérialisation. */
-    @SuppressWarnings("unchecked")
+    //@SuppressWarnings("unchecked")
     private String serialiserRegles(ContexteEtape contexte) {
         Object effets = contexte.get(ClesContexte.RESULTAT_REGLES);
         if (!(effets instanceof List<?> liste) || liste.isEmpty()) {

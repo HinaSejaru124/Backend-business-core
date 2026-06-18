@@ -10,8 +10,8 @@ import reactor.core.publisher.Flux;
 public interface RegleMetierRepository
         extends ReactiveCrudRepository<RegleMetierEntity, UUID> {
 
-    // Règles de Type (version_type_id non null) pour un déclencheur
-    Flux<RegleMetierEntity> findByDeclencheurAndVersionTypeIdNotNull(String declencheur);
+    // Règles de Type d'une version précise pour un déclencheur
+    Flux<RegleMetierEntity> findByDeclencheurAndVersionTypeId(String declencheur, UUID versionTypeId);
 
     // Règles locales d'une entreprise pour un déclencheur
     Flux<RegleMetierEntity> findByDeclencheurAndEntrepriseId(String declencheur, UUID entrepriseId);

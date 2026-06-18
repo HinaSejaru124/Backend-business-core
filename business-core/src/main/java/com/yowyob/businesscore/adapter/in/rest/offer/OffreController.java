@@ -1,54 +1,37 @@
 package com.yowyob.businesscore.adapter.in.rest.offer;
 
-import com.yowyob.businesscore.domain.offer.Capacite;
-import com.yowyob.businesscore.domain.offer.DefinitionOffre;
-import com.yowyob.businesscore.domain.port.in.offer.GestionOffre;
-import com.yowyob.businesscore.domain.port.in.offer.GestionOffre.DeclarerOffreCommande;
-import com.yowyob.businesscore.domain.shared.FormePrix;
-import com.yowyob.businesscore.domain.shared.TypeCapacite;
+import com.yowyob.businesscore.application.context.BusinessContextHolder;
+import com.yowyob.businesscore.application.usecase.businesstype.VersionTypeService;
+import com.yowyob.businesscore.application.usecase.offer.GestionOffreService;
+import com.yowyob.businesscore.application.usecase.offer.GestionOffreService.DeclarerOffreCommande;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
+/**
+ * API REST — Brique 2 (Offre). La version cible est résolue depuis l'URL ({@code typeId} + {@code n}),
+ * jamais reprise du payload. Le {@code BusinessContext} est posé par le filtre du socle.
+ */
 @RestController
 @RequestMapping("/v1/business-types/{typeId}/versions/{n}/offers")
 public class OffreController {
 
-    private final GestionOffre gestion;
+    private final GestionOffreService gestion;
+    private final VersionTypeService versionService;
 
-    public OffreController(GestionOffre gestion) {
+    public OffreController(GestionOffreService gestion, VersionTypeService versionService) {
         this.gestion = gestion;
-    }
-
-    public record DeclarerOffreRequete(
-            @NotNull UUID versionTypeId,
-            @NotBlank String nom,
-            @NotNull FormePrix formePrix,
-            BigDecimal prix,
-            Set<TypeCapacite> capacites) {}
-
-    public record CapaciteReponse(UUID id, TypeCapacite type, boolean active) {
-        static CapaciteReponse de(Capacite c) {
-            return new CapaciteReponse(c.id(), c.type(), c.active());
-        }
-    }
-
-    public record OffreReponse(
-            UUID id, UUID versionTypeId, String nom, FormePrix formePrix,
-            BigDecimal prix, List<CapaciteReponse> capacites) {
-        static OffreReponse de(DefinitionOffre o) {
-            return new OffreReponse(o.id(), o.versionTypeId(), o.nom(), o.formePrix(), o.prix(),
-                    o.capacites().stream().map(CapaciteReponse::de).toList());
-        }
+        this.versionService = versionService;
     }
 
     @PostMapping
@@ -56,15 +39,18 @@ public class OffreController {
     public Mono<OffreReponse> declarer(@PathVariable UUID typeId,
                                        @PathVariable int n,
                                        @Valid @RequestBody DeclarerOffreRequete req) {
-        return gestion.declarer(new DeclarerOffreCommande(
-                        req.versionTypeId(), req.nom(), req.formePrix(), req.prix(), req.capacites()))
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> versionService.trouverParNumero(typeId, n, ctx))
+                .flatMap(version -> gestion.declarer(new DeclarerOffreCommande(
+                        version.id(), req.nom(), req.formePrix(), req.prix(), req.capacites())))
                 .map(OffreReponse::de);
     }
 
     @GetMapping
-    public Flux<OffreReponse> lister(@PathVariable UUID typeId,
-                                     @PathVariable int n,
-                                     @RequestParam UUID versionTypeId) {
-        return gestion.lister(versionTypeId).map(OffreReponse::de);
+    public Flux<OffreReponse> lister(@PathVariable UUID typeId, @PathVariable int n) {
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> versionService.trouverParNumero(typeId, n, ctx))
+                .flatMapMany(version -> gestion.lister(version.id()))
+                .map(OffreReponse::de);
     }
 }

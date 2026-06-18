@@ -1,7 +1,7 @@
 package com.yowyob.businesscore.adapter.out.kernel.actor;
 
-import com.yowyob.businesscore.domain.port.out.actor.ResoudrePersonne;
-import com.yowyob.businesscore.shared.kernel.KernelClient;
+import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
+import com.yowyob.businesscore.domain.port.out.ResoudrePersonne;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -21,8 +21,8 @@ public class ResoudrePersonneKernelAdapter implements ResoudrePersonne {
     record KernelId(UUID id) {}
 
     @Override
-    public Mono<UUID> resoudreOperateur(String identifiant) {
-        return kernel.post("/api/actors", Map.of("identifier", identifiant), KernelId.class)
+    public Mono<UUID> resoudreOperateur(String identifiant, String nom) {
+        return kernel.post("/api/actors", Map.of("identifier", identifiant, "name", nom), KernelId.class)
                 .map(KernelId::id);
     }
 }

@@ -1,6 +1,6 @@
 package com.yowyob.businesscore.domain.actor;
 
-import com.yowyob.businesscore.shared.error.ProblemException;
+import com.yowyob.businesscore.application.error.ProblemException;
 
 import java.time.Instant;
 import java.util.Objects;

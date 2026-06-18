@@ -2,9 +2,9 @@ package com.yowyob.businesscore.adapter.out.persistence.actor;
 
 import com.yowyob.businesscore.domain.actor.ActeurMetier;
 import com.yowyob.businesscore.domain.actor.RoleMetier;
-import com.yowyob.businesscore.domain.port.out.actor.DepotActeur;
+import com.yowyob.businesscore.domain.actor.spi.DepotActeur;
+import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.domain.shared.CategorieActeur;
-import com.yowyob.businesscore.shared.context.BusinessContextHolder;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -24,7 +24,7 @@ public class ActeurPersistenceAdapter implements DepotActeur {
 
     @Override
     public Mono<RoleMetier> enregistrerRole(RoleMetier role) {
-        return BusinessContextHolder.current().flatMap(ctx -> {
+        return BusinessContextHolder.currentContext().flatMap(ctx -> {
             RoleMetierEntity entity = RoleMetierEntity.nouveau(
                     role.id(), ctx.tenantId(), role.versionTypeId(),
                     role.code(), role.categorie().name());
@@ -39,7 +39,7 @@ public class ActeurPersistenceAdapter implements DepotActeur {
 
     @Override
     public Mono<ActeurMetier> enregistrerActeur(ActeurMetier acteur) {
-        return BusinessContextHolder.current().flatMap(ctx ->
+        return BusinessContextHolder.currentContext().flatMap(ctx ->
                 acteurRepo.existsById(acteur.id()).flatMap(existe -> {
                     ActeurMetierEntity entity = ActeurMetierEntity.nouveau(
                             acteur.id(), ctx.tenantId(), acteur.entrepriseId(), acteur.roleMetierId(),

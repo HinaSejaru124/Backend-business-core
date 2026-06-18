@@ -1,4 +1,4 @@
-package com.yowyob.businesscore.domain.port.out.offer;
+package com.yowyob.businesscore.domain.offer.spi;
 
 import com.yowyob.businesscore.domain.offer.DefinitionOffre;
 import reactor.core.publisher.Flux;

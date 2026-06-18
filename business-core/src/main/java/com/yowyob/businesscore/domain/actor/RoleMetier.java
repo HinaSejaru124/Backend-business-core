@@ -1,7 +1,7 @@
 package com.yowyob.businesscore.domain.actor;
 
 import com.yowyob.businesscore.domain.shared.CategorieActeur;
-import com.yowyob.businesscore.shared.error.ProblemException;
+import com.yowyob.businesscore.application.error.ProblemException;
 
 import java.util.Objects;
 import java.util.UUID;

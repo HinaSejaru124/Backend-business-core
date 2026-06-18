@@ -11,7 +11,9 @@ import com.yowyob.businesscore.domain.shared.Effet;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Niveau 1 : catalogue fermé de conditions/effets paramétrées.
@@ -36,15 +38,20 @@ public class EvaluateurDeRegleN1 implements EvaluateurDeRegle {
      */
     @Override
     public Flux<EffetAAppliquer> evaluer(Declencheur declencheur, ContexteEvaluation contexte) {
-        // entrepriseId facultatif : transmis dans les valeurs du contexte, accepté en UUID ou en String.
-        Object entrepriseIdObj = contexte.get("entrepriseId");
-        java.util.UUID entrepriseId = entrepriseIdObj instanceof java.util.UUID u ? u
-                : entrepriseIdObj != null ? java.util.UUID.fromString(entrepriseIdObj.toString())
-                : null;
+        // entrepriseId / versionTypeId facultatifs : transmis dans les valeurs, en UUID ou en String.
+        UUID entrepriseId = versUuid(contexte.get("entrepriseId"));
+        UUID versionTypeId = versUuid(contexte.get("versionTypeId"));
 
-        return registre.chargerPourDeclencheur(entrepriseId, declencheur)
+        return registre.chargerPourDeclencheur(entrepriseId, versionTypeId, declencheur)
                 .filter(regle -> evaluateurCondition.satisfait(regle.condition(), contexte))
                 .map(regle -> toEffet(regle, contexte));
+    }
+
+    private static UUID versUuid(Object valeur) {
+        if (valeur instanceof UUID u) {
+            return u;
+        }
+        return valeur != null ? UUID.fromString(valeur.toString()) : null;
     }
 
     private EffetAAppliquer toEffet(RegleChargee regle, ContexteEvaluation contexte) {
@@ -57,6 +64,16 @@ public class EvaluateurDeRegleN1 implements EvaluateurDeRegle {
                     "Valeur ajustée automatiquement",
                     Map.of("ancienneValeur", ancienne != null ? ancienne : "N/A")
             );
+        }
+        if (regle.effet() == Effet.DEROGER) {
+            // DEROGER : on transmet les rôles habilités et le motif au gestionnaire d'effets.
+            Map<String, Object> details = new HashMap<>();
+            details.put("rolesAutorisesADeroger", regle.rolesAutorisesADeroger());
+            Object motif = contexte.get("motif");
+            if (motif != null) {
+                details.put("motif", motif);
+            }
+            return new EffetAAppliquer(regle.effet(), regle.id(), descriptionEffet(regle.effet()), details);
         }
         return new EffetAAppliquer(regle.effet(), regle.id(),
                 descriptionEffet(regle.effet()), Map.of());

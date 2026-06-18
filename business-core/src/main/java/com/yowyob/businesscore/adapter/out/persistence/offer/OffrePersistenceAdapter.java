@@ -2,11 +2,11 @@ package com.yowyob.businesscore.adapter.out.persistence.offer;
 
 import com.yowyob.businesscore.domain.offer.Capacite;
 import com.yowyob.businesscore.domain.offer.DefinitionOffre;
-import com.yowyob.businesscore.domain.port.out.offer.DepotOffre;
+import com.yowyob.businesscore.domain.offer.spi.DepotOffre;
+import com.yowyob.businesscore.application.context.BusinessContext;
+import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.domain.shared.FormePrix;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
-import com.yowyob.businesscore.shared.context.BusinessContext;
-import com.yowyob.businesscore.shared.context.BusinessContextHolder;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -27,7 +27,7 @@ public class OffrePersistenceAdapter implements DepotOffre {
 
     @Override
     public Mono<DefinitionOffre> enregistrer(DefinitionOffre offre) {
-        return BusinessContextHolder.current().flatMap(ctx -> {
+        return BusinessContextHolder.currentContext().flatMap(ctx -> {
             DefinitionOffreEntity entity = DefinitionOffreEntity.nouveau(
                     offre.id(), ctx.tenantId(), offre.versionTypeId(),
                     offre.nom(), offre.formePrix().name(), offre.prix());

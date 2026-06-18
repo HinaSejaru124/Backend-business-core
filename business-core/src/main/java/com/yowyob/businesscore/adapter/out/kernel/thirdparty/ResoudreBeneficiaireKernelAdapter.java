@@ -1,7 +1,7 @@
 package com.yowyob.businesscore.adapter.out.kernel.thirdparty;
 
-import com.yowyob.businesscore.domain.port.out.actor.ResoudreBeneficiaire;
-import com.yowyob.businesscore.shared.kernel.KernelClient;
+import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
+import com.yowyob.businesscore.domain.port.out.ResoudreBeneficiaire;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -21,8 +21,8 @@ public class ResoudreBeneficiaireKernelAdapter implements ResoudreBeneficiaire {
     record KernelId(UUID id) {}
 
     @Override
-    public Mono<UUID> resoudreBeneficiaire(String identifiant) {
-        return kernel.post("/api/third-parties", Map.of("identifier", identifiant), KernelId.class)
+    public Mono<UUID> resoudreBeneficiaire(String identifiant, String nom) {
+        return kernel.post("/api/third-parties", Map.of("identifier", identifiant, "name", nom), KernelId.class)
                 .map(KernelId::id);
     }
 }

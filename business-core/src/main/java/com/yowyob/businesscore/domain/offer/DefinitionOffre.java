@@ -1,8 +1,8 @@
 package com.yowyob.businesscore.domain.offer;
 
+import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.shared.FormePrix;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
-import com.yowyob.businesscore.shared.error.ProblemException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -29,7 +29,7 @@ public record DefinitionOffre(
         if (nom == null || nom.isBlank()) {
             throw ProblemException.unprocessable("nom de l'offre requis");
         }
-        if (formePrix.exigeMontant()) {
+        if (formePrix == FormePrix.FIXE) {
             if (prix == null || prix.signum() <= 0) {
                 throw ProblemException.unprocessable("un prix FIXE exige un montant strictement positif");
             }

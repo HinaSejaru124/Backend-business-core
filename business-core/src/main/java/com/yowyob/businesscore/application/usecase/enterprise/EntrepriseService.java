@@ -4,6 +4,7 @@ import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.enterprise.Entreprise;
 import com.yowyob.businesscore.domain.enterprise.spi.DepotEntreprise;
+import com.yowyob.businesscore.domain.port.out.PersisterEntreprise;
 import com.yowyob.businesscore.domain.port.out.PersisterVersionType;
 import com.yowyob.businesscore.domain.shared.CycleVie;
 import org.springframework.stereotype.Service;
@@ -24,11 +25,14 @@ public class EntrepriseService {
 
     private final DepotEntreprise depotEntreprise;
     private final PersisterVersionType persisterVersionType;
+    private final PersisterEntreprise persisterEntreprise;
 
     public EntrepriseService(DepotEntreprise depotEntreprise,
-                             PersisterVersionType persisterVersionType) {
+                             PersisterVersionType persisterVersionType,
+                             PersisterEntreprise persisterEntreprise) {
         this.depotEntreprise = depotEntreprise;
         this.persisterVersionType = persisterVersionType;
+        this.persisterEntreprise = persisterEntreprise;
     }
 
     public Mono<Entreprise> creer(UUID typeId, int numeroVersion, String nom,
@@ -38,11 +42,23 @@ public class EntrepriseService {
                         "Version " + numeroVersion + " introuvable pour le type " + typeId)))
                 .flatMap(version -> {
                     version.verifierAppartenance(ctx.tenantId());
-                    Entreprise entreprise = Entreprise.creer(
-                            ctx.tenantId(), version.typeMetierId(), version.id(),
-                            version.numero(), organizationId, nom);
-                    return depotEntreprise.sauvegarder(entreprise);
+                    return resoudreOrganisation(organizationId, nom).flatMap(orgId -> {
+                        Entreprise entreprise = Entreprise.creer(
+                                ctx.tenantId(), version.typeMetierId(), version.id(),
+                                version.numero(), orgId, nom);
+                        return depotEntreprise.sauvegarder(entreprise);
+                    });
                 });
+    }
+
+    /** Si aucun {@code organizationId} n'est fourni, provisionne l'organisation kernel + son agence. */
+    private Mono<UUID> resoudreOrganisation(UUID organizationId, String nom) {
+        if (organizationId != null) {
+            return Mono.just(organizationId);
+        }
+        return persisterEntreprise.creerOrganisation(nom)
+                .flatMap(orgId -> persisterEntreprise.creerAgence(orgId, nom + " — agence principale")
+                        .thenReturn(orgId));
     }
 
     public Flux<Entreprise> lister(BusinessContext ctx) {

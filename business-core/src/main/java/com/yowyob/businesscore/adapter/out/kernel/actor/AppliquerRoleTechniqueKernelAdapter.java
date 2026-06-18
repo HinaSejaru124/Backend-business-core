@@ -1,7 +1,7 @@
 package com.yowyob.businesscore.adapter.out.kernel.actor;
 
-import com.yowyob.businesscore.domain.port.out.actor.AppliquerRoleTechnique;
-import com.yowyob.businesscore.shared.kernel.KernelClient;
+import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
+import com.yowyob.businesscore.domain.port.out.AppliquerRoleTechnique;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -21,11 +21,11 @@ public class AppliquerRoleTechniqueKernelAdapter implements AppliquerRoleTechniq
     record KernelId(UUID id) {}
 
     @Override
-    public Mono<Void> appliquer(String codeRole, UUID actorKernelId) {
-        return kernel.post("/api/roles", Map.of("code", codeRole), KernelId.class)
+    public Mono<Void> appliquer(UUID actorId, String roleCode) {
+        return kernel.post("/api/roles", Map.of("code", roleCode), KernelId.class)
                 .flatMap(role -> kernel.post(
                         "/api/roles/assignments",
-                        Map.of("roleId", role.id(), "actorId", actorKernelId),
+                        Map.of("roleId", role.id(), "actorId", actorId),
                         KernelId.class))
                 .then();
     }

@@ -2,6 +2,7 @@ package com.yowyob.businesscore.application.saga.etape;
 
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.saga.ClesContexte;
+import com.yowyob.businesscore.application.usecase.rule.GestionnaireEffets;
 import com.yowyob.businesscore.domain.port.internal.ContexteEtape;
 import com.yowyob.businesscore.domain.port.internal.ContexteEvaluation;
 import com.yowyob.businesscore.domain.port.internal.EffetAAppliquer;
@@ -15,6 +16,7 @@ import reactor.core.publisher.Mono;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Étape {@code EVALUER_REGLES} — point d'ancrage des règles dans le workflow.
@@ -32,9 +34,11 @@ import java.util.Map;
 public class EvaluerReglesExecuteur implements ExecuteurDEtape {
 
     private final EvaluateurDeRegle evaluateurDeRegle;
+    private final GestionnaireEffets gestionnaireEffets;
 
-    public EvaluerReglesExecuteur(EvaluateurDeRegle evaluateurDeRegle) {
+    public EvaluerReglesExecuteur(EvaluateurDeRegle evaluateurDeRegle, GestionnaireEffets gestionnaireEffets) {
         this.evaluateurDeRegle = evaluateurDeRegle;
+        this.gestionnaireEffets = gestionnaireEffets;
     }
 
     @Override
@@ -54,9 +58,20 @@ public class EvaluerReglesExecuteur implements ExecuteurDEtape {
                     if (bloquant != null) {
                         return Mono.error(versProbleme(bloquant));
                     }
-                    // Aucun blocage : on conserve les effets appliqués pour la trace (audit).
-                    return Mono.just(contexte.avec(ClesContexte.RESULTAT_REGLES, effets));
+                    // Effets non bloquants appliqués (audit AJUSTER, événement ALERTER, cascade DEROGER),
+                    // puis on conserve la liste dans le contexte pour la trace.
+                    return gestionnaireEffets.appliquerNonBloquants(effets, rolesDe(contexte))
+                            .thenReturn(contexte.avec(ClesContexte.RESULTAT_REGLES, effets));
                 });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> rolesDe(ContexteEtape contexte) {
+        Object roles = contexte.get(ClesContexte.ROLES);
+        if (roles instanceof Set<?> ensemble) {
+            return (Set<String>) ensemble;
+        }
+        return Set.of();
     }
 
     private Declencheur declencheurDe(ContexteEtape contexte) {
@@ -70,12 +85,14 @@ public class EvaluerReglesExecuteur implements ExecuteurDEtape {
     private Map<String, Object> valeursPour(ContexteEtape contexte) {
         Map<String, Object> valeurs = new HashMap<>();
         copier(contexte, valeurs, ClesContexte.ENTREPRISE_ID);
+        copier(contexte, valeurs, ClesContexte.VERSION_TYPE_ID);
         copier(contexte, valeurs, ClesContexte.MONTANT);
         copier(contexte, valeurs, ClesContexte.CATEGORIE);
         copier(contexte, valeurs, ClesContexte.STOCK);
         copier(contexte, valeurs, ClesContexte.QUANTITE);
         copier(contexte, valeurs, ClesContexte.ROLES);
         copier(contexte, valeurs, ClesContexte.OFFRE_ID);
+        copier(contexte, valeurs, ClesContexte.MOTIF);
         return valeurs;
     }
 

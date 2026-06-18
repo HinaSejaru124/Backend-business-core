@@ -1,33 +1,47 @@
 package com.yowyob.businesscore.application.usecase.offer;
 
-import com.yowyob.businesscore.application.capacite.RegistreCapacites;
+import com.yowyob.businesscore.application.error.ProblemException;
+import com.yowyob.businesscore.application.saga.FournisseurDeCapaciteDispatcher;
 import com.yowyob.businesscore.domain.offer.Capacite;
 import com.yowyob.businesscore.domain.offer.DefinitionOffre;
-import com.yowyob.businesscore.domain.port.in.offer.GestionOffre;
-import com.yowyob.businesscore.domain.port.out.offer.DepotOffre;
+import com.yowyob.businesscore.domain.offer.spi.DepotOffre;
+import com.yowyob.businesscore.domain.shared.FormePrix;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
-import com.yowyob.businesscore.shared.error.ProblemException;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 @Service
-public class GestionOffreService implements GestionOffre {
+public class GestionOffreService {
+
+    public record DeclarerOffreCommande(
+            UUID versionTypeId,
+            String nom,
+            FormePrix formePrix,
+            BigDecimal prix,
+            Set<TypeCapacite> capacites) {}
 
     private final DepotOffre depot;
-    private final RegistreCapacites registre;
+    private final FournisseurDeCapaciteDispatcher capacites;
 
-    public GestionOffreService(DepotOffre depot, RegistreCapacites registre) {
+    public GestionOffreService(DepotOffre depot, FournisseurDeCapaciteDispatcher capacites) {
         this.depot = depot;
-        this.registre = registre;
+        this.capacites = capacites;
     }
 
-    @Override
     public Mono<DefinitionOffre> declarer(DeclarerOffreCommande commande) {
+        // Construction différée : l'invariant de domaine (prix FIXE) remonte en signal d'erreur réactif.
+        return Mono.fromCallable(() -> construire(commande))
+                .flatMap(offre -> depot.enregistrer(offre)
+                        .flatMap(enregistree -> activerCapacites(enregistree).thenReturn(enregistree)));
+    }
+
+    private DefinitionOffre construire(DeclarerOffreCommande commande) {
         UUID offreId = UUID.randomUUID();
         Set<TypeCapacite> demandees = commande.capacites() == null ? Set.of() : commande.capacites();
 
@@ -35,26 +49,18 @@ public class GestionOffreService implements GestionOffre {
                 .map(t -> Capacite.nouvelle(UUID.randomUUID(), offreId, t, true))
                 .toList();
 
-        DefinitionOffre offre = DefinitionOffre
+        return DefinitionOffre
                 .nouvelle(offreId, commande.versionTypeId(), commande.nom(), commande.formePrix(), commande.prix())
                 .avecCapacites(capacites);
-
-        // Persiste, puis active chaque capacité via sa stratégie (STOCKABLE -> stock, etc.).
-        return depot.enregistrer(offre)
-                .flatMap(enregistree -> activerCapacites(enregistree).thenReturn(enregistree));
     }
 
     private Mono<Void> activerCapacites(DefinitionOffre offre) {
         return Flux.fromIterable(offre.capacites())
                 .filter(Capacite::active)
-                .flatMap(c -> registre.pour(c.type())
-                        .map(f -> f.activer(offre))
-                        .orElseGet(() -> Mono.error(ProblemException.unprocessable(
-                                "Capacité non encore supportée : " + c.type()))))
+                .flatMap(c -> capacites.activer(c.type(), offre.id()))
                 .then();
     }
 
-    @Override
     public Flux<DefinitionOffre> lister(UUID versionTypeId) {
         return depot.parVersionType(versionTypeId);
     }

@@ -1,13 +1,17 @@
 package com.yowyob.businesscore.adapter.out.kernel.organization;
 
-import com.yowyob.businesscore.domain.port.out.enterprise.PersisterEntreprise;
-import com.yowyob.businesscore.shared.kernel.KernelClient;
+import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
+import com.yowyob.businesscore.domain.port.out.PersisterEntreprise;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Crée l'organisation réelle d'une entreprise dans le kernel.
+ * {@code POST /api/organizations} puis {@code POST /api/organizations/{orgId}/agencies}.
+ */
 @Component
 public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
 
@@ -20,15 +24,18 @@ public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
     record KernelId(UUID id) {}
 
     @Override
-    public Mono<UUID> creerOrganisationAvecAgence(String nomLocal) {
-        // 1) POST /api/organizations -> orgId, 2) POST /api/organizations/{orgId}/agencies (agence par défaut).
-        return kernel.post("/api/organizations", Map.of("name", nomLocal), KernelId.class)
-                .map(KernelId::id)
-                .flatMap(orgId -> kernel.postForOrganization(
-                                orgId,
-                                "/api/organizations/" + orgId + "/agencies",
-                                Map.of("name", nomLocal + " — agence principale", "primary", true),
-                                KernelId.class)
-                        .thenReturn(orgId));
+    public Mono<UUID> creerOrganisation(String nom) {
+        return kernel.post("/api/organizations", Map.of("name", nom), KernelId.class)
+                .map(KernelId::id);
+    }
+
+    @Override
+    public Mono<UUID> creerAgence(UUID organizationId, String nom) {
+        return kernel.postForOrganization(
+                        "/api/organizations/" + organizationId + "/agencies",
+                        Map.of("name", nom, "primary", true),
+                        KernelId.class,
+                        organizationId)
+                .map(KernelId::id);
     }
 }
