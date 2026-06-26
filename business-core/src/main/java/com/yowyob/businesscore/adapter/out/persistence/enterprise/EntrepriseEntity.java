@@ -34,6 +34,12 @@ public class EntrepriseEntity implements Persistable<UUID> {
     @Column("organization_id")
     private UUID organizationId;
 
+    @Column("business_actor_id")
+    private UUID businessActorId;
+
+    @Column("agency_id")
+    private UUID agencyId;
+
     private String nom;
 
     @Column("cycle_vie")
@@ -49,7 +55,8 @@ public class EntrepriseEntity implements Persistable<UUID> {
     }
 
     public static EntrepriseEntity nouveau(UUID id, UUID tenantId, UUID typeMetierId, UUID versionTypeId,
-                                           int numeroVersion, UUID organizationId, String nom, String cycleVie) {
+                                           int numeroVersion, UUID organizationId, UUID businessActorId,
+                                           UUID agencyId, String nom, String cycleVie) {
         EntrepriseEntity e = new EntrepriseEntity();
         e.id = id;
         e.tenantId = tenantId;
@@ -57,6 +64,8 @@ public class EntrepriseEntity implements Persistable<UUID> {
         e.versionTypeId = versionTypeId;
         e.numeroVersion = numeroVersion;
         e.organizationId = organizationId;
+        e.businessActorId = businessActorId;
+        e.agencyId = agencyId;
         e.nom = nom;
         e.cycleVie = cycleVie;
         e.nouveau = true;
@@ -93,6 +102,14 @@ public class EntrepriseEntity implements Persistable<UUID> {
         return organizationId;
     }
 
+    public UUID getBusinessActorId() {
+        return businessActorId;
+    }
+
+    public UUID getAgencyId() {
+        return agencyId;
+    }
+
     public String getNom() {
         return nom;
     }
@@ -127,6 +144,14 @@ public class EntrepriseEntity implements Persistable<UUID> {
 
     public void setOrganizationId(UUID organizationId) {
         this.organizationId = organizationId;
+    }
+
+    public void setBusinessActorId(UUID businessActorId) {
+        this.businessActorId = businessActorId;
+    }
+
+    public void setAgencyId(UUID agencyId) {
+        this.agencyId = agencyId;
     }
 
     public void setNom(String nom) {

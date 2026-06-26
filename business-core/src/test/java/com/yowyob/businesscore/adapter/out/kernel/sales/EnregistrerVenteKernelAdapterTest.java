@@ -4,6 +4,8 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
+import com.yowyob.businesscore.domain.port.internal.ContexteKernel;
+import com.yowyob.businesscore.domain.port.internal.ResolveurContexteKernel;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,12 +14,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
@@ -31,13 +34,15 @@ import static org.mockito.Mockito.when;
 
 /**
  * Test d'intégration de la façade financière {@link EnregistrerVenteKernelAdapter} : vérifie l'enchaînement
- * des trois appels kernel (create order → confirm → read bill) et le mapping du résultat. Kernel mické
- * par WireMock ; l'authentification (token + credentials) est mickée.
+ * des appels kernel (create order → confirm → facture client → bill cashier) et le mapping du résultat.
+ * Kernel mocké par WireMock ; authentification et {@code ResolveurContexteKernel} mockés.
  */
 class EnregistrerVenteKernelAdapterTest {
 
     private WireMockServer wireMock;
     private EnregistrerVenteKernelAdapter adapter;
+    private final UUID organizationId = UUID.randomUUID();
+    private final UUID agencyId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
@@ -50,11 +55,16 @@ class EnregistrerVenteKernelAdapterTest {
                 .thenReturn(Mono.just(new KernelCredentialStore.KernelCreds("client", "secret")));
         when(tokenService.tokenPour(any(), any())).thenReturn(Mono.just("jwt-test"));
 
+        ResolveurContexteKernel resolveur = mock(ResolveurContexteKernel.class);
+        when(resolveur.resoudre(any())).thenReturn(Mono.just(new ContexteKernel(
+                organizationId, agencyId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "XAF")));
+
         KernelProperties props = new KernelProperties(
-                "http://localhost:" + wireMock.port(), 5000, 0, "", "");
+                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER");
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
-        KernelClient kernel = new KernelClient(webClient, tokenService, credentialStore, props);
-        adapter = new EnregistrerVenteKernelAdapter(kernel);
+        KernelClient kernel = new KernelClient(
+                webClient, tokenService, credentialStore, JsonMapper.builder().build(), props);
+        adapter = new EnregistrerVenteKernelAdapter(kernel, resolveur);
     }
 
     @AfterEach
@@ -63,30 +73,37 @@ class EnregistrerVenteKernelAdapterTest {
     }
 
     @Test
-    @DisplayName("enchaîne create order, confirm puis read bill et mappe la transaction")
+    @DisplayName("enchaîne order → confirm → facture client → bill cashier et mappe le billId + montant/devise")
     void facade_multi_appels() {
         String orderId = UUID.randomUUID().toString();
+        String invoiceId = UUID.randomUUID().toString();
         String billId = UUID.randomUUID().toString();
 
         wireMock.stubFor(post(urlEqualTo("/api/sales/orders"))
                 .willReturn(okJson("{\"id\":\"" + orderId + "\"}")));
         wireMock.stubFor(post(urlEqualTo("/api/sales/orders/" + orderId + "/confirm"))
                 .willReturn(aResponse().withStatus(200)));
-        wireMock.stubFor(get(urlEqualTo("/api/cashier/bills/" + orderId))
-                .willReturn(okJson("{\"id\":\"" + billId + "\",\"amount\":1500,\"currency\":\"XAF\"}")));
+        wireMock.stubFor(post(urlEqualTo("/api/accounting/invoices/from-orders/" + orderId))
+                .willReturn(okJson("{\"id\":\"" + invoiceId + "\"}")));
+        wireMock.stubFor(post(urlEqualTo("/api/bills/import/accounting-invoices/" + invoiceId))
+                .willReturn(okJson("{\"id\":\"" + billId + "\",\"totalAmount\":1500,\"currency\":\"XAF\"}")));
 
-        StepVerifier.create(adapter.enregistrer(UUID.randomUUID(), 2, UUID.randomUUID()))
+        StepVerifier.create(adapter.enregistrer(UUID.randomUUID(), 2, UUID.randomUUID(), UUID.randomUUID()))
                 .assertNext(vente -> {
                     assertThat(vente.commandeId().toString()).isEqualTo(orderId);
-                    assertThat(vente.transactionKernelId().toString()).isEqualTo(billId);
+                    assertThat(vente.billId().toString()).isEqualTo(billId);
                     assertThat(vente.montant()).isEqualByComparingTo("1500");
                     assertThat(vente.devise()).isEqualTo("XAF");
                 })
                 .verifyComplete();
 
-        wireMock.verify(postRequestedFor(urlEqualTo("/api/sales/orders")));
+        // La commande porte la devise et l'organisation résolues (le métier ne les fournit pas).
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/sales/orders"))
+                .withRequestBody(matchingJsonPath("$.currency", equalTo("XAF")))
+                .withRequestBody(matchingJsonPath("$.organizationId", equalTo(organizationId.toString()))));
         wireMock.verify(postRequestedFor(urlEqualTo("/api/sales/orders/" + orderId + "/confirm")));
-        wireMock.verify(getRequestedFor(urlEqualTo("/api/cashier/bills/" + orderId)));
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/accounting/invoices/from-orders/" + orderId)));
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/bills/import/accounting-invoices/" + invoiceId)));
     }
 
     @Test

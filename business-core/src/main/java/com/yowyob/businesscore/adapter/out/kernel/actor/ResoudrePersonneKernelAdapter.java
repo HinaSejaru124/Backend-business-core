@@ -5,10 +5,12 @@ import com.yowyob.businesscore.domain.port.out.ResoudrePersonne;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-import java.util.Map;
 import java.util.UUID;
 
-/** Opérateur (interne) -> actor-core kernel : POST /api/actors. */
+/**
+ * Opérateur (interne) → actor-core kernel : {@code POST /api/actors}. Le kernel exige
+ * {@code firstName}/{@code lastName} ; on dérive du libellé via {@link NomPersonne}.
+ */
 @Component
 public class ResoudrePersonneKernelAdapter implements ResoudrePersonne {
 
@@ -20,9 +22,14 @@ public class ResoudrePersonneKernelAdapter implements ResoudrePersonne {
 
     record KernelId(UUID id) {}
 
+    record CreerActeurRequest(String firstName, String lastName, String name) {}
+
     @Override
     public Mono<UUID> resoudreOperateur(String identifiant, String nom) {
-        return kernel.post("/api/actors", Map.of("identifier", identifiant, "name", nom), KernelId.class)
+        NomPersonne nomPersonne = NomPersonne.de(nom);
+        CreerActeurRequest requete = new CreerActeurRequest(
+                nomPersonne.prenom(), nomPersonne.nomFamille(), nom);
+        return kernel.post("/api/actors", requete, KernelId.class)
                 .map(KernelId::id);
     }
 }

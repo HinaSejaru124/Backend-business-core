@@ -5,6 +5,7 @@ import com.yowyob.businesscore.application.saga.ClesContexte;
 import com.yowyob.businesscore.application.saga.Valeurs;
 import com.yowyob.businesscore.domain.port.internal.ContexteEtape;
 import com.yowyob.businesscore.domain.port.internal.ExecuteurDEtape;
+import com.yowyob.businesscore.domain.port.internal.ResoudreProduitEntreprise;
 import com.yowyob.businesscore.domain.port.out.VerifierDisponibilite;
 import com.yowyob.businesscore.domain.shared.TypeEtape;
 import org.springframework.stereotype.Component;
@@ -13,16 +14,20 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 /**
- * Étape {@code VERIFIER_STOCK} — lit le solde de stock de l'offre (via le port {@link VerifierDisponibilite})
- * et le pose dans le contexte. Si une quantité est demandée et que le stock est insuffisant, l'étape
- * échoue (422) — avant tout effet, donc sans compensation.
+ * Étape {@code VERIFIER_STOCK} — résout le produit kernel de l'offre pour l'entreprise courante (via
+ * {@link ResoudreProduitEntreprise}), lit son solde de stock (via {@link VerifierDisponibilite}) et le
+ * pose dans le contexte. Si une quantité est demandée et que le stock est insuffisant, l'étape échoue
+ * (422) — avant tout effet, donc sans compensation.
  */
 @Component
 public class VerifierStockExecuteur implements ExecuteurDEtape {
 
+    private final ResoudreProduitEntreprise resoudreProduit;
     private final VerifierDisponibilite verifierDisponibilite;
 
-    public VerifierStockExecuteur(VerifierDisponibilite verifierDisponibilite) {
+    public VerifierStockExecuteur(ResoudreProduitEntreprise resoudreProduit,
+                                  VerifierDisponibilite verifierDisponibilite) {
+        this.resoudreProduit = resoudreProduit;
         this.verifierDisponibilite = verifierDisponibilite;
     }
 
@@ -38,14 +43,17 @@ public class VerifierStockExecuteur implements ExecuteurDEtape {
             // Aucune offre ciblée : rien à vérifier.
             return Mono.just(contexte);
         }
+        UUID businessId = Valeurs.versUuid(contexte.get(ClesContexte.ENTREPRISE_ID));
         Integer quantite = Valeurs.versEntier(contexte.get(ClesContexte.QUANTITE));
-        return verifierDisponibilite.soldeStock(offreId).flatMap(solde -> {
-            if (quantite != null && solde < quantite) {
-                return Mono.error(ProblemException.unprocessable(
-                                "Stock insuffisant : disponible " + solde + ", demandé " + quantite)
-                        .violatedRule("STOCK_INSUFFISANT"));
-            }
-            return Mono.just(contexte.avec(ClesContexte.STOCK, solde));
-        });
+        return resoudreProduit.resoudre(businessId, offreId)
+                .flatMap(productId -> verifierDisponibilite.soldeStock(productId, businessId))
+                .flatMap(solde -> {
+                    if (quantite != null && solde < quantite) {
+                        return Mono.error(ProblemException.unprocessable(
+                                        "Stock insuffisant : disponible " + solde + ", demandé " + quantite)
+                                .violatedRule("STOCK_INSUFFISANT"));
+                    }
+                    return Mono.just(contexte.avec(ClesContexte.STOCK, solde));
+                });
     }
 }

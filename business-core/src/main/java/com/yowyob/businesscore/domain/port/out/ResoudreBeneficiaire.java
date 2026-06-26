@@ -6,10 +6,15 @@ import java.util.UUID;
 
 /**
  * Port de sortie — résout/crée un bénéficiaire externe (tiers).
- * Mappe : POST /api/third-parties.
- * Étanchéité RG-04 : un bénéficiaire vit dans tp-core, jamais dans actor-core.
+ *
+ * <p>Un tiers kernel n'est pas autonome : il enveloppe une « partie » (actor/organisation). Le
+ * bénéficiaire est donc matérialisé en deux temps — création de l'actor support puis déclaration du
+ * tiers ({@code POST /api/actors} puis {@code POST /api/third-parties}, sous l'organisation). RG-04 :
+ * le bénéficiaire reste un tiers (rôle commercial), distinct d'un opérateur (accès système).
+ *
+ * @param organizationId organisation sous laquelle déclarer le tiers (du résolveur de contexte).
  */
 public interface ResoudreBeneficiaire {
 
-    Mono<UUID> resoudreBeneficiaire(String identifiant, String nom);
+    Mono<UUID> resoudreBeneficiaire(UUID organizationId, String identifiant, String nom);
 }

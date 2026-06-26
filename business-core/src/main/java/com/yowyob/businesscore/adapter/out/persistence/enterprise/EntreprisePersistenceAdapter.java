@@ -61,20 +61,23 @@ public class EntreprisePersistenceAdapter implements DepotEntreprise, ResoudreEn
     private EntrepriseEntity versEntityNouveau(Entreprise e) {
         return EntrepriseEntity.nouveau(
                 e.id(), e.tenantId(), e.typeMetierId(), e.versionTypeId(),
-                e.numeroVersion(), e.organizationId(), e.nom(), e.cycleVie().name());
+                e.numeroVersion(), e.organizationId(), e.businessActorId(), e.agencyId(),
+                e.nom(), e.cycleVie().name());
     }
 
     private EntrepriseEntity appliquer(EntrepriseEntity entity, Entreprise e) {
         entity.setNom(e.nom());
         entity.setCycleVie(e.cycleVie().name());
         entity.setOrganizationId(e.organizationId());
+        entity.setBusinessActorId(e.businessActorId());
+        entity.setAgencyId(e.agencyId());
         return entity;
     }
 
     private Entreprise versDomaine(EntrepriseEntity e) {
         return new Entreprise(
                 e.getId(), e.getTenantId(), e.getTypeMetierId(), e.getVersionTypeId(),
-                e.getNumeroVersion(), e.getOrganizationId(), e.getNom(),
-                CycleVie.valueOf(e.getCycleVie()));
+                e.getNumeroVersion(), e.getOrganizationId(), e.getBusinessActorId(), e.getAgencyId(),
+                e.getNom(), CycleVie.valueOf(e.getCycleVie()));
     }
 }

@@ -88,4 +88,19 @@
         </rollback>
     </changeSet>
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         ent-003 — Références kernel mémorisées (business actor propriétaire + agence principale).
+         Colonnes nullables : renseignées à l'auto-provisionnement / à la résolution du contexte kernel.
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="ent-003-references-kernel" author="dev5">
+        <addColumn tableName="entreprise">
+            <column name="business_actor_id" type="uuid"/>
+            <column name="agency_id" type="uuid"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="entreprise" columnName="business_actor_id"/>
+            <dropColumn tableName="entreprise" columnName="agency_id"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

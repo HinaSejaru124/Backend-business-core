@@ -23,6 +23,8 @@ public record Entreprise(
         UUID versionTypeId,     // version de Type sur laquelle l'entreprise est épinglée
         int numeroVersion,
         UUID organizationId,    // référence Organization kernel (optionnelle au stade minimal)
+        UUID businessActorId,   // business actor propriétaire kernel (créé à l'onboarding), mémorisé
+        UUID agencyId,          // agence principale kernel, résolue/mémorisée (cf. ResolveurContexteKernel)
         String nom,
         CycleVie cycleVie
 ) {
@@ -42,7 +44,7 @@ public record Entreprise(
     public static Entreprise creer(UUID tenantId, UUID typeMetierId, UUID versionTypeId,
                                    int numeroVersion, UUID organizationId, String nom) {
         return new Entreprise(UUID.randomUUID(), tenantId, typeMetierId, versionTypeId,
-                numeroVersion, organizationId, nom, CycleVie.ACTIVE);
+                numeroVersion, organizationId, null, null, nom, CycleVie.ACTIVE);
     }
 
     /** Transition de cycle de vie (ACTIVE / SUSPENDUE / FERMEE). */
@@ -51,7 +53,19 @@ public record Entreprise(
             throw ProblemException.badRequest("Le cycle de vie cible est obligatoire.");
         }
         return new Entreprise(id, tenantId, typeMetierId, versionTypeId, numeroVersion,
-                organizationId, nom, nouveau);
+                organizationId, businessActorId, agencyId, nom, nouveau);
+    }
+
+    /** Mémorise les références kernel produites à l'auto-provisionnement (onboarding + organisation). */
+    public Entreprise avecReferencesKernel(UUID businessActorId, UUID organizationId, UUID agencyId) {
+        return new Entreprise(id, tenantId, typeMetierId, versionTypeId, numeroVersion,
+                organizationId, businessActorId, agencyId, nom, cycleVie);
+    }
+
+    /** Mémorise l'agence principale résolue auprès du kernel. */
+    public Entreprise avecAgence(UUID agencyId) {
+        return new Entreprise(id, tenantId, typeMetierId, versionTypeId, numeroVersion,
+                organizationId, businessActorId, agencyId, nom, cycleVie);
     }
 
     public void verifierAppartenance(UUID autreTenantId) {

@@ -43,11 +43,13 @@ public class EnregistrerVenteExecuteur implements EtapeCompensable {
         }
         int quantite = Valeurs.versEntierOuDefaut(contexte.get(ClesContexte.QUANTITE), 1);
         UUID beneficiaireId = Valeurs.versUuid(contexte.get(ClesContexte.BENEFICIAIRE_ID));
+        UUID businessId = Valeurs.versUuid(contexte.get(ClesContexte.ENTREPRISE_ID));
 
-        return enregistrerVente.enregistrer(offreId, quantite, beneficiaireId)
+        return enregistrerVente.enregistrer(offreId, quantite, beneficiaireId, businessId)
                 .map(vente -> contexte
                         .avec(ClesContexte.COMMANDE_ID, vente.commandeId())
-                        .avec(ClesContexte.TRANSACTION_KERNEL_ID, vente.transactionKernelId())
+                        // billId cashier : référence de transaction + cible de l'étape ENCAISSER.
+                        .avec(ClesContexte.TRANSACTION_KERNEL_ID, vente.billId())
                         .avec(ClesContexte.MONTANT, vente.montant())
                         .avec(ClesContexte.DEVISE, vente.devise()));
     }

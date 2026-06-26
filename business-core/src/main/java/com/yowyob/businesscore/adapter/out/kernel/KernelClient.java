@@ -10,8 +10,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -29,6 +31,12 @@ import java.util.UUID;
  *
  * Les adapters des features l'utilisent sans gérer l'authentification. Timeout + retry exponentiel
  * (résilience légère).
+ *
+ * <p><b>Enveloppe des réponses.</b> Le kernel enveloppe la plupart de ses réponses dans
+ * {@code {success, data, message, errorCode, timestamp}} mais pas toutes (certaines renvoient l'objet
+ * brut). Le client <b>détecte</b> l'enveloppe et n'expose que le {@code data} ; un {@code errorCode}
+ * non nul (erreur métier même en HTTP 200) est remonté en erreur. Les réponses brutes passent
+ * inchangées — un seul point central, les adapters n'ont rien à savoir de l'enveloppe.
  */
 @Component
 public class KernelClient {
@@ -40,16 +48,19 @@ public class KernelClient {
     private final WebClient kernelWebClient;
     private final KernelTokenService tokenService;
     private final KernelCredentialStore credentialStore;
+    private final ObjectMapper objectMapper;
     private final Duration timeout;
     private final int maxRetries;
 
     public KernelClient(@Qualifier("kernelWebClient") WebClient kernelWebClient,
                         KernelTokenService tokenService,
                         KernelCredentialStore credentialStore,
+                        ObjectMapper objectMapper,
                         KernelProperties properties) {
         this.kernelWebClient = kernelWebClient;
         this.tokenService = tokenService;
         this.credentialStore = credentialStore;
+        this.objectMapper = objectMapper;
         this.timeout = Duration.ofMillis(properties.timeoutMs());
         this.maxRetries = properties.maxRetries();
     }
@@ -83,8 +94,31 @@ public class KernelClient {
                         spec.header(HEADER_ORGANIZATION_ID, organizationId.toString());
                     }
                     WebClient.RequestHeadersSpec<?> finalSpec = (body != null) ? spec.bodyValue(body) : spec;
-                    return finalSpec.retrieve().bodyToMono(type).transform(this::resilience);
+                    return finalSpec.retrieve()
+                            .bodyToMono(Map.class)
+                            .transform(this::resilience)
+                            .flatMap(corps -> extraireData(corps, type));
                 }));
+    }
+
+    /**
+     * Désenveloppe la réponse : si le corps a la forme {@code {success, data, ...}}, n'expose que
+     * {@code data} (et remonte un {@code errorCode} non nul en erreur) ; sinon renvoie le corps brut.
+     */
+    private <T> Mono<T> extraireData(Map<?, ?> corps, Class<T> type) {
+        Object charge = corps;
+        if (corps.containsKey("success") && corps.containsKey("data")) {
+            Object errorCode = corps.get("errorCode");
+            if (errorCode != null) {
+                return Mono.error(new KernelException(errorCode.toString(),
+                        String.valueOf(corps.get("message"))));
+            }
+            charge = corps.get("data");
+        }
+        if (type == Void.class || charge == null) {
+            return Mono.empty();
+        }
+        return Mono.just(objectMapper.convertValue(charge, type));
     }
 
     private <T> Mono<T> resilience(Mono<T> source) {

@@ -40,7 +40,7 @@ class GestionActeurServiceTest {
     private void stubCommun() {
         Entreprise entreprise = new Entreprise(
                 businessId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                1, orgId, "Pharma Yaoundé", CycleVie.ACTIVE);
+                1, orgId, null, null, "Pharma Yaoundé", CycleVie.ACTIVE);
         when(lireEntreprise.parId(businessId)).thenReturn(Mono.just(entreprise));
         when(rattacherAOrganisation.rattacher(any(), any())).thenReturn(Mono.empty());
         when(depot.enregistrerActeur(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
@@ -64,7 +64,7 @@ class GestionActeurServiceTest {
         verify(resoudrePersonne).resoudreOperateur("jean", "jean");
         verify(appliquerRoleTechnique).appliquer(actorKernelId, "PHARMACIEN");
         // RG-04 : étanchéité — le chemin bénéficiaire ne doit jamais être emprunté.
-        verify(resoudreBeneficiaire, never()).resoudreBeneficiaire(any(), any());
+        verify(resoudreBeneficiaire, never()).resoudreBeneficiaire(any(), any(), any());
     }
 
     @Test
@@ -73,14 +73,14 @@ class GestionActeurServiceTest {
         UUID tiersId = UUID.randomUUID();
         when(depot.roleParId(roleId)).thenReturn(Mono.just(
                 RoleMetier.nouveau(roleId, UUID.randomUUID(), "CLIENT", CategorieActeur.BENEFICIAIRE)));
-        when(resoudreBeneficiaire.resoudreBeneficiaire("marie", "marie")).thenReturn(Mono.just(tiersId));
+        when(resoudreBeneficiaire.resoudreBeneficiaire(orgId, "marie", "marie")).thenReturn(Mono.just(tiersId));
 
         StepVerifier.create(service.rattacher(
                         new GestionActeurService.RattacherActeurCommande(businessId, roleId, "marie")))
                 .assertNext(a -> { assert a.acteurKernelId().equals(tiersId); })
                 .verifyComplete();
 
-        verify(resoudreBeneficiaire).resoudreBeneficiaire("marie", "marie");
+        verify(resoudreBeneficiaire).resoudreBeneficiaire(orgId, "marie", "marie");
         // RG-04 : un bénéficiaire ne touche jamais l'actor-core ni le rôle technique.
         verify(resoudrePersonne, never()).resoudreOperateur(any(), any());
         verify(appliquerRoleTechnique, never()).appliquer(any(), any());

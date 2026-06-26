@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : produit-entreprise. Mapping offre (type-level) ↔ produit kernel (org-scoped).
+      Le Product et l'Inventory du kernel sont scopés organisation ; une offre est déclarée au niveau
+      Type/version. On matérialise donc, PAR ENTREPRISE, l'identifiant du produit kernel créé pour une
+      offre. Le produit est créé paresseusement là où l'organisation est connue (première opération).
+      Préfixe d'IDs : pe-xxx. NE JAMAIS modifier _socle.xml ni le master.
+      Table tenant-owned -> tenant_id + RLS (copie exacte du snippet socle, Barrière 3).
+      Appliqué après enterprise.xml (entreprise) et offers-actors.xml (definition_offre).
+    -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         pe-001 — Table produit_entreprise (offre ↔ productId kernel, par entreprise)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="pe-001-produit-entreprise" author="dev3">
+        <createTable tableName="produit_entreprise">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="entreprise_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="offre_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Référence kernel : Product créé pour cette entreprise (organisation) -->
+            <column name="product_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="produit_entreprise"
+                baseColumnNames="entreprise_id"
+                referencedTableName="entreprise"
+                referencedColumnNames="id"
+                constraintName="fk_produit_entreprise_entreprise"
+                onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="produit_entreprise"
+                baseColumnNames="offre_id"
+                referencedTableName="definition_offre"
+                referencedColumnNames="id"
+                constraintName="fk_produit_entreprise_offre"
+                onDelete="CASCADE"/>
+
+        <!-- Un seul produit kernel par (entreprise, offre). -->
+        <addUniqueConstraint
+                tableName="produit_entreprise"
+                columnNames="entreprise_id, offre_id"
+                constraintName="uq_produit_entreprise_entreprise_offre"/>
+
+        <createIndex tableName="produit_entreprise" indexName="idx_produit_entreprise_entreprise">
+            <column name="entreprise_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS produit_entreprise;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         pe-002 — RLS (Barrière 3, copie exacte du snippet socle)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="pe-002-rls-produit-entreprise" author="dev3">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE produit_entreprise ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE produit_entreprise FORCE ROW LEVEL SECURITY;
+            CREATE POLICY produit_entreprise_tenant_isolation ON produit_entreprise
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS produit_entreprise_tenant_isolation ON produit_entreprise;
+                ALTER TABLE produit_entreprise NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE produit_entreprise DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

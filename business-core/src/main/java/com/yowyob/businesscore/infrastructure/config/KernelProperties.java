@@ -13,6 +13,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * (variables {@code KERNEL_CLIENT_ID}/{@code KERNEL_CLIENT_SECRET}). Elle sert à provisionner les
  * ClientApplications dédiées des développeurs ({@code POST /api/client-applications}) — appel qui
  * exige lui-même une ClientApplication valide via {@code X-Client-Id}/{@code X-Api-Key}.
+ *
+ * <p>{@code organizationService}/{@code businessActorRole} : valeurs exigées par le kernel lors de
+ * l'auto-provisionnement d'une organisation (cf. {@code PersisterEntrepriseKernelAdapter}). Le
+ * {@code service} doit correspondre à un code du catalogue de services kernel
+ * ({@code GET /api/organizations/services/catalog}) ; le rôle est celui du business actor propriétaire
+ * (OWNER). À ajuster par variable d'environnement selon l'environnement kernel cible.
  */
 @ConfigurationProperties(prefix = "businesscore.kernel")
 public record KernelProperties(
@@ -20,7 +26,9 @@ public record KernelProperties(
         long timeoutMs,
         int maxRetries,
         String clientId,
-        String clientSecret
+        String clientSecret,
+        String organizationService,
+        String businessActorRole
 ) {
 
     public KernelProperties {
@@ -35,6 +43,10 @@ public record KernelProperties(
         }
         clientId = clientId == null ? "" : clientId;
         clientSecret = clientSecret == null ? "" : clientSecret;
+        organizationService = (organizationService == null || organizationService.isBlank())
+                ? "BUSINESS_CORE" : organizationService;
+        businessActorRole = (businessActorRole == null || businessActorRole.isBlank())
+                ? "OWNER" : businessActorRole;
     }
 
     public boolean aDesCredentialsPlateforme() {

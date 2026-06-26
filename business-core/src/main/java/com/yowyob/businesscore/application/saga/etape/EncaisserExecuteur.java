@@ -1,5 +1,6 @@
 package com.yowyob.businesscore.application.saga.etape;
 
+import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.saga.ClesContexte;
 import com.yowyob.businesscore.application.saga.Valeurs;
 import com.yowyob.businesscore.domain.port.internal.ContexteEtape;
@@ -10,11 +11,12 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /**
  * Étape {@code ENCAISSER} — enregistre l'échange de valeur via le port interne
- * {@link PorteMonnaieGenerique} (implémentation monétaire de départ). Lit le montant/devise posés par
- * l'étape de vente ; sans montant à encaisser, l'étape est neutre.
+ * {@link PorteMonnaieGenerique} (implémentation monétaire de départ). Lit le montant/devise et le
+ * billId cashier posés par l'étape de vente ; sans montant à encaisser, l'étape est neutre.
  */
 @Component
 public class EncaisserExecuteur implements ExecuteurDEtape {
@@ -40,7 +42,14 @@ public class EncaisserExecuteur implements ExecuteurDEtape {
             return Mono.just(contexte);
         }
         String devise = Valeurs.versTexteOuDefaut(contexte.get(ClesContexte.DEVISE), DEVISE_DEFAUT);
-        return porteMonnaie.enregistrerEchange(montant, devise)
-                .map(mouvementId -> contexte.avec(ClesContexte.MOUVEMENT_ID, mouvementId));
+        UUID billId = Valeurs.versUuid(contexte.get(ClesContexte.TRANSACTION_KERNEL_ID));
+        if (billId == null) {
+            // Le kernel encaisse un bill cashier : sans bill produit par la vente, on ne peut pas encaisser.
+            return Mono.error(ProblemException.unprocessable(
+                    "Encaissement impossible : aucun bill cashier lié à la vente."));
+        }
+        UUID businessId = Valeurs.versUuid(contexte.get(ClesContexte.ENTREPRISE_ID));
+        return porteMonnaie.enregistrerEchange(billId, montant, devise, businessId)
+                .map(paiementId -> contexte.avec(ClesContexte.MOUVEMENT_ID, paiementId));
     }
 }

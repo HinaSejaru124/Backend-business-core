@@ -75,7 +75,8 @@ public class GestionActeurService {
                 ? resoudrePersonne.resoudreOperateur(identifiant, identifiant)
                 .flatMap(actorId -> appliquerRoleTechnique.appliquer(actorId, role.code())
                         .thenReturn(actorId))
-                : resoudreBeneficiaire.resoudreBeneficiaire(identifiant, identifiant);
+                : resoudreBeneficiaire.resoudreBeneficiaire(
+                        entreprise.organizationId(), identifiant, identifiant);
 
         return kernelId.flatMap(acteurKernelId ->
                 rattacherAOrganisation.rattacher(entreprise.organizationId(), acteurKernelId)

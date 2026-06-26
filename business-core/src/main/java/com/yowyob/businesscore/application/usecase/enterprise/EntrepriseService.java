@@ -42,23 +42,34 @@ public class EntrepriseService {
                         "Version " + numeroVersion + " introuvable pour le type " + typeId)))
                 .flatMap(version -> {
                     version.verifierAppartenance(ctx.tenantId());
-                    return resoudreOrganisation(organizationId, nom).flatMap(orgId -> {
+                    return resoudreOrganisation(organizationId, nom).flatMap(refs -> {
                         Entreprise entreprise = Entreprise.creer(
-                                ctx.tenantId(), version.typeMetierId(), version.id(),
-                                version.numero(), orgId, nom);
+                                        ctx.tenantId(), version.typeMetierId(), version.id(),
+                                        version.numero(), refs.organizationId(), nom)
+                                .avecReferencesKernel(
+                                        refs.businessActorId(), refs.organizationId(), refs.agencyId());
                         return depotEntreprise.sauvegarder(entreprise);
                     });
                 });
     }
 
-    /** Si aucun {@code organizationId} n'est fourni, provisionne l'organisation kernel + son agence. */
-    private Mono<UUID> resoudreOrganisation(UUID organizationId, String nom) {
+    /**
+     * Si aucun {@code organizationId} n'est fourni, provisionne l'organisation kernel (onboarding du
+     * business actor + organisation + agence principale) et renvoie les références à mémoriser.
+     */
+    private Mono<RefsKernel> resoudreOrganisation(UUID organizationId, String nom) {
         if (organizationId != null) {
-            return Mono.just(organizationId);
+            return Mono.just(new RefsKernel(null, organizationId, null));
         }
         return persisterEntreprise.creerOrganisation(nom)
-                .flatMap(orgId -> persisterEntreprise.creerAgence(orgId, nom + " — agence principale")
-                        .thenReturn(orgId));
+                .flatMap(prov -> persisterEntreprise
+                        .creerAgence(prov.organizationId(), nom + " — agence principale")
+                        .map(agencyId -> new RefsKernel(
+                                prov.businessActorId(), prov.organizationId(), agencyId)));
+    }
+
+    /** Références kernel à mémoriser dans l'entité Entreprise. */
+    private record RefsKernel(UUID businessActorId, UUID organizationId, UUID agencyId) {
     }
 
     public Flux<Entreprise> lister(BusinessContext ctx) {
@@ -72,7 +83,13 @@ public class EntrepriseService {
     }
 
     public Mono<Entreprise> changerCycleVie(UUID id, CycleVie cycleVie, BusinessContext ctx) {
-        return trouver(id, ctx).flatMap(entreprise ->
-                depotEntreprise.sauvegarder(entreprise.changerCycleVie(cycleVie)));
+        return trouver(id, ctx).flatMap(entreprise -> {
+            // Propage la transition au kernel (approve/suspend/close/reopen) avant de persister localement.
+            Mono<Void> transitionKernel = entreprise.organizationId() == null
+                    ? Mono.empty()
+                    : persisterEntreprise.changerCycleVieKernel(entreprise.organizationId(), cycleVie);
+            return transitionKernel.then(
+                    depotEntreprise.sauvegarder(entreprise.changerCycleVie(cycleVie)));
+        });
     }
 }
