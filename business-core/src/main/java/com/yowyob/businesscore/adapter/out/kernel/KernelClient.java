@@ -2,6 +2,8 @@ package com.yowyob.businesscore.adapter.out.kernel;
 
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
+import com.yowyob.businesscore.application.context.BusinessContextHolder;
+import com.yowyob.businesscore.application.security.KernelTokenHolder;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
@@ -43,12 +45,15 @@ public class KernelClient {
 
     public static final String HEADER_CLIENT_ID = "X-Client-Id";
     public static final String HEADER_API_KEY = "X-Api-Key";
+    public static final String HEADER_TENANT_ID = "X-Tenant-Id";
     public static final String HEADER_ORGANIZATION_ID = "X-Organization-Id";
 
     private final WebClient kernelWebClient;
     private final KernelTokenService tokenService;
     private final KernelCredentialStore credentialStore;
     private final ObjectMapper objectMapper;
+    private final String appClientId;
+    private final String appApiKey;
     private final Duration timeout;
     private final int maxRetries;
 
@@ -61,6 +66,8 @@ public class KernelClient {
         this.tokenService = tokenService;
         this.credentialStore = credentialStore;
         this.objectMapper = objectMapper;
+        this.appClientId = properties.clientId();
+        this.appApiKey = properties.clientSecret();
         this.timeout = Duration.ofMillis(properties.timeoutMs());
         this.maxRetries = properties.maxRetries();
     }
@@ -84,21 +91,53 @@ public class KernelClient {
     }
 
     private <T> Mono<T> exchange(HttpMethod method, String path, Object body, Class<T> type, UUID organizationId) {
+        return KernelTokenHolder.currentToken().flatMap(tokenDelegue ->
+                tokenDelegue.isPresent()
+                        ? exchangeDelegue(method, path, body, type, organizationId, tokenDelegue.get())
+                        : exchangeMachine(method, path, body, type, organizationId));
+    }
+
+    /**
+     * Flux <b>délégué</b> (cible) : re-transmet le JWT de l'utilisateur courant en {@code Bearer}, avec
+     * l'identité d'application BC ({@code X-Client-Id}/{@code X-Api-Key} du socle) et {@code X-Tenant-Id}.
+     */
+    private <T> Mono<T> exchangeDelegue(HttpMethod method, String path, Object body, Class<T> type,
+                                        UUID organizationId, String tokenUtilisateur) {
+        return BusinessContextHolder.currentTenantId().flatMap(tenant ->
+                envoyer(method, path, body, type, appClientId, appApiKey, tokenUtilisateur,
+                        tenant.map(UUID::toString).orElse(null), organizationId));
+    }
+
+    /**
+     * Flux <b>machine</b> (client-credentials) : repli quand aucun token délégué n'est présent dans le
+     * contexte (appels système ou routes non encore migrées). Comportement historique inchangé.
+     */
+    private <T> Mono<T> exchangeMachine(HttpMethod method, String path, Object body, Class<T> type,
+                                        UUID organizationId) {
         return credentialStore.pourTenantCourant().flatMap(creds ->
-                tokenService.tokenPour(creds.clientId(), creds.secret()).flatMap(jwt -> {
-                    WebClient.RequestBodySpec spec = kernelWebClient.method(method).uri(path);
-                    spec.header(HEADER_CLIENT_ID, creds.clientId())
-                            .header(HEADER_API_KEY, creds.secret())
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt);
-                    if (organizationId != null) {
-                        spec.header(HEADER_ORGANIZATION_ID, organizationId.toString());
-                    }
-                    WebClient.RequestHeadersSpec<?> finalSpec = (body != null) ? spec.bodyValue(body) : spec;
-                    return finalSpec.retrieve()
-                            .bodyToMono(Map.class)
-                            .transform(this::resilience)
-                            .flatMap(corps -> extraireData(corps, type));
-                }));
+                tokenService.tokenPour(creds.clientId(), creds.secret()).flatMap(jwt ->
+                        envoyer(method, path, body, type, creds.clientId(), creds.secret(), jwt,
+                                null, organizationId)));
+    }
+
+    private <T> Mono<T> envoyer(HttpMethod method, String path, Object body, Class<T> type,
+                                String clientId, String apiKey, String bearer,
+                                String tenantId, UUID organizationId) {
+        WebClient.RequestBodySpec spec = kernelWebClient.method(method).uri(path);
+        spec.header(HEADER_CLIENT_ID, clientId)
+                .header(HEADER_API_KEY, apiKey)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
+        if (tenantId != null) {
+            spec.header(HEADER_TENANT_ID, tenantId);
+        }
+        if (organizationId != null) {
+            spec.header(HEADER_ORGANIZATION_ID, organizationId.toString());
+        }
+        WebClient.RequestHeadersSpec<?> finalSpec = (body != null) ? spec.bodyValue(body) : spec;
+        return finalSpec.retrieve()
+                .bodyToMono(Map.class)
+                .transform(this::resilience)
+                .flatMap(corps -> extraireData(corps, type));
     }
 
     /**

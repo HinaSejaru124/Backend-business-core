@@ -32,6 +32,7 @@ public class SecurityConfig {
             "/health",
             "/actuator/health",
             "/v1/registration",
+            "/v1/auth/login",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/v3/api-docs/**",
@@ -43,10 +44,17 @@ public class SecurityConfig {
             ServerHttpSecurity http,
             ApiKeyAuthenticationConverter converter,
             ApiKeyReactiveAuthenticationManager authenticationManager,
+            JwtAuthenticationConverter jwtConverter,
+            JwtReactiveAuthenticationManager jwtAuthenticationManager,
             CorsConfigurationSource corsConfigurationSource,
             ProblemAuthenticationEntryPoint authenticationEntryPoint,
             ProblemAccessDeniedHandler accessDeniedHandler) {
 
+        // Authentification par JWT kernel délégué (Authorization: Bearer). Voie principale.
+        AuthenticationWebFilter jwtFilter = new AuthenticationWebFilter(jwtAuthenticationManager);
+        jwtFilter.setServerAuthenticationConverter(jwtConverter);
+
+        // Authentification par clé Business Core (X-BC-*). Conservée (ex. provisioning / transitoire).
         AuthenticationWebFilter apiKeyFilter = new AuthenticationWebFilter(authenticationManager);
         apiKeyFilter.setServerAuthenticationConverter(converter);
 
@@ -61,8 +69,12 @@ public class SecurityConfig {
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
-                .addFilterAt(apiKeyFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                // Chaque converter renvoie vide si son en-tête est absent : Bearer d'abord, puis clé BC.
+                .addFilterAt(jwtFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                .addFilterAfter(apiKeyFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                // Propagation du contexte vers le Reactor Context (lisible par use cases + KernelClient).
                 .addFilterAfter(new BusinessContextWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+                .addFilterAfter(new KernelTokenWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }
 

@@ -15,7 +15,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * {@code WebClient.builder()} sinon — ce qui garantit le démarrage sans dépendance optionnelle.
  */
 @Configuration
-@EnableConfigurationProperties(KernelProperties.class)
+@EnableConfigurationProperties({KernelProperties.class, AuthProperties.class})
 public class KernelWebClientConfig {
 
     @Bean("kernelWebClient")
