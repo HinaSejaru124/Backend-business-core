@@ -53,11 +53,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-        <!-- Vérification locale des JWT kernel (signature RS256 + JWKS). Version épinglée. -->
+        <!-- Vérification des JWT kernel (Resource Server JWT standard Spring : decoder réactif +
+             JWKS + rotation des clés). Tire nimbus-jose-jwt transitivement (version gérée par le BOM). -->
         <dependency>
-            <groupId>com.nimbusds</groupId>
-            <artifactId>nimbus-jose-jwt</artifactId>
-            <version>9.37.3</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

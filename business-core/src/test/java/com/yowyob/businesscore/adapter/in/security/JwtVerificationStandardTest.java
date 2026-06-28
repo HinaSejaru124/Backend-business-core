@@ -10,13 +10,14 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.yowyob.businesscore.application.context.BusinessContext;
-import com.yowyob.businesscore.infrastructure.config.AuthProperties;
-import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import reactor.test.StepVerifier;
 
 import java.time.Instant;
@@ -24,22 +25,24 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Vérifie la chaîne d'authentification JWT entrante : un token RS256 signé par le kernel (mocké via une
- * clé de test exposée en JWKS WireMock) est validé localement et projeté en {@link BusinessContext}
- * (tenant, acteur, permissions). Un token expiré est rejeté.
+ * Vérifie la chaîne d'authentification JWT entrante avec l'intégration <b>standard</b> Spring : le
+ * {@link ReactiveJwtDecoder} (Nimbus) valide un token RS256 signé par le kernel (clé exposée en JWKS
+ * WireMock), puis {@link BusinessContextJwtConverter} le projette en {@link BusinessContext}. Un token
+ * expiré est rejeté par le validateur par défaut.
  */
-class JwtReactiveAuthenticationManagerTest {
+class JwtVerificationStandardTest {
 
     private WireMockServer wireMock;
     private RSAKey signingKey;
-    private JwtReactiveAuthenticationManager manager;
+    private ReactiveJwtDecoder decoder;
+    private final BusinessContextJwtConverter converter = new BusinessContextJwtConverter();
 
     private static final UUID TENANT = UUID.randomUUID();
     private static final UUID ACTOR = UUID.randomUUID();
@@ -52,11 +55,12 @@ class JwtReactiveAuthenticationManagerTest {
         wireMock.stubFor(get(urlEqualTo("/.well-known/jwks.json"))
                 .willReturn(okJson(new JWKSet(signingKey.toPublicJWK()).toString())));
 
-        KernelProperties kernelProps = new KernelProperties(
-                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "", "");
-        AuthProperties authProps = new AuthProperties(
-                "", "", "http://localhost:" + wireMock.port() + "/.well-known/jwks.json");
-        manager = new JwtReactiveAuthenticationManager(new JwksJwtVerifier(kernelProps, authProps));
+        NimbusReactiveJwtDecoder nimbus = NimbusReactiveJwtDecoder
+                .withJwkSetUri("http://localhost:" + wireMock.port() + "/.well-known/jwks.json")
+                .jwsAlgorithm(SignatureAlgorithm.RS256)
+                .build();
+        nimbus.setJwtValidator(JwtValidators.createDefault());
+        this.decoder = nimbus;
     }
 
     @AfterEach
@@ -71,6 +75,7 @@ class JwtReactiveAuthenticationManagerTest {
                 .claim("actor", ACTOR.toString())
                 .claim("permissions", List.of("organizations:write", "products:read"))
                 .jwtID("jti-1")
+                .issueTime(Date.from(Instant.now().minusSeconds(5)))
                 .expirationTime(Date.from(expiration))
                 .build();
         SignedJWT jwt = new SignedJWT(
@@ -80,11 +85,11 @@ class JwtReactiveAuthenticationManagerTest {
     }
 
     @Test
-    @DisplayName("token valide → authentifié + BusinessContext (tenant, acteur, permissions)")
+    @DisplayName("token valide → décodé puis projeté en BusinessContext (tenant, acteur, permissions)")
     void token_valide_construit_le_contexte() throws Exception {
         String token = jeton(Instant.now().plusSeconds(900));
 
-        StepVerifier.create(manager.authenticate(JwtAuthenticationToken.unauthenticated(token)))
+        StepVerifier.create(decoder.decode(token).flatMap(converter::convert))
                 .assertNext(auth -> {
                     assertThat(auth.isAuthenticated()).isTrue();
                     assertThat(auth.getCredentials()).isEqualTo(token);
@@ -97,12 +102,12 @@ class JwtReactiveAuthenticationManagerTest {
     }
 
     @Test
-    @DisplayName("token expiré → rejeté (BadCredentials)")
+    @DisplayName("token expiré → rejeté par le decoder standard")
     void token_expire_rejete() throws Exception {
         String token = jeton(Instant.now().minusSeconds(60));
 
-        StepVerifier.create(manager.authenticate(JwtAuthenticationToken.unauthenticated(token)))
-                .expectError(BadCredentialsException.class)
+        StepVerifier.create(decoder.decode(token))
+                .expectError()
                 .verify();
     }
 }
