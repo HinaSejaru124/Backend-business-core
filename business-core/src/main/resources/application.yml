@@ -52,6 +52,14 @@ businesscore:
     client-secret: ${KERNEL_CLIENT_SECRET:}
     timeout-ms: 5000
     max-retries: 2
+  # Authentification déléguée au kernel (cf. Guide_Special_Auth.md)
+  auth:
+    # Tenant kernel en mode mono-tenant (en-tête X-Tenant-Id). Multi-tenant : découvert plus tard.
+    tenant-id: ${KERNEL_TENANT_ID:}
+    # Émetteur attendu du JWT (claim iss). Vide = vérification iss ignorée.
+    issuer: ${KERNEL_ISSUER:}
+    # URI des clés publiques RS256. Vide = déduite de kernel.base-url + /.well-known/jwks.json
+    jwks-uri: ${KERNEL_JWKS_URI:}
   security:
     # Clé maîtresse de chiffrement des secrets kernel (AES-256-GCM). Jamais en clair dans le repo.
     encryption-key: ${BC_ENCRYPTION_KEY:}
