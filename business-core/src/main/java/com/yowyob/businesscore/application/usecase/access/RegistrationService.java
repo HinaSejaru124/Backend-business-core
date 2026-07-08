@@ -4,9 +4,7 @@ import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccoun
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
 import com.yowyob.businesscore.domain.port.in.ApiKeyEmise;
 import com.yowyob.businesscore.domain.port.in.RegistrationUseCase;
-import com.yowyob.businesscore.domain.port.out.KernelClientCredentials;
-import com.yowyob.businesscore.domain.port.out.ProvisionnerAccesDev;
-import com.yowyob.businesscore.infrastructure.security.SecretCipher;
+import com.yowyob.businesscore.domain.port.out.AuthentifierUtilisateur;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -16,53 +14,48 @@ import java.util.Base64;
 import java.util.UUID;
 
 /**
- * Inscription d'un développeur (famille Accès, socle).
- *
- * <p>Provisionne une ClientApplication kernel dédiée (gouvernance native par développeur), stocke sa
- * clé kernel chiffrée (AES-GCM) et la clé Business Core hachée, puis renvoie la clé Business Core
- * (le secret n'est affiché qu'une fois). Le secret kernel n'est jamais exposé au développeur (ENF-04).
+ * Inscription d'un développeur :
+ * 1. Crée le compte sur le kernel (sign-up)
+ * 2. Crée le compte BC local (bcClientId + bcApiKey)
+ * Le dev vérifie son email, puis se connecte via POST /v1/auth/login.
  */
 @Service
 public class RegistrationService implements RegistrationUseCase {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final ProvisionnerAccesDev provisionnerAccesDev;
     private final DeveloperAccountRepository repository;
     private final PasswordEncoder passwordEncoder;
-    private final SecretCipher secretCipher;
+    private final AuthentifierUtilisateur authentifier;
 
-    public RegistrationService(ProvisionnerAccesDev provisionnerAccesDev,
-                               DeveloperAccountRepository repository,
+    public RegistrationService(DeveloperAccountRepository repository,
                                PasswordEncoder passwordEncoder,
-                               SecretCipher secretCipher) {
-        this.provisionnerAccesDev = provisionnerAccesDev;
+                               AuthentifierUtilisateur authentifier) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
-        this.secretCipher = secretCipher;
+        this.authentifier = authentifier;
     }
 
     @Override
-    public Mono<ApiKeyEmise> inscrire(String nom, String email, String planCode) {
+    public Mono<ApiKeyEmise> inscrire(String firstName, String lastName,
+                                      String email, String password,
+                                      String planCode) {
         String plan = (planCode == null || planCode.isBlank()) ? "FREE" : planCode;
         String bcClientId = "bck_" + jeton(9);
-        String bcApiKey = jeton(32);
+        String bcApiKey   = jeton(32);
 
-        return provisionnerAccesDev.provisionner(plan)
-                .flatMap(kernelCreds -> sauvegarder(bcClientId, bcApiKey, plan, kernelCreds))
+        return authentifier.signUp(email, password, firstName, lastName)
+                .flatMap(signUpResult -> {
+                    DeveloperAccountEntity entity = DeveloperAccountEntity.nouveau(
+                            UUID.randomUUID(),
+                            bcClientId,
+                            passwordEncoder.encode(bcApiKey),
+                            null,
+                            null,
+                            plan);
+                    return repository.save(entity);
+                })
                 .thenReturn(new ApiKeyEmise(bcClientId, bcApiKey, plan));
-    }
-
-    private Mono<DeveloperAccountEntity> sauvegarder(String bcClientId, String bcApiKey, String plan,
-                                                     KernelClientCredentials kernelCreds) {
-        DeveloperAccountEntity entity = DeveloperAccountEntity.nouveau(
-                UUID.randomUUID(),
-                bcClientId,
-                passwordEncoder.encode(bcApiKey),
-                kernelCreds.clientId(),
-                secretCipher.chiffrer(kernelCreds.secret()),
-                plan);
-        return repository.save(entity);
     }
 
     private static String jeton(int octets) {

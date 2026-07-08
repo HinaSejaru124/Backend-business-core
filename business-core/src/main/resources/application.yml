@@ -3,8 +3,6 @@ spring:
     name: business-core
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
-
-  # Runtime réactif (non bloquant). En prod, surchargé par SPRING_R2DBC_* (précédence env > yaml).
   r2dbc:
     url: ${BC_R2DBC_URL:r2dbc:postgresql://localhost:5432/businesscore}
     username: ${BC_DB_APP_USER:bc_app}
@@ -12,56 +10,39 @@ spring:
     pool:
       initial-size: 5
       max-size: 20
-
-  # Migrations au démarrage (JDBC, distinct du runtime R2DBC). En prod : SPRING_LIQUIBASE_*.
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.xml
     url: ${BC_JDBC_URL:jdbc:postgresql://localhost:5432/businesscore}
     user: ${BC_DB_OWNER_USER:bc_owner}
     password: ${BC_DB_OWNER_PASSWORD:bc_owner}
-
   data:
     redis:
       host: ${BC_REDIS_HOST:localhost}
       port: ${BC_REDIS_PORT:6379}
-
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    # Sécurité : vide en local (PLAINTEXT). En prod yowyob, fournir via SPRING_KAFKA_* :
-    #   security.protocol = SASL_PLAINTEXT ; properties.sasl.mechanism = SCRAM-SHA-256 ;
-    #   properties.sasl.jaas.config = org.apache.kafka.common.security.scram.ScramLoginModule required ...
     security:
       protocol: ${SPRING_KAFKA_SECURITY_PROTOCOL:}
     properties:
       sasl.mechanism: ${SPRING_KAFKA_PROPERTIES_SASL_MECHANISM:}
       sasl.jaas.config: ${SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG:}
 
-# Derrière le path-routing Traefik (PathPrefix /business-core-api + stripprefix), honorer
-# X-Forwarded-* pour des liens/redirections corrects (Swagger, etc.).
 server:
   forward-headers-strategy: framework
 
-# Configuration propre au Business Core
 businesscore:
   kernel:
-    # Hôte interne du kernel sur le réseau yowyob en prod : http://kernel-core-kernel-layer-1:8080
-    base-url: ${KERNEL_BASE_URL:http://kernel-core.yowyob.com}
-    # ClientApplication PLATEFORME du Business Core (pour provisionner les clients des développeurs)
-    client-id: ${KERNEL_CLIENT_ID:}
-    client-secret: ${KERNEL_CLIENT_SECRET:}
+    base-url: ${KERNEL_BASE_URL:https://kernel-core.yowyob.com}
+    client-id: ${KERNEL_CLIENT_ID:prod-platform-backend}
+    client-secret: ${KERNEL_CLIENT_SECRET:VbWi225xzYPoD8rQ2FRniTAqkylh34XYeWxa9HCU}
     timeout-ms: 5000
     max-retries: 2
-  # Authentification déléguée au kernel (cf. Guide_Special_Auth.md)
   auth:
-    # Tenant kernel en mode mono-tenant (en-tête X-Tenant-Id). Multi-tenant : découvert plus tard.
     tenant-id: ${KERNEL_TENANT_ID:}
-    # Émetteur attendu du JWT (claim iss). Vide = vérification iss ignorée.
     issuer: ${KERNEL_ISSUER:}
-    # URI des clés publiques RS256. Vide = déduite de kernel.base-url + /.well-known/jwks.json
     jwks-uri: ${KERNEL_JWKS_URI:}
   security:
-    # Clé maîtresse de chiffrement des secrets kernel (AES-256-GCM). Jamais en clair dans le repo.
     encryption-key: ${BC_ENCRYPTION_KEY:}
     cors:
       allowed-origins: ${BC_CORS_ORIGINS:*}
@@ -80,7 +61,7 @@ management:
 
 logging:
   level:
-    com.yowyob.businesscore: ${BC_LOG_LEVEL:INFO}
+    com.yowyob.businesscore: ${BC_LOG_LEVEL:DEBUG}
 
 ---
 spring:
@@ -88,8 +69,6 @@ spring:
     activate:
       on-profile: dev
 businesscore:
-  kernel:
-    base-url: ${KERNEL_BASE_URL:http://localhost:8089}
   security:
     encryption-key: ${BC_ENCRYPTION_KEY:dev-only-insecure-key-change-me-32b}
 

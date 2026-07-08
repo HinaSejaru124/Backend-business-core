@@ -1,5 +1,8 @@
 package com.yowyob.businesscore.adapter.in.security;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,14 +19,12 @@ import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
-import com.yowyob.businesscore.infrastructure.config.AuthProperties;
-import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
-import java.util.List;
+import com.yowyob.businesscore.infrastructure.config.AuthProperties;
+import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 
 /**
  * Sécurité réactive du Business Core (Barrière 1 + en-têtes + CORS).
@@ -36,16 +37,19 @@ import java.util.List;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
-    private static final String[] ROUTES_PUBLIQUES = {
-            "/health",
-            "/actuator/health",
-            "/v1/registration",
-            "/v1/auth/login",
-            "/swagger-ui.html",
-            "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/webjars/**"
-    };
+    // Remplace uniquement le tableau ROUTES_PUBLIQUES
+private static final String[] ROUTES_PUBLIQUES = {
+        "/health",
+        "/actuator/health",
+        "/v1/registration",
+        "/v1/auth/login",
+        "/v1/auth/discover",
+        "/v1/auth/select",
+        "/swagger-ui.html",
+        "/swagger-ui/**",
+        "/v3/api-docs/**",
+        "/webjars/**"
+};
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(

@@ -1,0 +1,11 @@
+KERNEL_BASE_URL=https://kernel-core.yowyob.com
+# ClientApplication PLATEFORME du Business Core (fournie par le DevOps en prod ; ne pas committer)
+KERNEL_CLIENT_ID=prod-platform-backend
+KERNEL_CLIENT_SECRET=VbWi225xzYPoD8rQ2FRniTAqkylh34XYeWxa9HCU
+
+
+{
+  "clientId": "bck_4ntUjXu8AlSj",
+  "apiKey": "JZwlkMVI_iWfs6Ia0N2M3drkMcschmDl8C7WZuJkv6c",
+  "plan": "FREE"
+}

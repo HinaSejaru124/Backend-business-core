@@ -10,4 +10,6 @@ import reactor.core.publisher.Mono;
 public interface AuthentifierUtilisateur {
 
     Mono<ResultatLogin> login(String principal, String motDePasse);
+    Mono<SignUpResult> signUp(String principal, String password,
+                                                   String firstName, String lastName);
 }
