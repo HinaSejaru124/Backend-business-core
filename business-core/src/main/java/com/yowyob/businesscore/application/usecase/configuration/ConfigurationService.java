@@ -89,11 +89,11 @@ public class ConfigurationService {
      */
     public Mono<String> resoudreValeur(UUID entrepriseId, UUID versionTypeId, String cle) {
         return depot.trouverParCleEtEntreprise(cle, entrepriseId)
-                .map(ParametreConfig::valeur)
+                .map(parametre -> parametre.valeur())
                 // Fallback sur le niveau TYPE si pas de surcharge entreprise
                 .switchIfEmpty(
                     depot.trouverParCleEtVersion(cle, versionTypeId)
-                         .map(ParametreConfig::valeur)
+                         .map(parametre -> parametre.valeur())
                 )
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                     "Paramètre '" + cle + "' introuvable pour cette entreprise.")));

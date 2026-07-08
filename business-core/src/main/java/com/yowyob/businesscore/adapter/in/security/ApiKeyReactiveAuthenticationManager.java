@@ -53,7 +53,7 @@ public class ApiKeyReactiveAuthenticationManager implements ReactiveAuthenticati
         String secret = (String) token.getCredentials();
 
         return apiKeyRepository.findByPrefix(prefix)
-                .filter(ApiKeyEntity::estActive)
+                .filter(cle -> cle.estActive())
                 .filter(cle -> passwordEncoder.matches(secret, cle.getKeyHash()))
                 .flatMap(cle -> construireContexte(cle, token.getOnBehalfOf()))
                 .switchIfEmpty(Mono.error(new BadCredentialsException("Clé Business Core invalide")));

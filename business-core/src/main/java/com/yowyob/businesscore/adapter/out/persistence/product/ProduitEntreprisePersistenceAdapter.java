@@ -20,7 +20,7 @@ public class ProduitEntreprisePersistenceAdapter implements DepotProduitEntrepri
     @Override
     public Mono<UUID> trouverProductId(UUID entrepriseId, UUID offreId) {
         return repository.findByEntrepriseIdAndOffreId(entrepriseId, offreId)
-                .map(ProduitEntrepriseEntity::getProductId);
+                .map(entity -> entity.getProductId());
     }
 
     @Override

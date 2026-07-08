@@ -1,6 +1,5 @@
 package com.yowyob.businesscore.application.usecase.operation;
 
-import com.yowyob.businesscore.domain.operation.EtapeOperation;
 import com.yowyob.businesscore.domain.operation.spi.PersisterOperation;
 import com.yowyob.businesscore.domain.port.internal.PlanificateurDOperation;
 import com.yowyob.businesscore.domain.shared.TypeEtape;
@@ -25,6 +24,6 @@ public class PlanificateurDOperationParBase implements PlanificateurDOperation {
 
     @Override
     public Flux<TypeEtape> planifier(UUID operationId) {
-        return persisterOperation.listerEtapes(operationId).map(EtapeOperation::typeEtape);
+        return persisterOperation.listerEtapes(operationId).map(etape -> etape.typeEtape());
     }
 }

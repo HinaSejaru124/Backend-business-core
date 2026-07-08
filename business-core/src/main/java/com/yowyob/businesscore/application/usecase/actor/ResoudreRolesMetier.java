@@ -1,6 +1,5 @@
 package com.yowyob.businesscore.application.usecase.actor;
 
-import com.yowyob.businesscore.domain.actor.RoleMetier;
 import com.yowyob.businesscore.domain.actor.spi.DepotActeur;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -33,7 +32,7 @@ public class ResoudreRolesMetier {
         return depotActeur.acteursParEntreprise(entrepriseId)
                 .filter(acteur -> acteur.estActif() && acteurKernelId.equals(acteur.acteurKernelId()))
                 .flatMap(acteur -> depotActeur.roleParId(acteur.roleMetierId()))
-                .map(RoleMetier::code)
+                .map(role -> role.code())
                 .collect(Collectors.toUnmodifiableSet());
     }
 }

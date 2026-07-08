@@ -3,7 +3,6 @@ package com.yowyob.businesscore.adapter.in.security;
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -19,7 +18,7 @@ public class BusinessContextWebFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         return ReactiveSecurityContextHolder.getContext()
-                .map(SecurityContext::getAuthentication)
+                .map(securityContext -> securityContext.getAuthentication())
                 .filter(auth -> auth != null && auth.isAuthenticated()
                         && auth.getPrincipal() instanceof BusinessContext)
                 .map(auth -> (BusinessContext) auth.getPrincipal())

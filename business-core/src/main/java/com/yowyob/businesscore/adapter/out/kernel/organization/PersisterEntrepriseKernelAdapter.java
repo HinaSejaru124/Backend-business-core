@@ -13,6 +13,7 @@ import com.yowyob.businesscore.domain.port.out.PersisterEntreprise;
 import com.yowyob.businesscore.domain.shared.CycleVie;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -68,7 +69,7 @@ public Mono<UUID> creerAgence(UUID organizationId, String nom) {
                     Map.of("code", code, "name", nom != null ? nom : "Agence principale"),
                     KernelId.class,
                     organizationId)
-            .map(KernelId::id);
+            .map(kernelId -> kernelId.id());
 }
 
     @Override
@@ -98,6 +99,17 @@ public Mono<UUID> creerAgence(UUID organizationId, String nom) {
                     }
                     return agences.length > 0 ? Mono.just(agences[0].id()) : Mono.empty();
                 });
+    }
+
+    @Override
+    public Mono<Void> souscrireServices(UUID organizationId) {
+        return Flux.fromIterable(properties.organizationServices())
+                .concatMap(code -> kernel.postForOrganization(
+                        "/api/organizations/" + organizationId + "/services",
+                        Map.of("serviceCode", code),
+                        Void.class,
+                        organizationId))
+                .then();
     }
 
     /** Crée le business actor propriétaire (prérequis à la création d'organisation). */

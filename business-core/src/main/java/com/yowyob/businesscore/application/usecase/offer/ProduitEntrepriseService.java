@@ -67,7 +67,7 @@ public class ProduitEntrepriseService implements ResoudreProduitEntreprise {
 
     private static CreationProduit construire(DefinitionOffre offre, ContexteKernel ctx) {
         boolean priceless = offre.prix() == null;
-        BigDecimal unitPrice = priceless ? BigDecimal.ZERO : offre.prix();
+        BigDecimal unitPrice = priceless ? new BigDecimal("0.01") : offre.prix();
         return new CreationProduit(
                 ctx.organizationId(),
                 sku(offre),

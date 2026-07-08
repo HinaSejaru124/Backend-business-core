@@ -2,7 +2,6 @@ package com.yowyob.businesscore.adapter.out.kernel.auth;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.yowyob.businesscore.application.error.ProblemException;
-import com.yowyob.businesscore.infrastructure.config.AuthProperties;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,10 +36,9 @@ class KernelAuthAdapterTest {
         wireMock = new WireMockServer(options().dynamicPort());
         wireMock.start();
         KernelProperties kernelProps = new KernelProperties(
-                "http://localhost:" + wireMock.port(), 5000, 0, "bc-app", "bc-secret", "ORGANIZATION", "OWNER");
-        AuthProperties authProps = new AuthProperties("tenant-123", "", "");
+                "http://localhost:" + wireMock.port(), 5000, 0, "bc-app", "bc-secret", "ORGANIZATION", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(kernelProps.baseUrl()).build();
-        adapter = new KernelAuthAdapter(webClient, kernelProps, authProps);
+        adapter = new KernelAuthAdapter(webClient, kernelProps);
     }
 
     @AfterEach

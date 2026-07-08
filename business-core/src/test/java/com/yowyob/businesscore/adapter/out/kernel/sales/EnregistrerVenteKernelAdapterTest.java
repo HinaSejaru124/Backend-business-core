@@ -4,7 +4,10 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
+import com.yowyob.businesscore.domain.actor.ActeurMetier;
+import com.yowyob.businesscore.domain.actor.spi.DepotActeur;
 import com.yowyob.businesscore.domain.port.internal.ContexteKernel;
+import com.yowyob.businesscore.domain.port.internal.ResoudreProduitEntreprise;
 import com.yowyob.businesscore.domain.port.internal.ResolveurContexteKernel;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.junit.jupiter.api.AfterEach;
@@ -59,13 +62,21 @@ class EnregistrerVenteKernelAdapterTest {
         when(resolveur.resoudre(any())).thenReturn(Mono.just(new ContexteKernel(
                 organizationId, agencyId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "XAF")));
 
+        ResoudreProduitEntreprise resoudreProduit = mock(ResoudreProduitEntreprise.class);
+        DepotActeur depotActeur = mock(DepotActeur.class);
+
         KernelProperties props = new KernelProperties(
-                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER");
+                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
         KernelClient kernel = new KernelClient(
                 webClient, tokenService, credentialStore, JsonMapper.builder().build(), props);
-        adapter = new EnregistrerVenteKernelAdapter(kernel, resolveur);
+        adapter = new EnregistrerVenteKernelAdapter(kernel, resolveur, resoudreProduit, depotActeur);
+        this.resoudreProduit = resoudreProduit;
+        this.depotActeur = depotActeur;
     }
+
+    private ResoudreProduitEntreprise resoudreProduit;
+    private DepotActeur depotActeur;
 
     @AfterEach
     void tearDown() {
@@ -78,6 +89,15 @@ class EnregistrerVenteKernelAdapterTest {
         String orderId = UUID.randomUUID().toString();
         String invoiceId = UUID.randomUUID().toString();
         String billId = UUID.randomUUID().toString();
+        UUID offreId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID beneficiaireLocalId = UUID.randomUUID();
+        UUID tiersKernelId = UUID.randomUUID();
+        UUID businessId = UUID.randomUUID();
+
+        when(resoudreProduit.resoudre(businessId, offreId)).thenReturn(Mono.just(productId));
+        when(depotActeur.acteurParId(beneficiaireLocalId)).thenReturn(Mono.just(
+                ActeurMetier.nouveau(beneficiaireLocalId, businessId, UUID.randomUUID(), tiersKernelId)));
 
         wireMock.stubFor(post(urlEqualTo("/api/sales/orders"))
                 .willReturn(okJson("{\"id\":\"" + orderId + "\"}")));
@@ -88,7 +108,7 @@ class EnregistrerVenteKernelAdapterTest {
         wireMock.stubFor(post(urlEqualTo("/api/bills/import/accounting-invoices/" + invoiceId))
                 .willReturn(okJson("{\"id\":\"" + billId + "\",\"totalAmount\":1500,\"currency\":\"XAF\"}")));
 
-        StepVerifier.create(adapter.enregistrer(UUID.randomUUID(), 2, UUID.randomUUID(), UUID.randomUUID()))
+        StepVerifier.create(adapter.enregistrer(offreId, 2, beneficiaireLocalId, businessId))
                 .assertNext(vente -> {
                     assertThat(vente.commandeId().toString()).isEqualTo(orderId);
                     assertThat(vente.billId().toString()).isEqualTo(billId);
@@ -97,10 +117,12 @@ class EnregistrerVenteKernelAdapterTest {
                 })
                 .verifyComplete();
 
-        // La commande porte la devise et l'organisation résolues (le métier ne les fournit pas).
+        // La commande porte la devise, l'organisation et les ids kernel résolus (pas les ids BC locaux).
         wireMock.verify(postRequestedFor(urlEqualTo("/api/sales/orders"))
                 .withRequestBody(matchingJsonPath("$.currency", equalTo("XAF")))
-                .withRequestBody(matchingJsonPath("$.organizationId", equalTo(organizationId.toString()))));
+                .withRequestBody(matchingJsonPath("$.organizationId", equalTo(organizationId.toString())))
+                .withRequestBody(matchingJsonPath("$.productId", equalTo(productId.toString())))
+                .withRequestBody(matchingJsonPath("$.customerThirdPartyId", equalTo(tiersKernelId.toString()))));
         wireMock.verify(postRequestedFor(urlEqualTo("/api/sales/orders/" + orderId + "/confirm")));
         wireMock.verify(postRequestedFor(urlEqualTo("/api/accounting/invoices/from-orders/" + orderId)));
         wireMock.verify(postRequestedFor(urlEqualTo("/api/bills/import/accounting-invoices/" + invoiceId)));

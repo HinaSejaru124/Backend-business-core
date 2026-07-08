@@ -80,14 +80,26 @@ public class KernelClient {
         return exchange(HttpMethod.POST, path, body, type, null);
     }
 
-    /** Variante pour une opération liée à une organisation (ajoute {@code X-Organization-Id}). */
     public <T> Mono<T> getForOrganization(String path, Class<T> type, UUID organizationId) {
         return exchange(HttpMethod.GET, path, null, type, organizationId);
+    }
+
+    public Mono<byte[]> getBytes(String path) {
+        return exchangeBytes(HttpMethod.GET, path, null);
+    }
+
+    public Mono<byte[]> getBytesForOrganization(String path, UUID organizationId) {
+        return exchangeBytes(HttpMethod.GET, path, organizationId);
     }
 
     /** Variante pour une opération liée à une organisation (ajoute {@code X-Organization-Id}). */
     public <T> Mono<T> postForOrganization(String path, Object body, Class<T> type, UUID organizationId) {
         return exchange(HttpMethod.POST, path, body, type, organizationId);
+    }
+
+    /** Variante pour une opération liée à une organisation (ajoute {@code X-Organization-Id}). */
+    public <T> Mono<T> putForOrganization(String path, Object body, Class<T> type, UUID organizationId) {
+        return exchange(HttpMethod.PUT, path, body, type, organizationId);
     }
 
     private <T> Mono<T> exchange(HttpMethod method, String path, Object body, Class<T> type, UUID organizationId) {
@@ -105,7 +117,7 @@ public class KernelClient {
                                         UUID organizationId, String tokenUtilisateur) {
         return BusinessContextHolder.currentTenantId().flatMap(tenant ->
                 envoyer(method, path, body, type, appClientId, appApiKey, tokenUtilisateur,
-                        tenant.map(UUID::toString).orElse(null), organizationId));
+                        tenant.map(uuid -> uuid.toString()).orElse(null), organizationId));
     }
 
     /**
@@ -135,9 +147,58 @@ public class KernelClient {
         }
         WebClient.RequestHeadersSpec<?> finalSpec = (body != null) ? spec.bodyValue(body) : spec;
         return finalSpec.retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(Object.class)
                 .transform(this::resilience)
-                .flatMap(corps -> extraireData(corps, type));
+                .flatMap(corps -> convertirReponse(corps, type));
+    }
+
+    private <T> Mono<T> convertirReponse(Object corps, Class<T> type) {
+        if (corps instanceof Map<?, ?> map) {
+            return extraireData(map, type);
+        }
+        if (type == Void.class || corps == null) {
+            return Mono.empty();
+        }
+        return Mono.just(objectMapper.convertValue(corps, type));
+    }
+
+    private Mono<byte[]> exchangeBytes(HttpMethod method, String path, UUID organizationId) {
+        return KernelTokenHolder.currentToken().flatMap(tokenDelegue ->
+                tokenDelegue.isPresent()
+                        ? exchangeBytesDelegue(method, path, organizationId, tokenDelegue.get())
+                        : exchangeBytesMachine(method, path, organizationId));
+    }
+
+    private Mono<byte[]> exchangeBytesDelegue(HttpMethod method, String path, UUID organizationId,
+                                              String tokenUtilisateur) {
+        return BusinessContextHolder.currentTenantId().flatMap(tenant ->
+                envoyerBytes(method, path, appClientId, appApiKey, tokenUtilisateur,
+                        tenant.map(uuid -> uuid.toString()).orElse(null), organizationId));
+    }
+
+    private Mono<byte[]> exchangeBytesMachine(HttpMethod method, String path, UUID organizationId) {
+        return credentialStore.pourTenantCourant().flatMap(creds ->
+                tokenService.tokenPour(creds.clientId(), creds.secret()).flatMap(jwt ->
+                        envoyerBytes(method, path, creds.clientId(), creds.secret(), jwt,
+                                null, organizationId)));
+    }
+
+    private Mono<byte[]> envoyerBytes(HttpMethod method, String path,
+                                      String clientId, String apiKey, String bearer,
+                                      String tenantId, UUID organizationId) {
+        WebClient.RequestBodySpec spec = kernelWebClient.method(method).uri(path);
+        spec.header(HEADER_CLIENT_ID, clientId)
+                .header(HEADER_API_KEY, apiKey)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
+        if (tenantId != null) {
+            spec.header(HEADER_TENANT_ID, tenantId);
+        }
+        if (organizationId != null) {
+            spec.header(HEADER_ORGANIZATION_ID, organizationId.toString());
+        }
+        return spec.retrieve()
+                .bodyToMono(byte[].class)
+                .transform(this::resilience);
     }
 
     /**

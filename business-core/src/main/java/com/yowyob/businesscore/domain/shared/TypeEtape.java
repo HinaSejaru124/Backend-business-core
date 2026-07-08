@@ -9,6 +9,7 @@ package com.yowyob.businesscore.domain.shared;
  */
 public enum TypeEtape {
     VERIFIER_STOCK,
+    ENGAGER_STOCK,
     EVALUER_REGLES,
     ENREGISTRER_VENTE,
     ENCAISSER,

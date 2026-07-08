@@ -34,6 +34,8 @@ public final class ClesContexte {
     public static final String DEVISE = "devise";
     public static final String TRANSACTION_KERNEL_ID = "transactionKernelId"; // billId cashier — cible de l'encaissement + réf. transaction
     public static final String COMMANDE_ID = "commandeId"; // id commande vente (order) — point de compensation
+    public static final String PRODUCT_ID = "productId"; // id produit kernel résolu pour l'offre
+    public static final String MOUVEMENT_STOCK_ID = "mouvementStockId";
     public static final String MOUVEMENT_ID = "mouvementId"; // id du paiement enregistré (encaissement)
     public static final String DOCUMENT_ID = "documentId";
     public static final String RESULTAT_REGLES = "resultatRegles"; // List<EffetAAppliquer> (audit)

@@ -5,15 +5,15 @@ import com.yowyob.businesscore.domain.transaction.TransactionVue;
 import com.yowyob.businesscore.domain.transaction.spi.LireTransactions;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Adapter kernel — implémente {@link LireTransactions}. Lit l'historique des transactions d'une
- * organisation depuis le core cashier ({@code GET /api/cashier/transactions}) via la variante
- * {@code getForOrganization} (ajoute {@code X-Organization-Id}). Les données ne sont jamais stockées.
+ * Adapter kernel — implémente {@link LireTransactions}. Lit l'historique des mouvements de caisse
+ * ({@code GET /api/cashier/movements}) et le détail d'un bill ({@code GET /api/cashier/bills/{id}}).
  */
 @Component
 public class LireTransactionsKernelAdapter implements LireTransactions {
@@ -26,14 +26,50 @@ public class LireTransactionsKernelAdapter implements LireTransactions {
 
     @Override
     public Flux<TransactionVue> listerParOrganisation(UUID organizationId, int page, int taille) {
-        String path = "/api/cashier/transactions?page=" + page + "&size=" + taille;
-        return kernel.getForOrganization(path, TransactionItem[].class, organizationId)
+        return kernel.getForOrganization("/api/cashier/movements", CashMovementView[].class, organizationId)
                 .flatMapMany(Flux::fromArray)
-                .map(item -> new TransactionVue(
-                        item.id(), item.amount(), item.currency(), item.status(), item.date()));
+                .skip((long) page * taille)
+                .take(taille)
+                .map(this::versVue);
+    }
+
+    @Override
+    public Mono<TransactionVue> trouverBill(UUID organizationId, UUID billId) {
+        return kernel.getForOrganization(
+                        "/api/cashier/bills/" + billId, BillView.class, organizationId)
+                .map(this::versVue);
+    }
+
+    @Override
+    public Mono<TransactionVue> trouverCommande(UUID organizationId, UUID commandeId) {
+        return kernel.getForOrganization(
+                        "/api/sales/orders/" + commandeId, SalesOrderView.class, organizationId)
+                .map(this::versVue);
+    }
+
+    private TransactionVue versVue(CashMovementView item) {
+        return new TransactionVue(
+                item.id(), item.amount(), item.currency(), item.status(), item.createdAt(), null);
+    }
+
+    private TransactionVue versVue(BillView bill) {
+        return new TransactionVue(
+                bill.id(), bill.totalAmount(), bill.currency(), bill.status(), bill.createdAt(),
+                bill.paidAmount());
+    }
+
+    private TransactionVue versVue(SalesOrderView order) {
+        return new TransactionVue(
+                order.id(), order.unitPrice(), order.currency(), order.status(), null, null);
     }
 }
 
-/** Élément de transaction tel que renvoyé par le core cashier du kernel. */
-record TransactionItem(UUID id, BigDecimal amount, String currency, String status, Instant date) {
+record CashMovementView(UUID id, BigDecimal amount, String currency, String status, Instant createdAt) {
+}
+
+record BillView(UUID id, BigDecimal totalAmount, BigDecimal paidAmount, String currency, String status,
+                Instant createdAt) {
+}
+
+record SalesOrderView(UUID id, BigDecimal unitPrice, String currency, String status) {
 }

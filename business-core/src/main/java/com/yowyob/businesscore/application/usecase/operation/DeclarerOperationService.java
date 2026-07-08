@@ -60,7 +60,7 @@ public class DeclarerOperationService {
 
         return persisterOperation.sauvegarderDefinition(definition).flatMap(sauvegardee -> {
             List<EtapeOperation> etapesDomaine = etapes.stream()
-                    .sorted(Comparator.comparingInt(EtapeDeclaration::ordre))
+                    .sorted(Comparator.comparingInt(etape -> etape.ordre()))
                     .map(e -> EtapeOperation.creer(sauvegardee.id(), e.ordre(), e.typeEtape()))
                     .toList();
             if (etapesDomaine.isEmpty()) {

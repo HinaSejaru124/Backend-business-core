@@ -3,7 +3,6 @@ package com.yowyob.businesscore.adapter.in.security;
 import com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -27,7 +26,7 @@ public class UsageTrackingWebFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         return ReactiveSecurityContextHolder.getContext()
-                .map(SecurityContext::getAuthentication)
+                .map(securityContext -> securityContext.getAuthentication())
                 .filter(auth -> auth instanceof ApiKeyAuthenticationToken token && token.getApiKeyId() != null)
                 .map(auth -> ((ApiKeyAuthenticationToken) auth).getApiKeyId())
                 .flatMap(apiKeyId -> chain.filter(exchange)

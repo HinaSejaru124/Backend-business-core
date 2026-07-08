@@ -46,7 +46,7 @@ class KernelClientDelegationTest {
         wireMock = new WireMockServer(options().dynamicPort());
         wireMock.start();
         KernelProperties props = new KernelProperties(
-                "http://localhost:" + wireMock.port(), 5000, 0, "bc-app", "bc-secret", "ORGANIZATION", "OWNER");
+                "http://localhost:" + wireMock.port(), 5000, 0, "bc-app", "bc-secret", "ORGANIZATION", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
         kernel = new KernelClient(
                 webClient, mock(KernelTokenService.class), mock(KernelCredentialStore.class),

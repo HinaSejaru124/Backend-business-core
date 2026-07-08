@@ -37,4 +37,19 @@ public class TransactionController {
                 .collectList()
                 .map(contenu -> Page.of(contenu, page, size, contenu.size()));
     }
+
+    @GetMapping("/businesses/{businessId}/transactions/{billId}")
+    public Mono<TransactionResponse> trouver(@PathVariable UUID businessId, @PathVariable UUID billId) {
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> consulterTransaction.trouver(businessId, billId, ctx))
+                .map(TransactionResponse::depuis);
+    }
+
+    @GetMapping("/businesses/{businessId}/orders/{orderId}")
+    public Mono<TransactionResponse> trouverCommande(@PathVariable UUID businessId,
+                                                     @PathVariable UUID orderId) {
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> consulterTransaction.trouverCommande(businessId, orderId, ctx))
+                .map(TransactionResponse::depuis);
+    }
 }

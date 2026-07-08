@@ -24,4 +24,7 @@ public interface PersisterEntreprise {
      * (FERMEE), {@code reopen} (réactivation → ACTIVE). POST /api/organizations/{orgId}/{action}.
      */
     Mono<Void> changerCycleVieKernel(UUID organizationId, CycleVie cible);
+
+    /** Souscrit les services kernel requis pour sales, billing, stock et comptabilité. */
+    Mono<Void> souscrireServices(UUID organizationId);
 }

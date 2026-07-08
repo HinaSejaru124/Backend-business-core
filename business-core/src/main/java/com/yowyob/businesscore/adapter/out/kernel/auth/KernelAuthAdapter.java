@@ -14,18 +14,15 @@ import com.yowyob.businesscore.domain.port.out.AuthentifierUtilisateur;
 import com.yowyob.businesscore.domain.port.out.OrganisationAccessible;
 import com.yowyob.businesscore.domain.port.out.ResultatLogin;
 import com.yowyob.businesscore.domain.port.out.SignUpResult;
-import com.yowyob.businesscore.infrastructure.config.AuthProperties;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 
 import reactor.core.publisher.Mono;
 
 /**
  * Adapter d'authentification : implémente {@link AuthentifierUtilisateur} via
- * {@code POST /api/auth/login}
- * du kernel, en mode <b>app-only</b> (en-têtes d'identité de l'application BC
- * {@code X-Client-Id} /
- * {@code X-Api-Key} + {@code X-Tenant-Id}, <b>sans</b> Bearer — il n'y a pas
- * encore de token utilisateur).
+ * discover-contexts / select-context du kernel, en mode <b>app-only</b>
+ * (en-têtes d'identité de l'application BC {@code X-Client-Id} / {@code X-Api-Key},
+ * <b>sans</b> Bearer — il n'y a pas encore de token utilisateur).
  *
  * <p>
  * Le kernel vérifie le mot de passe et renvoie un JWT signé ; le BC ne stocke
@@ -38,18 +35,14 @@ public class KernelAuthAdapter implements AuthentifierUtilisateur {
 
     private static final String HEADER_CLIENT_ID = "X-Client-Id";
     private static final String HEADER_API_KEY = "X-Api-Key";
-    private static final String HEADER_TENANT_ID = "X-Tenant-Id";
 
     private final WebClient kernelWebClient;
     private final KernelProperties kernelProperties;
-    private final AuthProperties authProperties;
 
     public KernelAuthAdapter(@Qualifier("kernelWebClient") WebClient kernelWebClient,
-            KernelProperties kernelProperties,
-            AuthProperties authProperties) {
+            KernelProperties kernelProperties) {
         this.kernelWebClient = kernelWebClient;
         this.kernelProperties = kernelProperties;
-        this.authProperties = authProperties;
     }
 
     @Override
@@ -76,7 +69,6 @@ public Mono<ResultatLogin> login(String principal, String motDePasse) {
             .flatMap(discoverReponse -> selectPremierContexte(discoverReponse, principal, motDePasse));
 }
 
-@SuppressWarnings("unchecked")
 private Mono<ResultatLogin> selectPremierContexte(Map<?, ?> discoverReponse,
                                                    String principal, String motDePasse) {
     Map<?, ?> data = discoverReponse.containsKey("data")
@@ -123,7 +115,7 @@ private Mono<ResultatLogin> selectPremierContexte(Map<?, ?> discoverReponse,
             .flatMap(this::versResultat);
 }
 
-@SuppressWarnings("unchecked")
+
 private Mono<ResultatLogin> versResultat(Map<?, ?> corps) {
     Object charge = corps;
     if (corps.containsKey("success") && corps.containsKey("data")) {
@@ -218,7 +210,7 @@ private Mono<ResultatLogin> versResultat(Map<?, ?> corps) {
                 .map(this::versSignUpResult);
     }
 
-    @SuppressWarnings("unchecked")
+    
     private SignUpResult versSignUpResult(Map<?, ?> corps) {
         Object charge = corps.containsKey("data") ? corps.get("data") : corps;
         Map<?, ?> data = charge instanceof Map<?, ?> m ? m : Map.of();

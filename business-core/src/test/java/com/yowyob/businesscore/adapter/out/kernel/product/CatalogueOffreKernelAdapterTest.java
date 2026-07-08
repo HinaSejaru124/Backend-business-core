@@ -51,7 +51,7 @@ class CatalogueOffreKernelAdapterTest {
         when(tokenService.tokenPour(any(), any())).thenReturn(Mono.just("jwt-test"));
 
         KernelProperties props = new KernelProperties(
-                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER");
+                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
         KernelClient kernel = new KernelClient(
                 webClient, tokenService, credentialStore, JsonMapper.builder().build(), props);
@@ -87,6 +87,6 @@ class CatalogueOffreKernelAdapterTest {
                 .withRequestBody(matchingJsonPath("$.variantLabel", equalTo("STANDARD")))
                 .withRequestBody(matchingJsonPath("$.unitPrice", equalTo("5000")))
                 .withRequestBody(matchingJsonPath("$.currency", equalTo("XAF")))
-                .withRequestBody(matchingJsonPath("$.trackInventory", equalTo("true"))));
+                .withRequestBody(matchingJsonPath("$.unitPrice", equalTo("5000"))));
     }
 }

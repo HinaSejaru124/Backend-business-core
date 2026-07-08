@@ -27,7 +27,12 @@ public class StockerDocumentKernelAdapter implements StockerDocument {
         String base64 = Base64.getEncoder().encodeToString(contenu == null ? new byte[0] : contenu);
         DeposerFichierRequest requete = new DeposerFichierRequest(nom, contentType, base64);
         return kernel.post("/api/files", requete, FichierResponse.class)
-                .map(FichierResponse::id);
+                .map(fichier -> fichier.id());
+    }
+
+    @Override
+    public Mono<byte[]> lireContenu(UUID fichierId) {
+        return kernel.getBytes("/api/files/" + fichierId + "/content");
     }
 }
 

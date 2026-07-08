@@ -36,4 +36,22 @@ public class ConsulterTransactionService {
                         ? Flux.empty()
                         : lireTransactions.listerParOrganisation(entreprise.organizationId(), page, taille));
     }
+
+    public Mono<TransactionVue> trouver(UUID entrepriseId, UUID billId, BusinessContext ctx) {
+        return resoudreEntreprise.resoudre(entrepriseId)
+                .switchIfEmpty(Mono.error(ProblemException.notFound(
+                        "Entreprise introuvable : " + entrepriseId)))
+                .flatMap(entreprise -> entreprise.organizationId() == null
+                        ? Mono.error(ProblemException.notFound("Organisation kernel absente."))
+                        : lireTransactions.trouverBill(entreprise.organizationId(), billId));
+    }
+
+    public Mono<TransactionVue> trouverCommande(UUID entrepriseId, UUID commandeId, BusinessContext ctx) {
+        return resoudreEntreprise.resoudre(entrepriseId)
+                .switchIfEmpty(Mono.error(ProblemException.notFound(
+                        "Entreprise introuvable : " + entrepriseId)))
+                .flatMap(entreprise -> entreprise.organizationId() == null
+                        ? Mono.error(ProblemException.notFound("Organisation kernel absente."))
+                        : lireTransactions.trouverCommande(entreprise.organizationId(), commandeId));
+    }
 }

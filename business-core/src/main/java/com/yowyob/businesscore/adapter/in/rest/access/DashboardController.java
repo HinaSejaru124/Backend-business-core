@@ -1,6 +1,5 @@
 package com.yowyob.businesscore.adapter.in.rest.access;
 
-import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
@@ -40,9 +39,9 @@ public class DashboardController {
     private Mono<UUID> developerCourant() {
         return BusinessContextHolder.currentContext()
                 .switchIfEmpty(Mono.error(ProblemException.forbidden("Contexte d'authentification absent")))
-                .map(BusinessContext::tenantId)
+                .map(ctx -> ctx.tenantId())
                 .flatMap(developerRepository::findByKernelTenantId)
-                .map(DeveloperAccountEntity::getId)
+                .map(account -> account.getId())
                 .switchIfEmpty(Mono.error(ProblemException.notFound("Compte développeur introuvable")));
     }
 }

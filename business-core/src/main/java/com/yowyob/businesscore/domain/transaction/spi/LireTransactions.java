@@ -2,6 +2,7 @@ package com.yowyob.businesscore.domain.transaction.spi;
 
 import com.yowyob.businesscore.domain.transaction.TransactionVue;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
@@ -12,4 +13,8 @@ import java.util.UUID;
 public interface LireTransactions {
 
     Flux<TransactionVue> listerParOrganisation(UUID organizationId, int page, int taille);
+
+    Mono<TransactionVue> trouverBill(UUID organizationId, UUID billId);
+
+    Mono<TransactionVue> trouverCommande(UUID organizationId, UUID commandeId);
 }

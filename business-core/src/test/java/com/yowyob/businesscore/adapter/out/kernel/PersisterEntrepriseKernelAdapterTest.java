@@ -51,7 +51,7 @@ class PersisterEntrepriseKernelAdapterTest {
         when(tokenService.tokenPour(any(), any())).thenReturn(Mono.just("jwt-test"));
 
         KernelProperties props = new KernelProperties(
-                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER");
+                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
         KernelClient kernel = new KernelClient(
                 webClient, tokenService, credentialStore, JsonMapper.builder().build(), props);
@@ -138,6 +138,18 @@ class PersisterEntrepriseKernelAdapterTest {
         wireMock.verify(postRequestedFor(urlEqualTo("/api/organizations/" + orgId + "/suspend")));
         wireMock.verify(postRequestedFor(urlEqualTo("/api/organizations/" + orgId + "/close")));
         wireMock.verify(postRequestedFor(urlEqualTo("/api/organizations/" + orgId + "/reopen")));
+    }
+
+    @Test
+    void souscrit_les_services_kernel() {
+        UUID orgId = UUID.randomUUID();
+        wireMock.stubFor(post(urlEqualTo("/api/organizations/" + orgId + "/services"))
+                .willReturn(okJson("{}")));
+
+        StepVerifier.create(adapter.souscrireServices(orgId)).verifyComplete();
+
+        wireMock.verify(4, postRequestedFor(urlEqualTo("/api/organizations/" + orgId + "/services"))
+                .withHeader("X-Organization-Id", equalTo(orgId.toString())));
     }
 
     @Test

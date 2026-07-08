@@ -14,11 +14,13 @@ public record TransactionResponse(
         BigDecimal montant,
         String devise,
         String statut,
-        Instant date
+        Instant date,
+        BigDecimal montantPaye
 ) {
 
     public static TransactionResponse depuis(TransactionVue vue) {
         return new TransactionResponse(
-                vue.transactionKernelId(), vue.montant(), vue.devise(), vue.statut(), vue.date());
+                vue.transactionKernelId(), vue.montant(), vue.devise(), vue.statut(), vue.date(),
+                vue.montantPaye());
     }
 }

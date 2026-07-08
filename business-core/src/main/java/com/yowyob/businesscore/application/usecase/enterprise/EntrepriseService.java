@@ -64,8 +64,10 @@ public class EntrepriseService {
         return persisterEntreprise.creerOrganisation(nom)
                 .flatMap(prov -> persisterEntreprise
                         .creerAgence(prov.organizationId(), nom + " — agence principale")
-                        .map(agencyId -> new RefsKernel(
-                                prov.businessActorId(), prov.organizationId(), agencyId)));
+                        .flatMap(agencyId -> persisterEntreprise
+                                .souscrireServices(prov.organizationId())
+                                .thenReturn(new RefsKernel(
+                                        prov.businessActorId(), prov.organizationId(), agencyId))));
     }
 
     /** Références kernel à mémoriser dans l'entité Entreprise. */

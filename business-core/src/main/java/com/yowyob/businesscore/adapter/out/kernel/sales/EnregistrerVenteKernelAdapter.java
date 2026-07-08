@@ -1,7 +1,10 @@
 package com.yowyob.businesscore.adapter.out.kernel.sales;
 
 import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
+import com.yowyob.businesscore.application.error.ProblemException;
+import com.yowyob.businesscore.domain.actor.spi.DepotActeur;
 import com.yowyob.businesscore.domain.port.internal.ContexteKernel;
+import com.yowyob.businesscore.domain.port.internal.ResoudreProduitEntreprise;
 import com.yowyob.businesscore.domain.port.internal.ResolveurContexteKernel;
 import com.yowyob.businesscore.domain.port.out.EnregistrerVente;
 import com.yowyob.businesscore.domain.port.out.VenteEnregistree;
@@ -33,19 +36,33 @@ public class EnregistrerVenteKernelAdapter implements EnregistrerVente {
 
     private final KernelClient kernel;
     private final ResolveurContexteKernel resolveur;
+    private final ResoudreProduitEntreprise resoudreProduit;
+    private final DepotActeur depotActeur;
 
-    public EnregistrerVenteKernelAdapter(KernelClient kernel, ResolveurContexteKernel resolveur) {
+    public EnregistrerVenteKernelAdapter(KernelClient kernel,
+                                         ResolveurContexteKernel resolveur,
+                                         ResoudreProduitEntreprise resoudreProduit,
+                                         DepotActeur depotActeur) {
         this.kernel = kernel;
         this.resolveur = resolveur;
+        this.resoudreProduit = resoudreProduit;
+        this.depotActeur = depotActeur;
     }
 
     @Override
     public Mono<VenteEnregistree> enregistrer(UUID offreId, int quantite, UUID beneficiaireId, UUID businessId) {
-        return resolveur.resoudre(businessId).flatMap(ctx -> {
-            UUID org = ctx.organizationId();
-            CreerCommandeRequest requete = new CreerCommandeRequest(
-                    ctx.currency(), org, ctx.agencyId(), beneficiaireId, offreId, quantite);
-            return kernel.postForOrganization("/api/sales/orders", requete, CommandeResponse.class, org)
+        return Mono.zip(
+                        resolveur.resoudre(businessId),
+                        resoudreProduit.resoudre(businessId, offreId),
+                        resoudreTiersClient(beneficiaireId))
+                .flatMap(t -> {
+                    ContexteKernel ctx = t.getT1();
+                    UUID productId = t.getT2();
+                    UUID customerThirdPartyId = t.getT3();
+                    UUID org = ctx.organizationId();
+                    CreerCommandeRequest requete = new CreerCommandeRequest(
+                            ctx.currency(), org, ctx.agencyId(), customerThirdPartyId, productId, quantite);
+                    return kernel.postForOrganization("/api/sales/orders", requete, CommandeResponse.class, org)
                     .flatMap(commande -> kernel
                             .postForOrganization("/api/sales/orders/" + commande.id() + "/confirm",
                                     null, Void.class, org)
@@ -57,7 +74,18 @@ public class EnregistrerVenteKernelAdapter implements EnregistrerVente {
                                     null, BillResponse.class, org))
                             .map(bill -> new VenteEnregistree(
                                     commande.id(), bill.id(), montant(bill), devise(bill, ctx))));
-        });
+                });
+    }
+
+    /** Le paramètre {@code beneficiaireId} est l'id local {@code ActeurMetier} ; le kernel attend le tiers. */
+    private Mono<UUID> resoudreTiersClient(UUID beneficiaireId) {
+        if (beneficiaireId == null) {
+            return Mono.fromCallable(() -> null);
+        }
+        return depotActeur.acteurParId(beneficiaireId)
+                .switchIfEmpty(Mono.error(ProblemException.notFound(
+                        "Bénéficiaire introuvable : " + beneficiaireId)))
+                .map(acteur -> acteur.acteurKernelId());
     }
 
     @Override

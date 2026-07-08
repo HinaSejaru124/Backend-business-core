@@ -14,6 +14,7 @@ public record TransactionVue(
         BigDecimal montant,
         String devise,
         String statut,
-        Instant date
+        Instant date,
+        BigDecimal montantPaye
 ) {
 }

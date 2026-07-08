@@ -39,7 +39,7 @@ public class ResoudreBeneficiaireKernelAdapter implements ResoudreBeneficiaire {
                             List.of("CUSTOMER"));
                     return kernel.post("/api/third-parties", tiers, KernelId.class);
                 })
-                .map(KernelId::id);
+                .map(kernelId -> kernelId.id());
     }
 
     private static String codeTiers(String identifiant) {

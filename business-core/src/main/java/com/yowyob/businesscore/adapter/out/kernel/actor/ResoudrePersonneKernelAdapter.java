@@ -30,6 +30,6 @@ public class ResoudrePersonneKernelAdapter implements ResoudrePersonne {
         CreerActeurRequest requete = new CreerActeurRequest(
                 nomPersonne.prenom(), nomPersonne.nomFamille(), nom);
         return kernel.post("/api/actors", requete, KernelId.class)
-                .map(KernelId::id);
+                .map(kernelId -> kernelId.id());
     }
 }

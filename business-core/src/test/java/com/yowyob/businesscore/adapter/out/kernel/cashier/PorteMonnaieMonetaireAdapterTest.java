@@ -21,11 +21,13 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -58,11 +60,12 @@ class PorteMonnaieMonetaireAdapterTest {
                 organizationId, UUID.randomUUID(), UUID.randomUUID(), registerId, UUID.randomUUID(), "XAF")));
 
         KernelProperties props = new KernelProperties(
-                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER");
+                "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
         KernelClient kernel = new KernelClient(
                 webClient, tokenService, credentialStore, JsonMapper.builder().build(), props);
-        adapter = new PorteMonnaieMonetaireAdapter(kernel, resolveur);
+        SessionCaisseKernelSupport sessionCaisse = new SessionCaisseKernelSupport(kernel);
+        adapter = new PorteMonnaieMonetaireAdapter(kernel, resolveur, sessionCaisse);
     }
 
     @AfterEach
@@ -71,11 +74,17 @@ class PorteMonnaieMonetaireAdapterTest {
     }
 
     @Test
-    @DisplayName("règle le bill cashier via bills/pay avec montant et caisse résolue")
+    @DisplayName("règle le bill cashier via bills/pay (billId en query param) avec la session ouverte")
     void encaisse_le_bill() {
         UUID billId = UUID.randomUUID();
         UUID paiementId = UUID.randomUUID();
-        wireMock.stubFor(post(urlEqualTo("/api/bills/pay"))
+        UUID sessionId = UUID.randomUUID();
+        // Une session est déjà ouverte pour la caisse : elle est réutilisée, pas de POST /api/sessions.
+        wireMock.stubFor(get(urlEqualTo("/api/cashier/sessions"))
+                .willReturn(okJson("[{\"id\":\"" + sessionId + "\",\"registerId\":\"" + registerId
+                        + "\",\"status\":\"OPEN\"}]")));
+        wireMock.stubFor(post(urlPathEqualTo("/api/bills/pay"))
+                .withQueryParam("billId", equalTo(billId.toString()))
                 .willReturn(okJson("{\"id\":\"" + paiementId + "\"}")));
 
         StepVerifier.create(adapter.enregistrerEchange(
@@ -83,10 +92,38 @@ class PorteMonnaieMonetaireAdapterTest {
                 .expectNext(paiementId)
                 .verifyComplete();
 
-        wireMock.verify(postRequestedFor(urlEqualTo("/api/bills/pay"))
-                .withRequestBody(matchingJsonPath("$.billId", equalTo(billId.toString())))
+        wireMock.verify(postRequestedFor(urlPathEqualTo("/api/bills/pay"))
+                .withQueryParam("billId", equalTo(billId.toString()))
                 .withRequestBody(matchingJsonPath("$.amount", equalTo("1500")))
-                .withRequestBody(matchingJsonPath("$.registerId", equalTo(registerId.toString()))));
+                .withRequestBody(matchingJsonPath("$.registerId", equalTo(registerId.toString())))
+                .withRequestBody(matchingJsonPath("$.sessionId", equalTo(sessionId.toString()))));
+    }
+
+    @Test
+    @DisplayName("ouvre une session de caisse quand aucune n'est ouverte, puis encaisse")
+    void ouvre_session_puis_encaisse() {
+        UUID billId = UUID.randomUUID();
+        UUID paiementId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        wireMock.stubFor(get(urlEqualTo("/api/cashier/sessions"))
+                .willReturn(okJson("[]")));
+        wireMock.stubFor(post(urlEqualTo("/api/sessions"))
+                .willReturn(okJson("{\"id\":\"" + sessionId + "\",\"registerId\":\"" + registerId
+                        + "\",\"status\":\"OPEN\"}")));
+        wireMock.stubFor(post(urlPathEqualTo("/api/bills/pay"))
+                .withQueryParam("billId", equalTo(billId.toString()))
+                .willReturn(okJson("{\"id\":\"" + paiementId + "\"}")));
+
+        StepVerifier.create(adapter.enregistrerEchange(
+                        billId, new BigDecimal("1500"), "XAF", UUID.randomUUID()))
+                .expectNext(paiementId)
+                .verifyComplete();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/sessions"))
+                .withRequestBody(matchingJsonPath("$.registerId", equalTo(registerId.toString())))
+                .withRequestBody(matchingJsonPath("$.currency", equalTo("XAF"))));
+        wireMock.verify(postRequestedFor(urlPathEqualTo("/api/bills/pay"))
+                .withRequestBody(matchingJsonPath("$.sessionId", equalTo(sessionId.toString()))));
     }
 
     @Test

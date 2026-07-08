@@ -16,7 +16,8 @@ import java.util.UUID;
  * Le Product kernel est scopé organisation : tous les champs obligatoires de {@code CreateProductRequest}
  * ({@code organizationId}, {@code sku}, {@code name}, {@code familyCode}, {@code variantLabel},
  * {@code unitPrice}, {@code currency}) sont fournis par le socle via {@link CreationProduit}.
- * - STOCKABLE -> {@code trackInventory=true} ; sans prix fixe -> {@code priceless=true} (SUR_DEVIS / GRATUIT).
+ * Les offres sans prix fixe utilisent un prix minimal (0.01) ; le suivi de stock passe par
+ * {@code /api/inventory/movements}.
  */
 @Component
 public class CatalogueOffreKernelAdapter implements GererCatalogueOffre {
@@ -38,17 +39,15 @@ public class CatalogueOffreKernelAdapter implements GererCatalogueOffre {
         payload.put("name", demande.nom());
         payload.put("familyCode", demande.familyCode());
         payload.put("variantLabel", demande.variantLabel());
-        payload.put("unitPrice", demande.unitPrice());
+        payload.put("unitPrice", demande.priceless() ? new BigDecimal("0.01") : demande.unitPrice());
         payload.put("currency", demande.currency());
-        payload.put("trackInventory", demande.stockable());
-        payload.put("priceless", demande.priceless());
         return kernel.postForOrganization("/api/products", payload, KernelId.class, demande.organizationId())
-                .map(KernelId::id);
+                .map(kernelId -> kernelId.id());
     }
 
     @Override
     public Mono<BigDecimal> prixEffectif(UUID produitId) {
         return kernel.get("/api/products/" + produitId + "/prices/effective", PrixEffectif.class)
-                .map(PrixEffectif::amount);
+                .map(prix -> prix.amount());
     }
 }

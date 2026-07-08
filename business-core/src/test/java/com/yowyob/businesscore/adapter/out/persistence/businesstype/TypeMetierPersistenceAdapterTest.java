@@ -9,7 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.test.StepVerifier;
@@ -24,8 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TypeMetierPersistenceAdapterTest {
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:16");
+    static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer("postgres:16");
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry reg) {

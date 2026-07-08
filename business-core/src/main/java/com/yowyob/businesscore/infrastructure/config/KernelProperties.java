@@ -2,6 +2,8 @@ package com.yowyob.businesscore.infrastructure.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.List;
+
 /**
  * Configuration de l'accès au kernel RT-Comops.
  *
@@ -28,7 +30,8 @@ public record KernelProperties(
         String clientId,
         String clientSecret,
         String organizationService,
-        String businessActorRole
+        String businessActorRole,
+        List<String> organizationServices
 ) {
 
     public KernelProperties {
@@ -47,6 +50,9 @@ public record KernelProperties(
                 ? "BUSINESS_CORE" : organizationService;
         businessActorRole = (businessActorRole == null || businessActorRole.isBlank())
                 ? "OWNER" : businessActorRole;
+        if (organizationServices == null || organizationServices.isEmpty()) {
+            organizationServices = List.of("BILLING", "CASHIER", "COMMERCIAL", "ACCOUNTING");
+        }
     }
 
     public boolean aDesCredentialsPlateforme() {

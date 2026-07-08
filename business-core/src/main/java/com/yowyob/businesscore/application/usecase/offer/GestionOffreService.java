@@ -1,6 +1,5 @@
 package com.yowyob.businesscore.application.usecase.offer;
 
-import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.saga.FournisseurDeCapaciteDispatcher;
 import com.yowyob.businesscore.domain.offer.Capacite;
 import com.yowyob.businesscore.domain.offer.DefinitionOffre;
@@ -56,7 +55,7 @@ public class GestionOffreService {
 
     private Mono<Void> activerCapacites(DefinitionOffre offre) {
         return Flux.fromIterable(offre.capacites())
-                .filter(Capacite::active)
+                .filter(capacite -> capacite.active())
                 .flatMap(c -> capacites.activer(c.type(), offre.id()))
                 .then();
     }

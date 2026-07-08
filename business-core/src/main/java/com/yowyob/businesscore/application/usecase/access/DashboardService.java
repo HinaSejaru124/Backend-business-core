@@ -52,7 +52,7 @@ public class DashboardService {
     public Mono<DashboardData> pour(UUID developerId) {
         return apiKeyRepository.findByDeveloperId(developerId).collectList()
                 .flatMap(cles -> {
-                    List<UUID> ids = cles.stream().map(ApiKeyEntity::getId).toList();
+                    List<UUID> ids = cles.stream().map(cle -> cle.getId()).toList();
                     if (ids.isEmpty()) {
                         return Mono.just(new DashboardData(0, 0, 0, 0.0, List.of(), cles));
                     }
@@ -63,7 +63,7 @@ public class DashboardService {
                             .findByApiKeyIdInAndJourGreaterThanEqual(ids, depuis)
                             .filter(r -> r.getJour().isBefore(today))
                             .collect(HashMap::new, (m, r) ->
-                                    m.merge(r.getJour(), r.getTotal(), Long::sum));
+                                    m.merge(r.getJour(), r.getTotal(), (a, b) -> Long.sum(a, b)));
 
                     Mono<long[]> live = Flux.fromIterable(ids)
                             .flatMap(id -> compteur.lireJour(id, today))

@@ -68,9 +68,9 @@ private static final String[] ROUTES_PUBLIQUES = {
         apiKeyFilter.setServerAuthenticationConverter(converter);
 
         return http
-                .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .csrf(csrf -> csrf.disable())
+                .httpBasic(httpBasic -> httpBasic.disable())
+                .formLogin(formLogin -> formLogin.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(ROUTES_PUBLIQUES).permitAll()
@@ -122,7 +122,7 @@ private static final String[] ROUTES_PUBLIQUES = {
     public CorsConfigurationSource corsConfigurationSource(
             @Value("${businesscore.security.cors.allowed-origins:*}") String allowedOrigins) {
         CorsConfiguration config = new CorsConfiguration();
-        List<String> origins = Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList();
+        List<String> origins = Arrays.stream(allowedOrigins.split(",")).map(origin -> origin.trim()).toList();
         config.setAllowedOriginPatterns(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

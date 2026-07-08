@@ -31,7 +31,7 @@ public class VerifierDisponibiliteKernelAdapter implements VerifierDisponibilite
                         "/api/inventory/movements/balance?organizationId=" + ctx.organizationId()
                                 + "&agencyId=" + ctx.agencyId() + "&productId=" + productId,
                         SoldeResponse.class, ctx.organizationId())
-                .map(SoldeResponse::balance));
+                .map(solde -> solde.balance()));
     }
 }
 
