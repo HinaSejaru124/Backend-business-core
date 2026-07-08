@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface ProduitEntrepriseRepository extends ReactiveCrudRepository<ProduitEntrepriseEntity, UUID> {
 
     Mono<ProduitEntrepriseEntity> findByEntrepriseIdAndOffreId(UUID entrepriseId, UUID offreId);
+
+    Mono<Boolean> existsByOffreId(UUID offreId);
 }

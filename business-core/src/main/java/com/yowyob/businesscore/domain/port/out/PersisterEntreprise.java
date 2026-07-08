@@ -25,6 +25,12 @@ public interface PersisterEntreprise {
      */
     Mono<Void> changerCycleVieKernel(UUID organizationId, CycleVie cible);
 
+    /**
+     * Première approbation de gouvernance kernel ({@code POST /api/organizations/{orgId}/approve}).
+     * Distinct de {@code reopen} (réactivation après suspend/close).
+     */
+    Mono<Void> approuverOrganisation(UUID organizationId, String reason);
+
     /** Souscrit les services kernel requis pour sales, billing, stock et comptabilité. */
     Mono<Void> souscrireServices(UUID organizationId);
 }

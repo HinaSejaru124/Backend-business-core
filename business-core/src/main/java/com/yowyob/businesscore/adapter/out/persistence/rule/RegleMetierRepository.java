@@ -15,4 +15,8 @@ public interface RegleMetierRepository
 
     // Règles locales d'une entreprise pour un déclencheur
     Flux<RegleMetierEntity> findByDeclencheurAndEntrepriseId(String declencheur, UUID entrepriseId);
+
+    Flux<RegleMetierEntity> findByVersionTypeId(UUID versionTypeId);
+
+    Flux<RegleMetierEntity> findByEntrepriseId(UUID entrepriseId);
 }

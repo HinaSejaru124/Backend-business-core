@@ -1,10 +1,10 @@
 package com.yowyob.businesscore.adapter.out.persistence.offer;
 
+import com.yowyob.businesscore.application.context.BusinessContext;
+import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.domain.offer.Capacite;
 import com.yowyob.businesscore.domain.offer.DefinitionOffre;
 import com.yowyob.businesscore.domain.offer.spi.DepotOffre;
-import com.yowyob.businesscore.application.context.BusinessContext;
-import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.domain.shared.FormePrix;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
 import org.springframework.stereotype.Component;
@@ -27,14 +27,20 @@ public class OffrePersistenceAdapter implements DepotOffre {
 
     @Override
     public Mono<DefinitionOffre> enregistrer(DefinitionOffre offre) {
-        return BusinessContextHolder.currentContext().flatMap(ctx -> {
-            DefinitionOffreEntity entity = DefinitionOffreEntity.nouveau(
-                    offre.id(), ctx.tenantId(), offre.versionTypeId(),
-                    offre.nom(), offre.formePrix().name(), offre.prix());
-            return offreRepo.save(entity)
-                    .then(enregistrerCapacites(offre, ctx))
-                    .thenReturn(offre);
-        });
+        return BusinessContextHolder.currentContext().flatMap(ctx ->
+                offreRepo.existsById(offre.id()).flatMap(existe -> {
+                    DefinitionOffreEntity entity = DefinitionOffreEntity.nouveau(
+                            offre.id(), ctx.tenantId(), offre.versionTypeId(),
+                            offre.nom(), offre.formePrix().name(), offre.prix());
+                    if (existe) {
+                        entity.enModification();
+                    }
+                    Mono<Void> capacites = existe
+                            ? capaciteRepo.deleteByDefinitionOffreId(offre.id())
+                                    .then(enregistrerCapacites(offre, ctx))
+                            : enregistrerCapacites(offre, ctx);
+                    return offreRepo.save(entity).then(capacites).then(parId(offre.id()));
+                }));
     }
 
     private Mono<Void> enregistrerCapacites(DefinitionOffre offre, BusinessContext ctx) {
@@ -53,6 +59,11 @@ public class OffrePersistenceAdapter implements DepotOffre {
     @Override
     public Mono<DefinitionOffre> parId(UUID id) {
         return offreRepo.findById(id).flatMap(this::recharger);
+    }
+
+    @Override
+    public Mono<Void> supprimer(UUID id) {
+        return capaciteRepo.deleteByDefinitionOffreId(id).then(offreRepo.deleteById(id));
     }
 
     private Mono<DefinitionOffre> recharger(DefinitionOffreEntity e) {

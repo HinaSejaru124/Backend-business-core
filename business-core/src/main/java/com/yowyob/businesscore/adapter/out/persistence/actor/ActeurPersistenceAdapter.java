@@ -24,17 +24,36 @@ public class ActeurPersistenceAdapter implements DepotActeur {
 
     @Override
     public Mono<RoleMetier> enregistrerRole(RoleMetier role) {
-        return BusinessContextHolder.currentContext().flatMap(ctx -> {
-            RoleMetierEntity entity = RoleMetierEntity.nouveau(
-                    role.id(), ctx.tenantId(), role.versionTypeId(),
-                    role.code(), role.categorie().name());
-            return roleRepo.save(entity).map(ActeurPersistenceAdapter::versRole);
-        });
+        return BusinessContextHolder.currentContext().flatMap(ctx ->
+                roleRepo.existsById(role.id()).flatMap(existe -> {
+                    RoleMetierEntity entity = RoleMetierEntity.nouveau(
+                            role.id(), ctx.tenantId(), role.versionTypeId(),
+                            role.code(), role.categorie().name());
+                    if (existe) {
+                        entity.enModification();
+                    }
+                    return roleRepo.save(entity).map(ActeurPersistenceAdapter::versRole);
+                }));
     }
 
     @Override
     public Mono<RoleMetier> roleParId(UUID id) {
         return roleRepo.findById(id).map(ActeurPersistenceAdapter::versRole);
+    }
+
+    @Override
+    public Flux<RoleMetier> rolesParVersionType(UUID versionTypeId) {
+        return roleRepo.findByVersionTypeId(versionTypeId).map(ActeurPersistenceAdapter::versRole);
+    }
+
+    @Override
+    public Mono<Void> supprimerRole(UUID roleId) {
+        return roleRepo.deleteById(roleId);
+    }
+
+    @Override
+    public Mono<Long> compterActeursActifsParRole(UUID roleMetierId) {
+        return acteurRepo.countActifsByRoleMetierId(roleMetierId).defaultIfEmpty(0L);
     }
 
     @Override

@@ -56,6 +56,15 @@ public record Entreprise(
                 organizationId, businessActorId, agencyId, nom, nouveau);
     }
 
+    /** Renomme l'entreprise (métadonnée locale ; pas de sync kernel dans cette version). */
+    public Entreprise renommer(String nouveauNom) {
+        if (nouveauNom == null || nouveauNom.isBlank()) {
+            throw ProblemException.badRequest("Le nom de l'entreprise est obligatoire.");
+        }
+        return new Entreprise(id, tenantId, typeMetierId, versionTypeId, numeroVersion,
+                organizationId, businessActorId, agencyId, nouveauNom.trim(), cycleVie);
+    }
+
     /** Mémorise les références kernel produites à l'auto-provisionnement (onboarding + organisation). */
     public Entreprise avecReferencesKernel(UUID businessActorId, UUID organizationId, UUID agencyId) {
         return new Entreprise(id, tenantId, typeMetierId, versionTypeId, numeroVersion,

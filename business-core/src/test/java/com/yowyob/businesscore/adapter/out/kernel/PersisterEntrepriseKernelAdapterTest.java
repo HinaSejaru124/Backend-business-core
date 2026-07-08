@@ -141,6 +141,31 @@ class PersisterEntrepriseKernelAdapterTest {
     }
 
     @Test
+    void approuve_l_organisation_avec_reason() {
+        UUID orgId = UUID.randomUUID();
+        wireMock.stubFor(post(urlEqualTo("/api/organizations/" + orgId + "/approve"))
+                .willReturn(aResponse().withStatus(200)));
+
+        StepVerifier.create(adapter.approuverOrganisation(orgId, "Validation KYC")).verifyComplete();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/organizations/" + orgId + "/approve"))
+                .withHeader("X-Organization-Id", equalTo(orgId.toString()))
+                .withRequestBody(matchingJsonPath("$.reason", equalTo("Validation KYC"))));
+    }
+
+    @Test
+    void approuve_utilise_le_motif_par_defaut_si_reason_vide() {
+        UUID orgId = UUID.randomUUID();
+        wireMock.stubFor(post(urlEqualTo("/api/organizations/" + orgId + "/approve"))
+                .willReturn(aResponse().withStatus(200)));
+
+        StepVerifier.create(adapter.approuverOrganisation(orgId, "  ")).verifyComplete();
+
+        wireMock.verify(postRequestedFor(urlEqualTo("/api/organizations/" + orgId + "/approve"))
+                .withRequestBody(matchingJsonPath("$.reason", equalTo("Approbation initiale"))));
+    }
+
+    @Test
     void souscrit_les_services_kernel() {
         UUID orgId = UUID.randomUUID();
         wireMock.stubFor(post(urlEqualTo("/api/organizations/" + orgId + "/services"))

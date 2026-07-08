@@ -50,6 +50,8 @@ public class DefinitionOffreEntity implements Persistable<UUID> {
     @Override
     public boolean isNew() { return nouveau; }
 
+    public void enModification() { this.nouveau = false; }
+
     public UUID getTenantId() { return tenantId; }
     public UUID getVersionTypeId() { return versionTypeId; }
     public String getNom() { return nom; }

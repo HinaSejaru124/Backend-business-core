@@ -3,6 +3,7 @@ package com.yowyob.businesscore.application.usecase.offer;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.saga.FournisseurDeCapaciteDispatcher;
 import com.yowyob.businesscore.domain.offer.spi.DepotOffre;
+import com.yowyob.businesscore.domain.offer.spi.DepotProduitEntreprise;
 import com.yowyob.businesscore.domain.shared.FormePrix;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
 import org.junit.jupiter.api.Test;
@@ -20,8 +21,9 @@ import static org.mockito.Mockito.*;
 class GestionOffreServiceTest {
 
     private final DepotOffre depot = mock(DepotOffre.class);
+    private final DepotProduitEntreprise depotProduit = mock(DepotProduitEntreprise.class);
     private final FournisseurDeCapaciteDispatcher capacites = mock(FournisseurDeCapaciteDispatcher.class);
-    private final GestionOffreService service = new GestionOffreService(depot, capacites);
+    private final GestionOffreService service = new GestionOffreService(depot, depotProduit, capacites);
 
     @Test
     void declarer_offre_stockable_active_la_strategie_correspondante() {

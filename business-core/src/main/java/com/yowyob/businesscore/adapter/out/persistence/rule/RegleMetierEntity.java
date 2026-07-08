@@ -1,7 +1,8 @@
-// adapter/out/persistence/rule/RegleMetierEntity.java
 package com.yowyob.businesscore.adapter.out.persistence.rule;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -11,30 +12,33 @@ import java.util.UUID;
 
 /**
  * Projection R2DBC de la table {@code regle_metier}.
- *
- * <p>{@code declencheur} et {@code effet} sont stockés sous forme de chaîne (le nom de l'enum) ;
- * {@code condition} est la condition N1 brute (« TYPE:param=val ») ; {@code rolesAutorisesADeroger}
- * est mappé sur une colonne PostgreSQL {@code text[]}. La table porte une colonne {@code tenant_id}
- * soumise à la Row-Level Security (isolation par tenant).
  */
 @Table("regle_metier")
-public class RegleMetierEntity {
+public class RegleMetierEntity implements Persistable<UUID> {
 
     @Id private UUID id;
     @Column("tenant_id")     private UUID tenantId;
     @Column("version_type_id") private UUID versionTypeId;
     @Column("entreprise_id") private UUID entrepriseId;
     @Column("declencheur")   private String declencheur;
-    @Column("condition")     private String condition;   // format "TYPE:param=val"
+    @Column("condition")     private String condition;
     @Column("effet")         private String effet;
     @Column("roles_autorises_a_deroger") private List<String> rolesAutorisesADeroger;
     @Column("created_at")    private OffsetDateTime createdAt;
     @Column("updated_at")    private OffsetDateTime updatedAt;
+    @Transient private boolean nouveau = true;
 
-    public UUID getId()                               { return id; }
-    public void setId(UUID v)                         { this.id = v; }
+    @Override
+    public UUID getId() { return id; }
+
+    @Override
+    public boolean isNew() { return nouveau; }
+
+    public void enModification() { this.nouveau = false; }
+
     public UUID getTenantId()                         { return tenantId; }
     public void setTenantId(UUID v)                   { this.tenantId = v; }
+    public void setId(UUID v)                         { this.id = v; }
     public UUID getVersionTypeId()                    { return versionTypeId; }
     public void setVersionTypeId(UUID v)              { this.versionTypeId = v; }
     public UUID getEntrepriseId()                     { return entrepriseId; }

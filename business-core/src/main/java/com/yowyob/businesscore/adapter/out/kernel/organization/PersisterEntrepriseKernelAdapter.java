@@ -86,6 +86,17 @@ public Mono<UUID> creerAgence(UUID organizationId, String nom) {
     }
 
     @Override
+    public Mono<Void> approuverOrganisation(UUID organizationId, String reason) {
+        String motif = (reason == null || reason.isBlank()) ? "Approbation initiale" : reason.trim();
+        return kernel.postForOrganization(
+                        "/api/organizations/" + organizationId + "/approve",
+                        Map.of("reason", motif),
+                        Void.class,
+                        organizationId)
+                .then();
+    }
+
+    @Override
     public Mono<UUID> trouverAgencePrincipale(UUID organizationId) {
         return kernel.getForOrganization(
                         "/api/organizations/" + organizationId + "/agencies",

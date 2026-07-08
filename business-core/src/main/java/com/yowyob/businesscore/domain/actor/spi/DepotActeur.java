@@ -11,6 +11,9 @@ import java.util.UUID;
 public interface DepotActeur {
     Mono<RoleMetier> enregistrerRole(RoleMetier role);
     Mono<RoleMetier> roleParId(UUID id);
+    Flux<RoleMetier> rolesParVersionType(UUID versionTypeId);
+    Mono<Void> supprimerRole(UUID roleId);
+    Mono<Long> compterActeursActifsParRole(UUID roleMetierId);
 
     Mono<ActeurMetier> enregistrerActeur(ActeurMetier acteur);
     Mono<ActeurMetier> acteurParId(UUID id);

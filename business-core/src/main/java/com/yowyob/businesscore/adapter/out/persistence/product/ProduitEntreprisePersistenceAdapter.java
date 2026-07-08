@@ -30,4 +30,9 @@ public class ProduitEntreprisePersistenceAdapter implements DepotProduitEntrepri
                                 UUID.randomUUID(), ctx.tenantId(), entrepriseId, offreId, productId))
                 .then());
     }
+
+    @Override
+    public Mono<Boolean> existeMappingPourOffre(UUID offreId) {
+        return repository.existsByOffreId(offreId);
+    }
 }

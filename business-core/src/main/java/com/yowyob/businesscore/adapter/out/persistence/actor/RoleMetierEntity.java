@@ -41,6 +41,11 @@ public class RoleMetierEntity implements Persistable<UUID> {
         return e;
     }
 
+    /** Marque l'entité pour un UPDATE (Persistable.isNew = false). */
+    public void enModification() {
+        this.nouveau = false;
+    }
+
     @Override
     public UUID getId() { return id; }
     @Override

@@ -19,4 +19,7 @@ public interface DepotProduitEntreprise {
 
     /** Mémorise le produit kernel créé pour {@code (entrepriseId, offreId)} (tenant courant). */
     Mono<Void> enregistrer(UUID entrepriseId, UUID offreId, UUID productId);
+
+    /** Indique si au moins une entreprise a déjà un produit kernel mappé sur cette offre. */
+    Mono<Boolean> existeMappingPourOffre(UUID offreId);
 }

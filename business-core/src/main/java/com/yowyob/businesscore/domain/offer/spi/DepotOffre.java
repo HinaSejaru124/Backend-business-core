@@ -12,4 +12,5 @@ public interface DepotOffre {
     Mono<DefinitionOffre> enregistrer(DefinitionOffre offre);
     Flux<DefinitionOffre> parVersionType(UUID versionTypeId);
     Mono<DefinitionOffre> parId(UUID id);
+    Mono<Void> supprimer(UUID id);
 }

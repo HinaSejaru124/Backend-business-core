@@ -28,4 +28,9 @@ public record RoleMetier(
     public static RoleMetier nouveau(UUID id, UUID versionTypeId, String code, CategorieActeur categorie) {
         return new RoleMetier(id, versionTypeId, code, categorie);
     }
+
+    /** Met à jour le code ; la catégorie est immuable (RG-04). */
+    public RoleMetier avecCode(String nouveauCode) {
+        return new RoleMetier(id, versionTypeId, nouveauCode, categorie);
+    }
 }

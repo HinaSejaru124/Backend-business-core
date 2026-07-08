@@ -86,12 +86,39 @@ public class EntrepriseService {
 
     public Mono<Entreprise> changerCycleVie(UUID id, CycleVie cycleVie, BusinessContext ctx) {
         return trouver(id, ctx).flatMap(entreprise -> {
-            // Propage la transition au kernel (approve/suspend/close/reopen) avant de persister localement.
+            // Propage la transition au kernel (suspend/close/reopen) avant de persister localement.
             Mono<Void> transitionKernel = entreprise.organizationId() == null
                     ? Mono.empty()
                     : persisterEntreprise.changerCycleVieKernel(entreprise.organizationId(), cycleVie);
             return transitionKernel.then(
                     depotEntreprise.sauvegarder(entreprise.changerCycleVie(cycleVie)));
         });
+    }
+
+    /**
+     * Première approbation de gouvernance kernel, puis passage local en {@link CycleVie#ACTIVE}.
+     * Distinct de {@link #changerCycleVie} avec ACTIVE (qui appelle {@code reopen}).
+     */
+    public Mono<Entreprise> approuver(UUID id, String reason, BusinessContext ctx) {
+        return trouver(id, ctx).flatMap(entreprise -> {
+            if (entreprise.organizationId() == null) {
+                return Mono.error(ProblemException.unprocessable(
+                        "L'entreprise n'a pas d'organisation kernel à approuver."));
+            }
+            return persisterEntreprise.approuverOrganisation(entreprise.organizationId(), reason)
+                    .then(depotEntreprise.sauvegarder(entreprise.changerCycleVie(CycleVie.ACTIVE)));
+        });
+    }
+
+    /** Met à jour le nom local de l'entreprise (pas de rename kernel). */
+    public Mono<Entreprise> modifier(UUID id, String nom, BusinessContext ctx) {
+        return trouver(id, ctx)
+                .map(entreprise -> entreprise.renommer(nom))
+                .flatMap(depotEntreprise::sauvegarder);
+    }
+
+    /** Archive l'entreprise : cycle de vie {@link CycleVie#FERMEE} (local + kernel {@code close}). */
+    public Mono<Void> archiver(UUID id, BusinessContext ctx) {
+        return changerCycleVie(id, CycleVie.FERMEE, ctx).then();
     }
 }

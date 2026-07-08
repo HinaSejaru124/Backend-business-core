@@ -77,6 +77,14 @@ public class OperationController {
                 .map(OperationResponse::depuis);
     }
 
+    /** Consulter le détail d'une opération par nom. */
+    @GetMapping("/businesses/{businessId}/operations/{name}")
+    public Mono<OperationResponse> trouver(@PathVariable UUID businessId, @PathVariable String name) {
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> consulterOperation.trouverParNom(businessId, name, ctx))
+                .map(OperationResponse::depuis);
+    }
+
     /** Exécuter une opération : immédiate (200) ou différée (202). */
     @PostMapping("/businesses/{businessId}/operations/{name}:execute")
     public Mono<ResponseEntity<Object>> executer(@PathVariable UUID businessId,

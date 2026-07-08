@@ -217,6 +217,58 @@ paths:
                 items:
                   $ref: '#/components/schemas/Offer'
 
+  /v1/business-types/{typeId}/versions/{versionNumber}/offers/{offerId}:
+    parameters:
+      - $ref: '#/components/parameters/TypeId'
+      - $ref: '#/components/parameters/VersionNumber'
+      - name: offerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Contenu de version]
+      summary: Consulter une offre
+      responses:
+        '200':
+          description: L'offre
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        '404':
+          $ref: '#/components/responses/Problem'
+    put:
+      tags: [Contenu de version]
+      summary: Modifier une offre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOffer'
+      responses:
+        '200':
+          description: Offre mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        '404':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Contenu de version]
+      summary: Supprimer une offre
+      description: Refusé (409) si un produit kernel est déjà mappé pour une entreprise.
+      responses:
+        '204':
+          description: Offre supprimée
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+
   /v1/business-types/{typeId}/versions/{versionNumber}/roles:
     parameters:
       - $ref: '#/components/parameters/TypeId'
@@ -237,6 +289,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Role'
+    get:
+      tags: [Contenu de version]
+      summary: Lister les rôles métier
+      responses:
+        '200':
+          description: Liste des rôles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+
+  /v1/business-types/{typeId}/versions/{versionNumber}/roles/{roleId}:
+    parameters:
+      - $ref: '#/components/parameters/TypeId'
+      - $ref: '#/components/parameters/VersionNumber'
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags: [Contenu de version]
+      summary: Modifier un rôle métier
+      description: Met à jour le code ; la catégorie est immuable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRole'
+      responses:
+        '200':
+          description: Rôle mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '404':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Contenu de version]
+      summary: Supprimer un rôle métier
+      description: Refusé (409) si des acteurs actifs le référencent.
+      responses:
+        '204':
+          description: Rôle supprimé
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
 
   /v1/business-types/{typeId}/versions/{versionNumber}/rules:
     parameters:
@@ -258,6 +363,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Rule'
+    get:
+      tags: [Contenu de version]
+      summary: Lister les règles de Type
+      responses:
+        '200':
+          description: Liste des règles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rule'
+
+  /v1/business-types/{typeId}/versions/{versionNumber}/rules/{ruleId}:
+    parameters:
+      - $ref: '#/components/parameters/TypeId'
+      - $ref: '#/components/parameters/VersionNumber'
+      - name: ruleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Contenu de version]
+      summary: Consulter une règle de Type
+      responses:
+        '200':
+          description: La règle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+          $ref: '#/components/responses/Problem'
+    put:
+      tags: [Contenu de version]
+      summary: Modifier une règle de Type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRule'
+      responses:
+        '200':
+          description: Règle mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Contenu de version]
+      summary: Supprimer une règle de Type
+      responses:
+        '204':
+          description: Règle supprimée
+        '404':
+          $ref: '#/components/responses/Problem'
 
   /v1/business-types/{typeId}/versions/{versionNumber}/operations:
     parameters:
@@ -350,6 +516,61 @@ paths:
                 $ref: '#/components/schemas/Business'
         '404':
           $ref: '#/components/responses/Problem'
+    put:
+      tags: [Entreprises]
+      summary: Modifier une entreprise
+      description: Met à jour les métadonnées locales (nom). Pas de rename de l'organisation kernel.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBusiness'
+      responses:
+        '200':
+          description: Entreprise mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Business'
+        '404':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Entreprises]
+      summary: Archiver une entreprise
+      description: Passe le cycle de vie en FERMEE (local + kernel close). Pas de suppression dure.
+      responses:
+        '204':
+          description: Entreprise archivée
+        '404':
+          $ref: '#/components/responses/Problem'
+
+  /v1/businesses/{businessId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/BusinessId'
+    post:
+      tags: [Entreprises]
+      summary: Approuver l'organisation kernel
+      description: |
+        Première approbation de gouvernance (`POST /api/organizations/{id}/approve`).
+        Distinct de `PUT .../lifecycle` avec ACTIVE (qui appelle `reopen`).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveBusiness'
+      responses:
+        '200':
+          description: Entreprise approuvée (cycleVie ACTIVE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Business'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
 
   /v1/businesses/{businessId}/lifecycle:
     parameters:
@@ -407,6 +628,43 @@ paths:
     parameters:
       - $ref: '#/components/parameters/BusinessId'
       - $ref: '#/components/parameters/ActorId'
+    get:
+      tags: [Entreprises]
+      summary: Consulter un acteur
+      responses:
+        '200':
+          description: L'acteur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Actor'
+        '404':
+          $ref: '#/components/responses/Problem'
+    put:
+      tags: [Entreprises]
+      summary: Modifier le rôle d'un acteur
+      description: |
+        Détache l'association courante et en crée une nouvelle avec le rôle fourni.
+        La catégorie (OPERATEUR / BENEFICIAIRE) ne peut pas changer (RG-04).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateActor'
+      responses:
+        '200':
+          description: Nouvelle association acteur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Actor'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
     delete:
       tags: [Entreprises]
       summary: Détacher un acteur
@@ -414,6 +672,8 @@ paths:
       responses:
         '204':
           description: Acteur détaché
+        '404':
+          $ref: '#/components/responses/Problem'
 
   /v1/businesses/{businessId}/rules:
     parameters:
@@ -434,6 +694,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Rule'
+    get:
+      tags: [Entreprises]
+      summary: Lister les règles locales
+      responses:
+        '200':
+          description: Liste des règles locales
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rule'
+
+  /v1/businesses/{businessId}/rules/{ruleId}:
+    parameters:
+      - $ref: '#/components/parameters/BusinessId'
+      - name: ruleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Entreprises]
+      summary: Consulter une règle locale
+      responses:
+        '200':
+          description: La règle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+          $ref: '#/components/responses/Problem'
+    put:
+      tags: [Entreprises]
+      summary: Modifier une règle locale
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRule'
+      responses:
+        '200':
+          description: Règle mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags: [Entreprises]
+      summary: Supprimer une règle locale
+      responses:
+        '204':
+          description: Règle supprimée
+        '404':
+          $ref: '#/components/responses/Problem'
 
   /v1/businesses/{businessId}/config/{key}:
     parameters:
@@ -478,6 +798,28 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Operation'
+
+  /v1/businesses/{businessId}/operations/{name}:
+    parameters:
+      - $ref: '#/components/parameters/BusinessId'
+      - name: name
+        in: path
+        required: true
+        description: Nom de l'opération (ex. vente, reservation)
+        schema:
+          type: string
+    get:
+      tags: [Opérations]
+      summary: Consulter une opération
+      responses:
+        '200':
+          description: Détail de l'opération
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '404':
+          $ref: '#/components/responses/Problem'
 
   /v1/businesses/{businessId}/operations/{name}:execute:
     parameters:
@@ -542,6 +884,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PageTransaction'
+
+  /v1/businesses/{businessId}/transactions/{billId}:
+    parameters:
+      - $ref: '#/components/parameters/BusinessId'
+      - name: billId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Consultation]
+      summary: Consulter une facture cashier (bill)
+      responses:
+        '200':
+          description: La transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          $ref: '#/components/responses/Problem'
+
+  /v1/businesses/{businessId}/orders/{orderId}:
+    parameters:
+      - $ref: '#/components/parameters/BusinessId'
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Consultation]
+      summary: Consulter une commande de vente
+      responses:
+        '200':
+          description: La commande
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          $ref: '#/components/responses/Problem'
 
   /v1/businesses/{businessId}/traces:
     parameters:
@@ -810,6 +1196,14 @@ components:
           type: string
           enum: [OPERATEUR, BENEFICIAIRE]
 
+    UpdateRole:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          example: pharmacien-responsable
+
     Role:
       allOf:
         - $ref: '#/components/schemas/CreateRole'
@@ -929,6 +1323,22 @@ components:
           format: uuid
           description: Référence Organization kernel (créée si absente)
 
+    UpdateBusiness:
+      type: object
+      required: [nom]
+      properties:
+        nom:
+          type: string
+          example: Pharmacie du Centre
+
+    ApproveBusiness:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Motif d'approbation (défaut « Approbation initiale »)
+          example: Validation KYC
+
     Business:
       type: object
       properties:
@@ -970,6 +1380,15 @@ components:
         valideDepuis:
           type: string
           format: date
+
+    UpdateActor:
+      type: object
+      required: [roleMetierId]
+      properties:
+        roleMetierId:
+          type: string
+          format: uuid
+          description: Nouveau rôle métier (même catégorie que l'actuel)
 
     Actor:
       type: object
