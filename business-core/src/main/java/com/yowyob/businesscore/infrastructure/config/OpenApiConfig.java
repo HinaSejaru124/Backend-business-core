@@ -23,19 +23,19 @@ import org.springframework.context.annotation.Configuration;
                         et déclenche des Opérations. Le Business Core orchestre le kernel en façade.
 
                         ## Authentification
-                        La plupart des routes exigent les en-têtes `X-BC-Client-Id` et `X-BC-Api-Key`
-                        (clé Business Core émise à l'inscription). Les routes `/v1/auth/*` utilisent
-                        un JWT Bearer après login.
+                        - **Authorize** : secret `X-BC-Api-Key` (clé BC émise à l'inscription), ou JWT Bearer
+                          sur `GET /v1/auth/me` après login.
+                        - **Client-Id** : identifiant public (`X-BC-Client-Id`), saisi comme en-tête sur
+                          chaque requête protégée — ce n'est pas un secret et n'apparaît pas dans Authorize.
 
                         ## Conventions
-                        - Versionnement de l'API dans l'URL (`/v1`), distinct de la version d'un Type Métier.
+                        - Versionnement de l'API dans l'URL /v1, distinct de la version d'un Type Métier.
                         - Opérations synchrones par défaut (`200`), différées en `202` avec une trace de suivi.
                         - Erreurs au format RFC 7807 (Problem Details), enrichies de champs métier.
                         """,
                 contact = @Contact(name = "Équipe Business Core")
         ),
         security = {
-                @SecurityRequirement(name = "bcClientId"),
                 @SecurityRequirement(name = "bcApiKey")
         },
         tags = {
@@ -50,18 +50,14 @@ import org.springframework.context.annotation.Configuration;
         }
 )
 @SecurityScheme(
-        name = "bcClientId",
-        type = SecuritySchemeType.APIKEY,
-        in = SecuritySchemeIn.HEADER,
-        paramName = "X-BC-Client-Id",
-        description = "Identifiant client Business Core (émis à l'inscription)"
-)
-@SecurityScheme(
         name = "bcApiKey",
         type = SecuritySchemeType.APIKEY,
         in = SecuritySchemeIn.HEADER,
         paramName = "X-BC-Api-Key",
-        description = "Secret de la clé Business Core (affiché une seule fois à la création)"
+        description = """
+                Secret de la clé Business Core (affiché une seule fois à la création).
+                Requiert aussi l'en-tête X-BC-Client-Id (identifiant public, pas un secret).
+                """
 )
 @SecurityScheme(
         name = "bearerAuth",
