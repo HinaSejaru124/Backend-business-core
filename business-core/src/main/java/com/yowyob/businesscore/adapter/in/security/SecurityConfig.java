@@ -60,7 +60,8 @@ private static final String[] ROUTES_PUBLIQUES = {
             BusinessContextJwtConverter jwtConverter,
             CorsConfigurationSource corsConfigurationSource,
             ProblemAuthenticationEntryPoint authenticationEntryPoint,
-            ProblemAccessDeniedHandler accessDeniedHandler) {
+            ProblemAccessDeniedHandler accessDeniedHandler,
+            com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur usageCompteur) {
 
         // Authentification par clé Business Core (X-BC-*). Conservée (provisioning / transitoire).
         AuthenticationWebFilter apiKeyFilter = new AuthenticationWebFilter(authenticationManager);
@@ -88,6 +89,8 @@ private static final String[] ROUTES_PUBLIQUES = {
                 // Propagation du contexte vers le Reactor Context (lisible par use cases + KernelClient).
                 .addFilterAfter(new BusinessContextWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
                 .addFilterAfter(new KernelTokenWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
+                // Comptabilise l'usage par clé API (dashboard développeur).
+                .addFilterAfter(new UsageTrackingWebFilter(usageCompteur), SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }
 

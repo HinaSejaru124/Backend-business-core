@@ -11,5 +11,7 @@ import java.util.UUID;
  */
 public interface DeveloperAccountRepository extends ReactiveCrudRepository<DeveloperAccountEntity, UUID> {
 
-    Mono<DeveloperAccountEntity> findByBcClientId(String bcClientId);
+    Mono<DeveloperAccountEntity> findByEmail(String email);
+
+    Mono<DeveloperAccountEntity> findByKernelTenantId(UUID kernelTenantId);
 }

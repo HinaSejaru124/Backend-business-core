@@ -20,6 +20,9 @@ public class ProblemAuthenticationEntryPoint implements ServerAuthenticationEntr
 
     @Override
     public Mono<Void> commence(ServerWebExchange exchange, AuthenticationException ex) {
+        if (ex instanceof EspaceNonLieException) {
+            return writer.write(exchange, HttpStatus.UNAUTHORIZED, "Espace non lié", ex.getMessage());
+        }
         return writer.write(exchange, HttpStatus.UNAUTHORIZED, "Authentification requise",
                 "Clé Business Core absente ou invalide");
     }

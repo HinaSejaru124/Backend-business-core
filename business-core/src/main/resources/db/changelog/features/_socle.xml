@@ -134,4 +134,104 @@
         </rollback>
     </changeSet>
 
+    <!--
+      Alignement tenant (Partie A) : le tenant BC doit être le tenant kernel.
+      - kernel_tenant_id : le tid renvoyé par le kernel (sign-up puis login). Sert de tenant_id
+        pour toutes les données métier, quel que soit le mode d'auth (clé API ou JWT).
+      - email : permet de retrouver le compte au login (le login est public, sans clé BC) pour
+        confirmer/renseigner le kernel_tenant_id s'il est absent.
+    -->
+    <changeSet id="socle-006-developer-account-tenant-email" author="socle">
+        <addColumn tableName="developer_account">
+            <column name="kernel_tenant_id" type="uuid"/>
+            <column name="email" type="varchar(255)"/>
+        </addColumn>
+        <addUniqueConstraint tableName="developer_account" columnNames="email"
+                             constraintName="uq_developer_account_email"/>
+    </changeSet>
+
+    <!--
+      Portail multi-clés (Partie B) : plusieurs clés API par développeur.
+      Table sans RLS (comme developer_account) : sert à établir le tenant, ne porte aucune donnée métier.
+    -->
+    <changeSet id="socle-007-api-key" author="socle">
+        <createTable tableName="api_key">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="developer_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="prefix" type="varchar(64)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="key_hash" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(64)" defaultValue="Default">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="varchar(16)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_used_at" type="timestamptz"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="api_key" baseColumnNames="developer_id"
+                                 referencedTableName="developer_account" referencedColumnNames="id"
+                                 constraintName="fk_api_key_developer"/>
+        <createIndex tableName="api_key" indexName="idx_api_key_developer_status">
+            <column name="developer_id"/>
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Migre les clés existantes (colonnes de developer_account) vers la table api_key. -->
+    <changeSet id="socle-008-migrate-legacy-keys" author="socle">
+        <sql>
+            INSERT INTO api_key (id, developer_id, prefix, key_hash, name, status, created_at)
+            SELECT gen_random_uuid(), id, bc_client_id, bc_api_key_hash, 'Default', 'ACTIVE', created_at
+            FROM developer_account
+            WHERE bc_client_id IS NOT NULL;
+        </sql>
+        <rollback>
+            <sql>DELETE FROM api_key;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- Les colonnes de clé migrent dans api_key : on les retire de developer_account. -->
+    <changeSet id="socle-009-drop-legacy-key-columns" author="socle">
+        <dropUniqueConstraint tableName="developer_account" constraintName="developer_account_bc_client_id_key"/>
+        <dropColumn tableName="developer_account" columnName="bc_client_id"/>
+        <dropColumn tableName="developer_account" columnName="bc_api_key_hash"/>
+    </changeSet>
+
+    <!-- Dashboard (B5) : agrégat quotidien d'usage par clé API. -->
+    <changeSet id="socle-010-api-key-usage-daily" author="socle">
+        <createTable tableName="api_key_usage_daily">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="api_key_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="jour" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="total" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="errors" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="p95_ms" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="api_key_usage_daily" columnNames="api_key_id,jour"
+                             constraintName="uq_api_key_usage_daily_key_jour"/>
+    </changeSet>
+
 </databaseChangeLog>

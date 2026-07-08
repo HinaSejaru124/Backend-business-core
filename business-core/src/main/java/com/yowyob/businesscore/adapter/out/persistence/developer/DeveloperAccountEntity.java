@@ -12,8 +12,12 @@ import java.util.UUID;
 /**
  * Compte développeur — registre d'authentification et porteur du tenant.
  *
- * <p>DÉFINIT le tenant : {@code id} sert de {@code tenant_id} pour toutes les données métier. Cette
- * table n'a donc pas de RLS (elle serait sinon impossible à interroger avant que le tenant soit connu).
+ * <p>Le tenant métier est le {@code kernel_tenant_id} (le {@code tid} du kernel), renseigné au sign-up
+ * puis confirmé au login. Toutes les données métier sont isolées sur ce tenant, que l'appel soit
+ * authentifié par une clé API (backend du dev) ou par un JWT utilisateur : les deux résolvent le même
+ * tenant. Cette table n'a pas de RLS (elle sert précisément à établir le tenant avant qu'il soit connu).
+ *
+ * <p>Les clés API vivent désormais dans la table {@code api_key} (plusieurs clés par développeur).
  *
  * <p>Implémente {@link Persistable} avec un identifiant généré côté application : on contrôle l'UUID
  * et on signale explicitement l'état "nouveau" pour que Spring Data émette un INSERT (et non un UPDATE).
@@ -24,11 +28,10 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
     @Id
     private UUID id;
 
-    @Column("bc_client_id")
-    private String bcClientId;
+    private String email;
 
-    @Column("bc_api_key_hash")
-    private String bcApiKeyHash;
+    @Column("kernel_tenant_id")
+    private UUID kernelTenantId;
 
     @Column("kernel_client_id")
     private String kernelClientId;
@@ -49,13 +52,13 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
     public DeveloperAccountEntity() {
     }
 
-    public static DeveloperAccountEntity nouveau(UUID id, String bcClientId, String bcApiKeyHash,
+    public static DeveloperAccountEntity nouveau(UUID id, String email, UUID kernelTenantId,
                                                  String kernelClientId, String kernelSecretEncrypted,
                                                  String plan) {
         DeveloperAccountEntity e = new DeveloperAccountEntity();
         e.id = id;
-        e.bcClientId = bcClientId;
-        e.bcApiKeyHash = bcApiKeyHash;
+        e.email = email;
+        e.kernelTenantId = kernelTenantId;
         e.kernelClientId = kernelClientId;
         e.kernelSecretEncrypted = kernelSecretEncrypted;
         e.plan = plan;
@@ -75,12 +78,12 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
         return nouveau;
     }
 
-    public String getBcClientId() {
-        return bcClientId;
+    public String getEmail() {
+        return email;
     }
 
-    public String getBcApiKeyHash() {
-        return bcApiKeyHash;
+    public UUID getKernelTenantId() {
+        return kernelTenantId;
     }
 
     public String getKernelClientId() {
@@ -107,12 +110,12 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
         this.id = id;
     }
 
-    public void setBcClientId(String bcClientId) {
-        this.bcClientId = bcClientId;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
-    public void setBcApiKeyHash(String bcApiKeyHash) {
-        this.bcApiKeyHash = bcApiKeyHash;
+    public void setKernelTenantId(UUID kernelTenantId) {
+        this.kernelTenantId = kernelTenantId;
     }
 
     public void setKernelClientId(String kernelClientId) {

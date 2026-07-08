@@ -37,7 +37,7 @@ public class KernelCredentialStore {
                         .map(Mono::just)
                         .orElseGet(() -> Mono.error(
                                 new IllegalStateException("Aucun tenant courant"))))
-                .flatMap(repository::findById)
+                .flatMap(repository::findByKernelTenantId)
                 .flatMap(account -> {
                     // Nouveau flux : pas de credentials kernel propres → plateforme BC
                     if (account.getKernelClientId() == null

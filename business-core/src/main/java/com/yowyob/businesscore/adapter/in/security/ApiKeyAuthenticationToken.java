@@ -14,6 +14,7 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
     private final String apiKey;
     private final String onBehalfOf;
     private final BusinessContext businessContext;
+    private final java.util.UUID apiKeyId;
 
     private ApiKeyAuthenticationToken(String clientId, String apiKey, String onBehalfOf) {
         super(AuthorityUtils.NO_AUTHORITIES);
@@ -21,15 +22,17 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
         this.apiKey = apiKey;
         this.onBehalfOf = onBehalfOf;
         this.businessContext = null;
+        this.apiKeyId = null;
         setAuthenticated(false);
     }
 
-    private ApiKeyAuthenticationToken(BusinessContext businessContext) {
+    private ApiKeyAuthenticationToken(BusinessContext businessContext, java.util.UUID apiKeyId) {
         super(AuthorityUtils.NO_AUTHORITIES);
         this.clientId = null;
         this.apiKey = null;
         this.onBehalfOf = null;
         this.businessContext = businessContext;
+        this.apiKeyId = apiKeyId;
         super.setAuthenticated(true);
     }
 
@@ -37,8 +40,8 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
         return new ApiKeyAuthenticationToken(clientId, apiKey, onBehalfOf);
     }
 
-    public static ApiKeyAuthenticationToken authenticated(BusinessContext businessContext) {
-        return new ApiKeyAuthenticationToken(businessContext);
+    public static ApiKeyAuthenticationToken authenticated(BusinessContext businessContext, java.util.UUID apiKeyId) {
+        return new ApiKeyAuthenticationToken(businessContext, apiKeyId);
     }
 
     public String getClientId() {
@@ -47,6 +50,11 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
 
     public String getOnBehalfOf() {
         return onBehalfOf;
+    }
+
+    /** Identifiant de la clé API ayant authentifié la requête (null pour le flux JWT). */
+    public java.util.UUID getApiKeyId() {
+        return apiKeyId;
     }
 
     @Override

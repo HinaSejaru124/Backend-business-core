@@ -5,35 +5,34 @@ import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccoun
 import com.yowyob.businesscore.domain.port.in.ApiKeyEmise;
 import com.yowyob.businesscore.domain.port.in.RegistrationUseCase;
 import com.yowyob.businesscore.domain.port.out.AuthentifierUtilisateur;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.UUID;
 
 /**
  * Inscription d'un développeur :
- * 1. Crée le compte sur le kernel (sign-up)
- * 2. Crée le compte BC local (bcClientId + bcApiKey)
- * Le dev vérifie son email, puis se connecte via POST /v1/auth/login.
+ * <ol>
+ *   <li>crée le compte sur le kernel (sign-up) — le kernel fait autorité sur l'identité et le tenant ;</li>
+ *   <li>crée le compte BC local en mémorisant le {@code kernel_tenant_id} (le tenant métier) et l'email ;</li>
+ *   <li>émet une première clé API (dans la table {@code api_key}).</li>
+ * </ol>
+ * Le tenant BC est donc le tenant kernel dès l'inscription : la clé API et le JWT résolvent le même
+ * espace. Le dev vérifie son email, puis se connecte via {@code POST /v1/auth/login}.
  */
 @Service
 public class RegistrationService implements RegistrationUseCase {
 
-    private static final SecureRandom RANDOM = new SecureRandom();
-
     private final DeveloperAccountRepository repository;
-    private final PasswordEncoder passwordEncoder;
     private final AuthentifierUtilisateur authentifier;
+    private final ApiKeyService apiKeyService;
 
     public RegistrationService(DeveloperAccountRepository repository,
-                               PasswordEncoder passwordEncoder,
-                               AuthentifierUtilisateur authentifier) {
+                               AuthentifierUtilisateur authentifier,
+                               ApiKeyService apiKeyService) {
         this.repository = repository;
-        this.passwordEncoder = passwordEncoder;
         this.authentifier = authentifier;
+        this.apiKeyService = apiKeyService;
     }
 
     @Override
@@ -41,26 +40,30 @@ public class RegistrationService implements RegistrationUseCase {
                                       String email, String password,
                                       String planCode) {
         String plan = (planCode == null || planCode.isBlank()) ? "FREE" : planCode;
-        String bcClientId = "bck_" + jeton(9);
-        String bcApiKey   = jeton(32);
 
         return authentifier.signUp(email, password, firstName, lastName)
                 .flatMap(signUpResult -> {
                     DeveloperAccountEntity entity = DeveloperAccountEntity.nouveau(
                             UUID.randomUUID(),
-                            bcClientId,
-                            passwordEncoder.encode(bcApiKey),
+                            email,
+                            parseUuid(signUpResult.tenantId()),
                             null,
                             null,
                             plan);
                     return repository.save(entity);
                 })
-                .thenReturn(new ApiKeyEmise(bcClientId, bcApiKey, plan));
+                .flatMap(account -> apiKeyService.creer(account.getId(), "Default")
+                        .map(cle -> new ApiKeyEmise(cle.prefix(), cle.secret(), plan)));
     }
 
-    private static String jeton(int octets) {
-        byte[] bytes = new byte[octets];
-        RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    private static UUID parseUuid(String valeur) {
+        if (valeur == null || valeur.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(valeur);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }
