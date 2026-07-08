@@ -1,16 +1,20 @@
 package com.yowyob.businesscore.adapter.in.rest.access;
 
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Vue d'une clé API (liste / renommage). Le secret n'y figure jamais : seul le {@code prefix} public
- * est exposé après la création.
- */
-public record CleApiResponse(UUID id, String prefix, String name, String status,
-                             Instant createdAt, Instant lastUsedAt) {
+@Schema(description = "Vue d'une clé API (sans secret)")
+public record CleApiResponse(
+        @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
+        @Schema(description = "Préfixe public", example = "bc_live_abc123") String prefix,
+        @Schema(example = "Prod") String name,
+        @Schema(example = "ACTIVE", allowableValues = {"ACTIVE", "REVOKED"}) String status,
+        Instant createdAt,
+        Instant lastUsedAt
+) {
 
     public static CleApiResponse depuis(ApiKeyEntity e) {
         return new CleApiResponse(e.getId(), e.getPrefix(), e.getName(), e.getStatus(),

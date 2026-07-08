@@ -1,15 +1,16 @@
 package com.yowyob.businesscore.adapter.in.rest.businesstype;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
-/**
- * Corps de POST /v1/business-types.
- * domainCode et domainNom sont optionnels —
- * si fournis, le BusinessDomain kernel est résolu ou créé.
- */
+@Schema(description = "Création d'un type métier en BROUILLON")
 public record CreerTypeRequest(
+        @Schema(description = "Code unique du type", example = "RETAIL")
         @NotBlank(message = "code est obligatoire") String code,
-        @NotBlank(message = "nom est obligatoire")  String nom,
+        @Schema(description = "Libellé", example = "Commerce de détail")
+        @NotBlank(message = "nom est obligatoire") String nom,
+        @Schema(description = "Code domaine kernel (optionnel)", example = "COMMERCE")
         String domainCode,
+        @Schema(description = "Nom du domaine kernel (optionnel)", example = "Commerce")
         String domainNom
 ) {}

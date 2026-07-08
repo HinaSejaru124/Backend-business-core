@@ -1,21 +1,20 @@
 package com.yowyob.businesscore.adapter.in.rest.transaction;
 
 import com.yowyob.businesscore.domain.transaction.TransactionVue;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Réponse d'une transaction lue du kernel (aligné OpenAPI {@code Transaction}).
- */
+@Schema(description = "Transaction lue du kernel (facture ou commande)")
 public record TransactionResponse(
-        UUID transactionKernelId,
-        BigDecimal montant,
-        String devise,
-        String statut,
+        @Schema(example = "00000000-0000-0000-0000-000000000000") UUID transactionKernelId,
+        @Schema(example = "25000.00") BigDecimal montant,
+        @Schema(example = "XOF") String devise,
+        @Schema(example = "PAYEE") String statut,
         Instant date,
-        BigDecimal montantPaye
+        @Schema(example = "25000.00") BigDecimal montantPaye
 ) {
 
     public static TransactionResponse depuis(TransactionVue vue) {

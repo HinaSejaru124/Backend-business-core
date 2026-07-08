@@ -1,16 +1,17 @@
 package com.yowyob.businesscore.adapter.in.rest.businesstype;
 
 import com.yowyob.businesscore.domain.configuration.ParametreConfig;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
 
-/** Réponse JSON pour un paramètre de configuration (schéma OpenAPI {@code ConfigParam}). */
+@Schema(description = "Paramètre de configuration")
 public record ParametreConfigResponse(
-        UUID    id,
-        String  cle,
-        String  valeur,
+        @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
+        @Schema(example = "devise") String cle,
+        @Schema(example = "XOF") String valeur,
         boolean verrouille,
-        String  portee          // TYPE | ENTREPRISE
+        @Schema(example = "TYPE", allowableValues = {"TYPE", "ENTREPRISE"}) String portee
 ) {
     public static ParametreConfigResponse depuis(ParametreConfig p) {
         return new ParametreConfigResponse(

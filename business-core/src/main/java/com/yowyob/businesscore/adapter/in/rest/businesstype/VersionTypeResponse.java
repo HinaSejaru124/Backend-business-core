@@ -1,18 +1,19 @@
 package com.yowyob.businesscore.adapter.in.rest.businesstype;
 
 import com.yowyob.businesscore.domain.businesstype.VersionType;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 import java.util.UUID;
 
-/** Réponse JSON pour une VersionType. */
+@Schema(description = "Version d'un type métier")
 public record VersionTypeResponse(
-        UUID    id,
-        UUID    typeMetierId,
-        int     numero,
-        boolean immuable,
+        @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
+        UUID typeMetierId,
+        @Schema(example = "1") int numero,
+        @Schema(description = "Verrouillée après publication") boolean immuable,
         Instant publieeLe,
-        String  libelle
+        @Schema(example = "v1 initiale") String libelle
 ) {
     public static VersionTypeResponse depuis(VersionType v) {
         return new VersionTypeResponse(

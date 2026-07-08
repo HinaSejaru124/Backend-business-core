@@ -1,20 +1,17 @@
 package com.yowyob.businesscore.adapter.in.rest.auth;
 
 import com.yowyob.businesscore.application.context.BusinessContext;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Réponse de {@code GET /v1/auth/me} : identité de l'utilisateur authentifié, dérivée des claims du JWT
- * kernel ({@code tid}, {@code actor}, {@code permissions}). {@code owner} = présence de
- * {@code organizations:write}.
- */
+@Schema(description = "Profil de l'utilisateur authentifié (claims JWT kernel)")
 public record MeResponse(
-        UUID tenantId,
-        UUID actorId,
-        List<String> permissions,
-        boolean owner
+        @Schema(description = "Tenant kernel (`tid`)") UUID tenantId,
+        @Schema(description = "Acteur kernel (`actor`)") UUID actorId,
+        @Schema(description = "Permissions dérivées du JWT") List<String> permissions,
+        @Schema(description = "Présence de `organizations:write`") boolean owner
 ) {
 
     public static MeResponse depuis(BusinessContext ctx) {

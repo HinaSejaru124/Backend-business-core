@@ -4,6 +4,11 @@ import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.usecase.businesstype.TypeMetierService;
 import com.yowyob.businesscore.application.usecase.businesstype.VersionTypeService;
 import com.yowyob.businesscore.application.usecase.configuration.ConfigurationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -12,25 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-/**
- * Controller REST — Brique 1 (Type Métier) + Brique 7 (Configuration).
- *
- * Toutes les routes sont protégées par la clé Business Core (SecurityConfig du socle).
- * Le BusinessContext est extrait du contexte réactif (posé par BusinessContextWebFilter).
- *
- * Routes exposées :
- *   POST   /v1/business-types                               → créer un type
- *   GET    /v1/business-types                               → lister les types du tenant
- *   GET    /v1/business-types/{typeId}                      → voir un type
- *   POST   /v1/business-types/{typeId}/publish              → publier un type
- *   POST   /v1/business-types/{typeId}/archive              → archiver un type
- *   POST   /v1/business-types/{typeId}/versions             → créer une version
- *   GET    /v1/business-types/{typeId}/versions             → lister les versions
- *   GET    /v1/business-types/{typeId}/versions/{versionNumber} → voir une version
- *   POST   /v1/business-types/{typeId}/versions/{versionNumber}/publish → publier une version
- *   POST   /v1/business-types/{typeId}/versions/{versionNumber}/config  → définir un paramètre
- *   GET    /v1/business-types/{typeId}/versions/{versionNumber}/config  → lister les paramètres
- */
+@Tag(name = "Types métier", description = "Déclaration du modèle métier (niveau Type)")
 @RestController
 @RequestMapping("/v1/business-types")
 public class BusinessTypeController {
@@ -47,16 +34,15 @@ public class BusinessTypeController {
         this.configService  = configService;
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // Types Métier
-    // ══════════════════════════════════════════════════════════════════════
-
-    /** POST /v1/business-types — Créer un Type Métier en BROUILLON */
+    @Operation(summary = "Créer un type métier",
+            description = "Crée un Type Métier en état BROUILLON pour le tenant courant.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Type créé"),
+            @ApiResponse(responseCode = "422", description = "Données invalides")
+    })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Mono<TypeMetierResponse> creer(
-            @Valid @RequestBody CreerTypeRequest req) {
-
+    public Mono<TypeMetierResponse> creer(@Valid @RequestBody CreerTypeRequest req) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> typeService.creer(
                         req.code(), req.nom(),
@@ -65,7 +51,8 @@ public class BusinessTypeController {
                 .map(TypeMetierResponse::depuis);
     }
 
-    /** GET /v1/business-types — Lister les Types Métier du tenant */
+    @Operation(summary = "Lister les types métier")
+    @ApiResponse(responseCode = "200", description = "Liste des types du tenant")
     @GetMapping
     public Flux<TypeMetierResponse> lister() {
         return BusinessContextHolder.currentContext()
@@ -73,15 +60,25 @@ public class BusinessTypeController {
                 .map(TypeMetierResponse::depuis);
     }
 
-    /** GET /v1/business-types/{typeId} — Voir un Type Métier */
+    @Operation(summary = "Consulter un type métier")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Le type métier"),
+            @ApiResponse(responseCode = "404", description = "Type introuvable")
+    })
     @GetMapping("/{typeId}")
-    public Mono<TypeMetierResponse> trouver(@PathVariable UUID typeId) {
+    public Mono<TypeMetierResponse> trouver(
+            @Parameter(description = "Identifiant du type métier") @PathVariable UUID typeId) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> typeService.trouverParId(typeId, ctx))
                 .map(TypeMetierResponse::depuis);
     }
 
-    /** POST /v1/business-types/{typeId}/publish — Publier : BROUILLON → PUBLIE */
+    @Operation(summary = "Publier un type métier", description = "Transition BROUILLON → PUBLIE.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Type publié"),
+            @ApiResponse(responseCode = "404", description = "Type introuvable"),
+            @ApiResponse(responseCode = "409", description = "Transition invalide")
+    })
     @PostMapping("/{typeId}/publish")
     public Mono<TypeMetierResponse> publier(@PathVariable UUID typeId) {
         return BusinessContextHolder.currentContext()
@@ -89,7 +86,11 @@ public class BusinessTypeController {
                 .map(TypeMetierResponse::depuis);
     }
 
-    /** POST /v1/business-types/{typeId}/archive — Archiver : PUBLIE → ARCHIVE */
+    @Operation(summary = "Archiver un type métier", description = "Transition PUBLIE → ARCHIVE.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Type archivé"),
+            @ApiResponse(responseCode = "404", description = "Type introuvable")
+    })
     @PostMapping("/{typeId}/archive")
     public Mono<TypeMetierResponse> archiver(@PathVariable UUID typeId) {
         return BusinessContextHolder.currentContext()
@@ -97,11 +98,12 @@ public class BusinessTypeController {
                 .map(TypeMetierResponse::depuis);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // Versions
-    // ══════════════════════════════════════════════════════════════════════
-
-    /** POST /v1/business-types/{typeId}/versions — Créer une nouvelle version */
+    @Operation(summary = "Créer une version", description = "Incrémente le numéro de version du type.",
+            tags = {"Contenu de version"})
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Version créée"),
+            @ApiResponse(responseCode = "404", description = "Type introuvable")
+    })
     @PostMapping("/{typeId}/versions")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<VersionTypeResponse> creerVersion(@PathVariable UUID typeId) {
@@ -110,7 +112,8 @@ public class BusinessTypeController {
                 .map(VersionTypeResponse::depuis);
     }
 
-    /** GET /v1/business-types/{typeId}/versions — Lister les versions */
+    @Operation(summary = "Lister les versions", tags = {"Contenu de version"})
+    @ApiResponse(responseCode = "200", description = "Liste des versions")
     @GetMapping("/{typeId}/versions")
     public Flux<VersionTypeResponse> listerVersions(@PathVariable UUID typeId) {
         return BusinessContextHolder.currentContext()
@@ -118,16 +121,25 @@ public class BusinessTypeController {
                 .map(VersionTypeResponse::depuis);
     }
 
-    /** GET /v1/business-types/{typeId}/versions/{versionNumber} — Voir une version */
+    @Operation(summary = "Consulter une version", tags = {"Contenu de version"})
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "La version"),
+            @ApiResponse(responseCode = "404", description = "Version introuvable")
+    })
     @GetMapping("/{typeId}/versions/{versionNumber}")
     public Mono<VersionTypeResponse> trouverVersion(@PathVariable UUID typeId,
-                                                    @PathVariable int versionNumber) {
+                                                    @Parameter(example = "1") @PathVariable int versionNumber) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> versionService.trouverParNumero(typeId, versionNumber, ctx))
                 .map(VersionTypeResponse::depuis);
     }
 
-    /** POST /v1/business-types/{typeId}/versions/{versionNumber}/publish — Publier une version */
+    @Operation(summary = "Publier une version", description = "Rend la version utilisable pour instancier des entreprises.",
+            tags = {"Contenu de version"})
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Version publiée"),
+            @ApiResponse(responseCode = "404", description = "Version introuvable")
+    })
     @PostMapping("/{typeId}/versions/{versionNumber}/publish")
     public Mono<VersionTypeResponse> publierVersion(@PathVariable UUID typeId,
                                                     @PathVariable int versionNumber) {
@@ -136,17 +148,16 @@ public class BusinessTypeController {
                 .map(VersionTypeResponse::depuis);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // Configuration
-    // ══════════════════════════════════════════════════════════════════════
-
-    /** POST /v1/business-types/{typeId}/versions/{versionNumber}/config — Définir un paramètre */
+    @Operation(summary = "Définir un paramètre de configuration", tags = {"Contenu de version"})
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Paramètre enregistré"),
+            @ApiResponse(responseCode = "404", description = "Version introuvable")
+    })
     @PostMapping("/{typeId}/versions/{versionNumber}/config")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<ParametreConfigResponse> definirParametre(@PathVariable UUID typeId,
                                                           @PathVariable int versionNumber,
                                                           @Valid @RequestBody DefinirParametreRequest req) {
-        // Résolution numéro → version (revérifie aussi l'appartenance au tenant) avant d'écrire le paramètre.
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> versionService.trouverParNumero(typeId, versionNumber, ctx)
                         .flatMap(v -> configService.definirPourType(
@@ -154,7 +165,8 @@ public class BusinessTypeController {
                 .map(ParametreConfigResponse::depuis);
     }
 
-    /** GET /v1/business-types/{typeId}/versions/{versionNumber}/config — Lister les paramètres */
+    @Operation(summary = "Lister les paramètres de configuration", tags = {"Contenu de version"})
+    @ApiResponse(responseCode = "200", description = "Liste des paramètres")
     @GetMapping("/{typeId}/versions/{versionNumber}/config")
     public Flux<ParametreConfigResponse> listerParametres(@PathVariable UUID typeId,
                                                           @PathVariable int versionNumber) {

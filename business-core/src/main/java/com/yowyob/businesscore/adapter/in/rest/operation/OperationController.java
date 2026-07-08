@@ -6,6 +6,11 @@ import com.yowyob.businesscore.application.usecase.operation.DeclarerOperationSe
 import com.yowyob.businesscore.application.usecase.operation.EtapeDeclaration;
 import com.yowyob.businesscore.application.usecase.operation.ExecuterOperationService;
 import com.yowyob.businesscore.domain.operation.ResultatExecution;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,15 +28,7 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * API REST — Brique 5 (Opérations). Routes (cf. OpenAPI) :
- * <ul>
- *   <li>{@code POST /v1/business-types/{typeId}/versions/{n}/operations} — déclarer ;</li>
- *   <li>{@code GET  /v1/businesses/{businessId}/operations} — lister ;</li>
- *   <li>{@code POST /v1/businesses/{businessId}/operations/{name}:execute} — exécuter (200 / 202).</li>
- * </ul>
- * Le {@code BusinessContext} (donc le tenant) est lu du contexte réactif posé par le filtre du socle.
- */
+@Tag(name = "Opérations", description = "Déclaration et exécution des actes métier")
 @RestController
 @RequestMapping("/v1")
 public class OperationController {
@@ -48,7 +45,14 @@ public class OperationController {
         this.executerOperation = executerOperation;
     }
 
-    /** Déclarer une opération et ses étapes sous une version de Type. */
+    @Operation(
+            summary = "Déclarer une opération",
+            description = "Déclare une opération et ses étapes de saga sous une version de Type.",
+            tags = {"Contenu de version"})
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Opération déclarée"),
+            @ApiResponse(responseCode = "404", description = "Version introuvable")
+    })
     @PostMapping("/business-types/{typeId}/versions/{versionNumber}/operations")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<OperationResponse> declarer(@PathVariable UUID typeId,
@@ -69,7 +73,9 @@ public class OperationController {
                 .map(OperationResponse::depuis);
     }
 
-    /** Lister les opérations disponibles pour une entreprise. */
+    @Operation(summary = "Lister les opérations disponibles",
+            description = "Opérations de la version épinglée à l'entreprise.")
+    @ApiResponse(responseCode = "200", description = "Liste des opérations")
     @GetMapping("/businesses/{businessId}/operations")
     public Flux<OperationResponse> lister(@PathVariable UUID businessId) {
         return BusinessContextHolder.currentContext()
@@ -77,18 +83,35 @@ public class OperationController {
                 .map(OperationResponse::depuis);
     }
 
-    /** Consulter le détail d'une opération par nom. */
+    @Operation(summary = "Consulter une opération par nom")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Détail de l'opération"),
+            @ApiResponse(responseCode = "404", description = "Opération introuvable")
+    })
     @GetMapping("/businesses/{businessId}/operations/{name}")
-    public Mono<OperationResponse> trouver(@PathVariable UUID businessId, @PathVariable String name) {
+    public Mono<OperationResponse> trouver(@PathVariable UUID businessId,
+                                             @Parameter(example = "vente") @PathVariable String name) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> consulterOperation.trouverParNom(businessId, name, ctx))
                 .map(OperationResponse::depuis);
     }
 
-    /** Exécuter une opération : immédiate (200) ou différée (202). */
+    @Operation(
+            summary = "Exécuter une opération",
+            description = """
+                    Déclenche un acte métier. Synchrone par défaut (`200` COMPLETEE).
+                    Différée : `202` EN_COURS avec URL de trace. Règle bloquante : `422`.
+                    Header optionnel `Idempotency-Key` pour éviter les doublons.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Opération terminée"),
+            @ApiResponse(responseCode = "202", description = "Opération acceptée, en cours"),
+            @ApiResponse(responseCode = "422", description = "Règle métier non respectée")
+    })
     @PostMapping("/businesses/{businessId}/operations/{name}:execute")
     public Mono<ResponseEntity<Object>> executer(@PathVariable UUID businessId,
-                                                 @PathVariable String name,
+                                                 @Parameter(example = "vente") @PathVariable String name,
+                                                 @Parameter(description = "Clé d'idempotence")
                                                  @RequestHeader(value = "Idempotency-Key", required = false)
                                                  String idempotencyKey,
                                                  @RequestBody(required = false) ExecuterOperationRequest requete) {

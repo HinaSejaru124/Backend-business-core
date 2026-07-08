@@ -1,19 +1,18 @@
 package com.yowyob.businesscore.adapter.in.rest.operation;
 
 import com.yowyob.businesscore.domain.operation.OperationAvecEtapes;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Réponse d'une opération déclarée (aligné OpenAPI {@code Operation}).
- */
+@Schema(description = "Opération déclarée sur une version de type")
 public record OperationResponse(
-        UUID id,
-        String nom,
-        String roleDeclencheur,
-        String declencheurRegles,
-        boolean differe,
+        @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
+        @Schema(example = "vente") String nom,
+        @Schema(example = "CAISSIER") String roleDeclencheur,
+        @Schema(example = "AVANT_OPERATION") String declencheurRegles,
+        @Schema(example = "false") boolean differe,
         List<EtapeResponse> etapes
 ) {
 
@@ -27,7 +26,11 @@ public record OperationResponse(
                 operation.etapes().stream().map(EtapeResponse::depuis).toList());
     }
 
-    public record EtapeResponse(int ordre, String typeEtape) {
+    @Schema(description = "Étape de saga")
+    public record EtapeResponse(
+            @Schema(example = "0") int ordre,
+            @Schema(example = "ENREGISTRER_VENTE") String typeEtape
+    ) {
         public static EtapeResponse depuis(com.yowyob.businesscore.domain.operation.EtapeOperation etape) {
             return new EtapeResponse(etape.ordre(), etape.typeEtape().name());
         }

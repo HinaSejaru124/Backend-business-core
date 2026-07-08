@@ -1,13 +1,15 @@
 package com.yowyob.businesscore.adapter.in.rest.operation;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.Map;
 
-/**
- * Corps de {@code POST /v1/businesses/{businessId}/operations/{name}:execute} (aligné OpenAPI
- * {@code ExecuteOperation}). {@code parametres} porte les entrées métier de l'opération
- * (ex. {@code offreId}, {@code quantite}, {@code beneficiaireId}).
- */
-public record ExecuterOperationRequest(Map<String, Object> parametres) {
+@Schema(description = "Paramètres d'exécution d'une opération métier")
+public record ExecuterOperationRequest(
+        @Schema(description = "Entrées métier libres",
+                example = "{\"offreId\":\"00000000-0000-0000-0000-000000000000\",\"quantite\":2}")
+        Map<String, Object> parametres
+) {
 
     public Map<String, Object> parametresOuVide() {
         return parametres == null ? Map.of() : parametres;

@@ -5,6 +5,11 @@ import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.usecase.access.ApiKeyService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,17 +25,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-/**
- * Portail développeur — gestion des clés API (famille Accès). Le développeur courant est résolu depuis
- * le tenant du {@link BusinessContext} (posé par l'authentification). Le secret d'une clé n'est renvoyé
- * qu'à la création.
- * <ul>
- *   <li>{@code POST   /v1/api-keys} — créer une clé (secret affiché une fois) ;</li>
- *   <li>{@code GET    /v1/api-keys} — lister ses clés (sans secret) ;</li>
- *   <li>{@code PATCH  /v1/api-keys/{id}} — renommer ;</li>
- *   <li>{@code POST   /v1/api-keys/{id}:revoke} — révoquer (immédiat).</li>
- * </ul>
- */
+@Tag(name = "Accès", description = "Inscription et gestion des clés d'API")
 @RestController
 @RequestMapping("/v1/api-keys")
 public class ApiKeyController {
@@ -44,6 +39,12 @@ public class ApiKeyController {
         this.developerRepository = developerRepository;
     }
 
+    @Operation(summary = "Créer une clé API",
+            description = "Émet une nouvelle paire Client-Id / Api-Key. Le secret n'est affiché qu'une fois.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Clé créée (secret inclus)"),
+            @ApiResponse(responseCode = "403", description = "Contexte développeur absent")
+    })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<CleApiCreeeResponse> creer(@RequestBody(required = false) CreerCleRequest requete) {
@@ -53,6 +54,8 @@ public class ApiKeyController {
                 .map(CleApiCreeeResponse::depuis);
     }
 
+    @Operation(summary = "Lister ses clés API", description = "Retourne les clés sans le secret.")
+    @ApiResponse(responseCode = "200", description = "Liste des clés")
     @GetMapping
     public Flux<CleApiResponse> lister() {
         return developerCourant()
@@ -60,14 +63,25 @@ public class ApiKeyController {
                 .map(CleApiResponse::depuis);
     }
 
+    @Operation(summary = "Renommer une clé API")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Clé renommée"),
+            @ApiResponse(responseCode = "404", description = "Clé introuvable")
+    })
     @PatchMapping("/{id}")
-    public Mono<CleApiResponse> renommer(@PathVariable UUID id,
-                                         @Valid @RequestBody RenommerCleRequest requete) {
+    public Mono<CleApiResponse> renommer(
+            @Parameter(description = "Identifiant de la clé") @PathVariable UUID id,
+            @Valid @RequestBody RenommerCleRequest requete) {
         return developerCourant()
                 .flatMap(developerId -> apiKeyService.renommer(developerId, id, requete.name()))
                 .map(CleApiResponse::depuis);
     }
 
+    @Operation(summary = "Révoquer une clé API", description = "Révocation immédiate ; la clé ne peut plus s'authentifier.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Clé révoquée"),
+            @ApiResponse(responseCode = "404", description = "Clé introuvable")
+    })
     @PostMapping("/{id}:revoke")
     public Mono<CleApiResponse> revoquer(@PathVariable UUID id) {
         return developerCourant()
@@ -75,7 +89,6 @@ public class ApiKeyController {
                 .map(CleApiResponse::depuis);
     }
 
-    /** Résout le compte développeur courant depuis le tenant kernel du contexte. */
     private Mono<UUID> developerCourant() {
         return BusinessContextHolder.currentContext()
                 .switchIfEmpty(Mono.error(ProblemException.forbidden("Contexte d'authentification absent")))

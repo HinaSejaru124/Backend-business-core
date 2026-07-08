@@ -1,18 +1,20 @@
 package com.yowyob.businesscore.adapter.in.rest.actor;
 
 import com.yowyob.businesscore.domain.actor.ActeurMetier;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 import java.util.UUID;
 
-/** Réponse d'un acteur métier rattaché (aligné OpenAPI {@code Actor}). */
+@Schema(description = "Acteur métier rattaché à une entreprise")
 public record ActeurReponse(
-        UUID id,
+        @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
         UUID entrepriseId,
-        UUID roleMetierId,
-        UUID acteurKernelId,
+        @Schema(description = "Rôle métier assigné") UUID roleMetierId,
+        @Schema(description = "Identifiant acteur côté kernel") UUID acteurKernelId,
         Instant valideDepuis,
-        Instant valideJusqua) {
+        Instant valideJusqua
+) {
 
     public static ActeurReponse de(ActeurMetier a) {
         return new ActeurReponse(a.id(), a.entrepriseId(), a.roleMetierId(),

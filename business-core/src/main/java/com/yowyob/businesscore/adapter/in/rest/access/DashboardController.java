@@ -5,6 +5,10 @@ import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.usecase.access.DashboardService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,10 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-/**
- * Tableau de bord développeur — {@code GET /v1/dashboard}. Synthèse d'usage (30 jours) et clés API du
- * développeur courant (résolu depuis le tenant kernel du {@link BusinessContext}).
- */
+@Tag(name = "Accès", description = "Inscription et gestion des clés d'API")
 @RestController
 @RequestMapping("/v1/dashboard")
 public class DashboardController {
@@ -29,6 +30,13 @@ public class DashboardController {
         this.developerRepository = developerRepository;
     }
 
+    @Operation(summary = "Tableau de bord développeur",
+            description = "Synthèse d'usage sur 30 jours et état des clés API du développeur courant.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Données du tableau de bord"),
+            @ApiResponse(responseCode = "403", description = "Contexte développeur absent"),
+            @ApiResponse(responseCode = "404", description = "Compte développeur introuvable")
+    })
     @GetMapping
     public Mono<DashboardResponse> tableau() {
         return developerCourant()

@@ -1,19 +1,18 @@
 package com.yowyob.businesscore.adapter.in.rest.trace;
 
 import com.yowyob.businesscore.domain.transaction.TraceOperation;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Réponse d'une trace d'opération (aligné OpenAPI {@code OperationTrace}).
- */
+@Schema(description = "Trace d'exécution d'une opération")
 public record OperationTraceResponse(
-        UUID id,
-        String operationNom,
-        String cleIdempotence,
+        @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
+        @Schema(example = "vente") String operationNom,
+        @Schema(description = "Clé d'idempotence fournie à l'exécution") String cleIdempotence,
         UUID transactionKernelId,
-        String statut,
+        @Schema(example = "COMPLETEE", allowableValues = {"EN_COURS", "COMPLETEE", "ECHEC"}) String statut,
         Instant creeLe,
         Instant resoluLe
 ) {

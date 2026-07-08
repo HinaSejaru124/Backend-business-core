@@ -1,21 +1,18 @@
 package com.yowyob.businesscore.adapter.in.rest.auth;
 
 import com.yowyob.businesscore.domain.port.out.ResultatLogin;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-/**
- * Réponse de {@code POST /v1/auth/login}. Le client stocke {@code accessToken} et le rejoue en
- * {@code Authorization: Bearer} sur les appels suivants. {@code organisations} permet un éventuel choix
- * d'organisation côté client ; {@code owner} indique si l'utilisateur peut créer une organisation.
- */
+@Schema(description = "Réponse de login — JWT à utiliser en Bearer")
 public record LoginResponse(
-        String accessToken,
-        String tokenType,
-        long expiresInSeconds,
+        @Schema(description = "JWT kernel") String accessToken,
+        @Schema(example = "Bearer") String tokenType,
+        @Schema(description = "Durée de validité en secondes", example = "3600") long expiresInSeconds,
         List<String> authorities,
         List<OrganisationDto> organisations,
-        boolean owner
+        @Schema(description = "Peut créer une organisation") boolean owner
 ) {
 
     public static LoginResponse depuis(ResultatLogin r) {
@@ -28,8 +25,13 @@ public record LoginResponse(
                 r.estOwner());
     }
 
-    public record OrganisationDto(String organizationId, String organizationCode,
-                                  String displayName, List<String> services) {
+    @Schema(description = "Organisation accessible après login")
+    public record OrganisationDto(
+            @Schema(example = "org-123") String organizationId,
+            @Schema(example = "ALPHA") String organizationCode,
+            @Schema(example = "Boutique Alpha") String displayName,
+            List<String> services
+    ) {
         public static OrganisationDto depuis(com.yowyob.businesscore.domain.port.out.OrganisationAccessible o) {
             return new OrganisationDto(o.organizationId(), o.organizationCode(), o.displayName(), o.services());
         }

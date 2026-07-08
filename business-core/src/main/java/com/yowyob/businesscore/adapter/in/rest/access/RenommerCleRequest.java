@@ -1,7 +1,10 @@
 package com.yowyob.businesscore.adapter.in.rest.access;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
-/** Corps de {@code PATCH /v1/api-keys/{id}}. */
-public record RenommerCleRequest(@NotBlank(message = "le nom est obligatoire") String name) {
+@Schema(description = "Renommage d'une clé API")
+public record RenommerCleRequest(
+        @Schema(example = "Staging") @NotBlank(message = "le nom est obligatoire") String name
+) {
 }

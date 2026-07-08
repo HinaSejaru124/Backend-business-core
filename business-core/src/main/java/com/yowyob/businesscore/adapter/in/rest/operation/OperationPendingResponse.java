@@ -1,13 +1,14 @@
 package com.yowyob.businesscore.adapter.in.rest.operation;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.UUID;
 
-/**
- * Réponse {@code 202} d'une opération différée acceptée (aligné OpenAPI {@code OperationPending}).
- */
+@Schema(description = "Réponse 202 — opération différée acceptée")
 public record OperationPendingResponse(
-        String statut,   // EN_COURS
-        UUID traceId,
-        String suivi     // URL de suivi de la trace
+        @Schema(example = "EN_COURS") String statut,
+        @Schema(example = "00000000-0000-0000-0000-000000000000") UUID traceId,
+        @Schema(description = "URL de suivi", example = "/v1/businesses/{businessId}/traces/{traceId}")
+        String suivi
 ) {
 }
