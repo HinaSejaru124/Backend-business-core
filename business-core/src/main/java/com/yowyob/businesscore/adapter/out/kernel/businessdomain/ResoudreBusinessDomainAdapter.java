@@ -1,14 +1,16 @@
 package com.yowyob.businesscore.adapter.out.kernel.businessdomain;
 
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.stereotype.Component;
+
 import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
 import com.yowyob.businesscore.domain.port.out.BusinessDomainRef;
 import com.yowyob.businesscore.domain.port.out.ResoudreBusinessDomain;
-import org.springframework.stereotype.Component;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * Implémentation socle de {@link ResoudreBusinessDomain} : référence la taxonomie kernel des domaines
@@ -29,11 +31,14 @@ public class ResoudreBusinessDomainAdapter implements ResoudreBusinessDomain {
     }
 
     @Override
-    public Mono<UUID> resoudreOuCreer(String code, String nom) {
-        Map<String, Object> body = Map.of("code", code, "nom", nom == null ? "" : nom);
-        return kernelClient.post("/api/business-domains", body, Map.class)
-                .map(reponse -> extraireId(reponse));
-    }
+public Mono<UUID> resoudreOuCreer(String code, String nom) {
+    Map<String, Object> body = Map.of(
+            "code", code,
+            "name", nom == null ? "" : nom  // ← "name" pas "nom"
+    );
+    return kernelClient.post("/api/business-domains", body, Map.class)
+            .map(reponse -> extraireId(reponse));
+}
 
     @Override
     public Flux<BusinessDomainRef> lister() {

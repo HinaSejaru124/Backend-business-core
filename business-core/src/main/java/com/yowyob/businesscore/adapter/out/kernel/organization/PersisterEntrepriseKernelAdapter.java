@@ -1,16 +1,19 @@
 package com.yowyob.businesscore.adapter.out.kernel.organization;
 
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
 import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
 import com.yowyob.businesscore.domain.port.out.OrganisationProvisionnee;
 import com.yowyob.businesscore.domain.port.out.PersisterEntreprise;
 import com.yowyob.businesscore.domain.shared.CycleVie;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
-import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
 
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import reactor.core.publisher.Mono;
 
 /**
  * Crée l'organisation réelle d'une entreprise dans le kernel.
@@ -55,14 +58,18 @@ public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
     }
 
     @Override
-    public Mono<UUID> creerAgence(UUID organizationId, String nom) {
-        return kernel.postForOrganization(
-                        "/api/organizations/" + organizationId + "/agencies",
-                        Map.of("name", nom, "primary", true),
-                        KernelId.class,
-                        organizationId)
-                .map(KernelId::id);
-    }
+public Mono<UUID> creerAgence(UUID organizationId, String nom) {
+    String code = nom == null ? "AGENCE" 
+        : nom.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "").substring(0, Math.min(nom.length(), 8))
+          + "-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase(Locale.ROOT);
+    
+    return kernel.postForOrganization(
+                    "/api/organizations/" + organizationId + "/agencies",
+                    Map.of("code", code, "name", nom != null ? nom : "Agence principale"),
+                    KernelId.class,
+                    organizationId)
+            .map(KernelId::id);
+}
 
     @Override
     public Mono<Void> changerCycleVieKernel(UUID organizationId, CycleVie cible) {
@@ -95,10 +102,33 @@ public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
 
     /** Crée le business actor propriétaire (prérequis à la création d'organisation). */
     private Mono<UUID> creerBusinessActor(String nom) {
-        CreerBusinessActorRequest requete = new CreerBusinessActorRequest(
-                nom, properties.businessActorRole(), true);
-        return kernel.post("/api/actors/onboarding", requete, KernelId.class).map(KernelId::id);
-    }
+    CreerBusinessActorRequest requete = new CreerBusinessActorRequest(
+            nom, properties.businessActorRole(), true);
+
+    return kernel.post("/api/actors/onboarding", requete, Map.class)
+            .map(this::extraireId)
+            .onErrorResume(e -> {
+                boolean est409 = e instanceof WebClientResponseException ex
+                        && ex.getStatusCode().value() == 409;
+
+                boolean estRetryExhausted409 = reactor.core.Exceptions.isRetryExhausted(e)
+                        && e.getCause() instanceof WebClientResponseException ex2
+                        && ex2.getStatusCode().value() == 409;
+
+                if (est409 || estRetryExhausted409) {
+                    return kernel.get("/api/actors/me", Map.class)
+                            .map(this::extraireId);
+                }
+                return Mono.error(e);
+            });
+}
+
+private UUID extraireId(Map<?, ?> reponse) {
+    Object charge = reponse.containsKey("data") ? reponse.get("data") : reponse;
+    Object id = charge instanceof Map<?, ?> m ? m.get("id") : reponse.get("id");
+    if (id == null) throw new IllegalStateException("Réponse kernel sans id");
+    return UUID.fromString(id.toString());
+}
 
     /** Code unique exigé par le kernel : slug du nom + suffixe court (évite les collisions). */
     private static String genererCode(String nom) {

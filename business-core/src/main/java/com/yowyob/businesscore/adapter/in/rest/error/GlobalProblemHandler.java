@@ -63,7 +63,7 @@ public class GlobalProblemHandler {
         @ExceptionHandler(Exception.class)
         public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
                 // LOG TEMPORAIRE — à retirer après debug
-                // ex.printStackTrace();
+                ex.printStackTrace();
                 ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
                                 "Une erreur interne est survenue");
                 problem.setTitle("Erreur interne");

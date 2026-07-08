@@ -161,9 +161,17 @@ public class KernelClient {
     }
 
     private <T> Mono<T> resilience(Mono<T> source) {
-        Mono<T> avecTimeout = source.timeout(timeout);
-        return maxRetries > 0
-                ? avecTimeout.retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(200)))
-                : avecTimeout;
+    Mono<T> avecTimeout = source.timeout(timeout);
+    return maxRetries > 0
+            ? avecTimeout.retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(200))
+                    .filter(this::estRetryable))
+            : avecTimeout;
+}
+
+private boolean estRetryable(Throwable e) {
+    if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException ex) {
+        return ex.getStatusCode().is5xxServerError();
     }
+    return !(e instanceof java.util.concurrent.TimeoutException) || true; // timeouts restent retryable
+}
 }
