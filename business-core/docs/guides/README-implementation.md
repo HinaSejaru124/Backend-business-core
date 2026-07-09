@@ -6,27 +6,27 @@
 ## 1. Le projet en une page
 
 Le **Business Core** est un noyau métier générique qui s'appuie sur le **kernel RT-Comops** (déjà
-déployé, distant). Il répond à « c'est quoi un métier ? » via un modèle déclaratif (*metadata-driven*)
+déployé, distant). Il répond à « c'est quoi un métier ? » via un modèle déclaratif (_metadata-driven_)
 en sept briques, exposé par une API REST réactive, en architecture hexagonale.
 
 Principe fondateur : **le développeur déclare son métier en données** ; il ne code rien dans le Business
 Core. Nous codons le moteur générique qui interprète ces données. Le domaine ne dépend de rien : toute
-technologie (base, kernel, Kafka) est un *adapter* branché sur un *port*.
+technologie (base, kernel, Kafka) est un _adapter_ branché sur un _port_.
 
 ## 2. Stack (figée)
 
-| Élément | Choix |
-|---|---|
-| Langage | Java 21 (LTS) |
-| Framework | Spring Boot 4.0.x (Framework 7, Security 7, Jackson 3) |
-| Web | Spring WebFlux (réactif) |
-| Données | Spring Data R2DBC + r2dbc-postgresql |
-| Base | PostgreSQL 16 |
-| Cache | Redis 7 (réactif) |
-| Événements | Kafka 3 |
-| Migrations | Liquibase (JDBC au démarrage) |
-| Build | Maven |
-| Tests | JUnit 5, Reactor Test (`StepVerifier`), Testcontainers, WireMock |
+| Élément    | Choix                                                            |
+| ---------- | ---------------------------------------------------------------- |
+| Langage    | Java 21 (LTS)                                                    |
+| Framework  | Spring Boot 4.0.x (Framework 7, Security 7, Jackson 3)           |
+| Web        | Spring WebFlux (réactif)                                         |
+| Données    | Spring Data R2DBC + r2dbc-postgresql                             |
+| Base       | PostgreSQL 16                                                    |
+| Cache      | Redis 7 (réactif)                                                |
+| Événements | Kafka 3                                                          |
+| Migrations | Liquibase (JDBC au démarrage)                                    |
+| Build      | Maven                                                            |
+| Tests      | JUnit 5, Reactor Test (`StepVerifier`), Testcontainers, WireMock |
 
 **Réactif partout** : `Mono`/`Flux`, jamais `.block()`, `WebClient` (pas `RestTemplate`), pas de JDBC
 au runtime.

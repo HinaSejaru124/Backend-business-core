@@ -22,16 +22,16 @@ export PASSWORD="MotDePasse1!Secur"
 
 ## Règle d'authentification (important)
 
-| Mode | Headers | `tenantId` RLS | Usage recommandé |
-|------|---------|----------------|------------------|
-| **JWT Bearer** | `Authorization: Bearer <token>` | `tid` du kernel (JWT) | **Tests E2E manuels — utiliser partout après login** |
-| Clé BC | `X-BC-Client-Id` + `X-BC-Api-Key` | `kernel_tenant_id` du compte dev | Intégrations machine-to-machine (backend du dev) |
+| Mode           | Headers                           | `tenantId` RLS                   | Usage recommandé                                     |
+| -------------- | --------------------------------- | -------------------------------- | ---------------------------------------------------- |
+| **JWT Bearer** | `Authorization: Bearer <token>`   | `tid` du kernel (JWT)            | **Tests E2E manuels — utiliser partout après login** |
+| Clé BC         | `X-BC-Client-Id` + `X-BC-Api-Key` | `kernel_tenant_id` du compte dev | Intégrations machine-to-machine (backend du dev)     |
 
 **Ne pas mélanger** clé BC et JWT dans un même parcours de test : le modèle métier créé sous un tenant
 ne sera pas visible lors de la création d'entreprise sous un autre tenant → **404 version introuvable**.
 
 Les en-têtes `X-BC-Client-Id` / `X-BC-Api-Key` sont des **headers HTTP** (identifiant public + secret).
-Dans Swagger UI, rien ne va dans **Authorize** ; le Client-Id et le Api-key est un champ header dans **Try it out**.
+Dans Swagger UI : **Authorize** → JWT Bearer uniquement ; Client-Id et Api-Key sont des champs header dans **Try it out** (mode M2M).
 
 **À partir de l'étape 3**, toutes les routes protégées utilisent :
 
@@ -241,12 +241,12 @@ curl -s -X POST $BC_URL/v1/business-types/$TYPE_ID/versions/$VERSION/config \
 
 Sur le Swagger kernel (`https://kernel-core.yowyob.com/swagger-ui.html`), après création d'entreprise (étape 13) :
 
-| Action | Pourquoi |
-|--------|----------|
-| `POST /api/organizations/{id}/approve` | Organisation utilisable |
+| Action                                      | Pourquoi                                           |
+| ------------------------------------------- | -------------------------------------------------- |
+| `POST /api/organizations/{id}/approve`      | Organisation utilisable                            |
 | `POST /api/organizations/{id}/services` × N | Souscrire COMMERCIAL, ACCOUNTING, CASHIER, PRODUCT |
-| Créer une caisse (cash register) | UUID pour `caisse_principale` |
-| (Optionnel) Ouvrir session caisse | Si `bills/pay` exige une session active |
+| Créer une caisse (cash register)            | UUID pour `caisse_principale`                      |
+| (Optionnel) Ouvrir session caisse           | Si `bills/pay` exige une session active            |
 
 ---
 
@@ -340,11 +340,11 @@ curl -s $BC_URL/v1/businesses/$BUSINESS_ID/traces/$TRACE_ID \
 
 ## Dépannage
 
-| Symptôme | Cause fréquente |
-|----------|-----------------|
-| 404 version introuvable (création entreprise) | Mélange clé BC + JWT dans le même parcours |
-| 401 sur routes protégées | JWT expiré ou absent |
-| 500 à l'inscription | Kernel injoignable ou credentials BC invalides |
-| 422 à l'exécution vente | Règle bloquante, org non approuvée, services manquants |
-| Échec ENCAISSER | `caisse_principale` absent ou session caisse inactive |
-| Clé BC « espace non lié » | Faire un `POST /v1/auth/login` au moins une fois |
+| Symptôme                                      | Cause fréquente                                        |
+| --------------------------------------------- | ------------------------------------------------------ |
+| 404 version introuvable (création entreprise) | Mélange clé BC + JWT dans le même parcours             |
+| 401 sur routes protégées                      | JWT expiré ou absent                                   |
+| 500 à l'inscription                           | Kernel injoignable ou credentials BC invalides         |
+| 422 à l'exécution vente                       | Règle bloquante, org non approuvée, services manquants |
+| Échec ENCAISSER                               | `caisse_principale` absent ou session caisse inactive  |
+| Clé BC « espace non lié »                     | Faire un `POST /v1/auth/login` au moins une fois       |
