@@ -23,7 +23,7 @@ import java.util.Set;
 
 /**
  * Documente {@code X-BC-Client-Id} et {@code X-BC-Api-Key} comme en-têtes Try it out sur les routes
- * protégées. Seul le JWT ({@code bearerAuth}) apparaît dans Authorize — pas les clés BC.
+ * API consommables (M2M). Les routes console développeur n'affichent que le JWT ({@code bearerAuth}).
  */
 @Component
 public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer {
@@ -39,10 +39,17 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
             "/v1/auth/login"
     );
 
+    /** Routes console développeur : JWT uniquement dans Swagger (pas de headers BC). */
+    private static final Set<String> JWT_ONLY_PREFIXES = Set.of(
+            "/v1/auth",
+            "/v1/api-keys",
+            "/v1/dashboard"
+    );
+
     @Override
     public io.swagger.v3.oas.models.Operation customize(io.swagger.v3.oas.models.Operation operation,
                                                         HandlerMethod handlerMethod) {
-        if (isPublicRoute(handlerMethod) || isBearerOnly(handlerMethod, operation)) {
+        if (isPublicRoute(handlerMethod) || isJwtOnlyRoute(handlerMethod, operation)) {
             return operation;
         }
         addHeaderIfAbsent(operation, CLIENT_ID_HEADER,
@@ -126,7 +133,16 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
         }
     }
 
-    private boolean isBearerOnly(HandlerMethod handlerMethod, io.swagger.v3.oas.models.Operation operation) {
+    private boolean isJwtOnlyRoute(HandlerMethod handlerMethod, io.swagger.v3.oas.models.Operation operation) {
+        String path = resolvePath(handlerMethod);
+        for (String prefix : JWT_ONLY_PREFIXES) {
+            if (path.equals(prefix) || path.startsWith(prefix + "/")) {
+                return true;
+            }
+        }
+        if (hasBearerSecurityRequirement(handlerMethod.getBeanType())) {
+            return true;
+        }
         Operation annotation = handlerMethod.getMethodAnnotation(Operation.class);
         if (annotation != null && annotation.security().length == 1) {
             SecurityRequirement req = annotation.security()[0];
@@ -140,5 +156,10 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
             return req.size() == 1 && req.containsKey(BEARER_SCHEME);
         }
         return false;
+    }
+
+    private boolean hasBearerSecurityRequirement(Class<?> type) {
+        SecurityRequirement requirement = AnnotatedElementUtils.findMergedAnnotation(type, SecurityRequirement.class);
+        return requirement != null && BEARER_SCHEME.equals(requirement.name());
     }
 }

@@ -21,15 +21,17 @@ import org.springframework.context.annotation.Configuration;
                         et déclenche des Opérations. Le Business Core orchestre le kernel en façade.
 
                         ## Authentification
-                        Deux modes à l'exécution (l'un ou l'autre) :
-                        - **JWT** : `Authorize` → Bearer, token obtenu via `POST /v1/auth/login`.
-                        - **Clé BC (backend M2M)** : en-têtes `X-BC-Client-Id` + `X-BC-Api-Key` dans Try it out
+                        Deux surfaces distinctes :
+                        - **Console développeur** (`/v1/auth`, `/v1/api-keys`, `/v1/dashboard`) :
+                          JWT via `Authorize` (token obtenu via `POST /v1/auth/login`). Pas de headers BC.
+                        - **API consommable M2M** (types métier, entreprises, opérations…) :
+                          en-têtes `X-BC-Client-Id` + `X-BC-Api-Key` dans Try it out
                           (secret stocké côté serveur du développeur — pas dans Authorize).
 
-                        Ni le Client-Id ni l'Api-Key ne figurent dans Authorize : ce sont des en-têtes HTTP.
+                        À l'exécution, JWT et clé BC restent mutuellement exclusifs sur un même appel.
 
                         ## Tests E2E
-                        Après login, préférer le JWT Bearer sur toutes les routes pour un tenant kernel unique.
+                        Après login, utiliser le JWT Bearer sur les routes console dev et le parcours métier.
 
                         ## Conventions
                         - Versionnement de l'API dans l'URL /v1, distinct de la version d'un Type Métier.
