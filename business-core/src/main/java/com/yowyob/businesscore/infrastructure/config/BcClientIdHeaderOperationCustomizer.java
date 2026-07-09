@@ -22,13 +22,14 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Documente {@code X-BC-Client-Id} comme en-tête requis sur les routes protégées par clé BC.
- * L'identifiant public n'est pas un schéma Authorize (contrairement au secret {@code X-BC-Api-Key}).
+ * Documente {@code X-BC-Client-Id} et {@code X-BC-Api-Key} comme en-têtes Try it out sur les routes
+ * protégées. Seul le JWT ({@code bearerAuth}) apparaît dans Authorize — pas les clés BC.
  */
 @Component
 public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer {
 
     private static final String CLIENT_ID_HEADER = ApiKeyAuthenticationConverter.HEADER_CLIENT_ID;
+    private static final String API_KEY_HEADER = ApiKeyAuthenticationConverter.HEADER_API_KEY;
     private static final String BEARER_SCHEME = "bearerAuth";
 
     /** Aligné sur {@code SecurityConfig.ROUTES_PUBLIQUES} (partie controllers). */
@@ -41,26 +42,41 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
     @Override
     public io.swagger.v3.oas.models.Operation customize(io.swagger.v3.oas.models.Operation operation,
                                                         HandlerMethod handlerMethod) {
-        if (hasClientIdParameter(operation)
-                || isPublicRoute(handlerMethod)
-                || isBearerOnly(handlerMethod, operation)) {
+        if (isPublicRoute(handlerMethod) || isBearerOnly(handlerMethod, operation)) {
             return operation;
         }
-        operation.addParametersItem(new Parameter()
-                .in("header")
-                .name(CLIENT_ID_HEADER)
-                .required(true)
-                .description("Identifiant public de la clé BC (préfixe, émis à l'inscription)")
-                .schema(new StringSchema().example("bc_live_abc123")));
+        addHeaderIfAbsent(operation, CLIENT_ID_HEADER,
+                "Identifiant public de la clé BC (préfixe, émis à l'inscription). Alternative : JWT via Authorize.",
+                "bck_live_abc123", false);
+        addHeaderIfAbsent(operation, API_KEY_HEADER,
+                "Secret de la clé BC (backend M2M). Requiert aussi X-BC-Client-Id. Alternative : JWT via Authorize.",
+                null, false);
         return operation;
     }
 
-    private boolean hasClientIdParameter(io.swagger.v3.oas.models.Operation operation) {
+    private void addHeaderIfAbsent(io.swagger.v3.oas.models.Operation operation, String name,
+                                   String description, String example, boolean required) {
+        if (hasHeaderParameter(operation, name)) {
+            return;
+        }
+        StringSchema schema = new StringSchema();
+        if (example != null) {
+            schema.example(example);
+        }
+        operation.addParametersItem(new Parameter()
+                .in("header")
+                .name(name)
+                .required(required)
+                .description(description)
+                .schema(schema));
+    }
+
+    private boolean hasHeaderParameter(io.swagger.v3.oas.models.Operation operation, String headerName) {
         if (operation.getParameters() == null) {
             return false;
         }
         return operation.getParameters().stream()
-                .anyMatch(p -> CLIENT_ID_HEADER.equalsIgnoreCase(p.getName()));
+                .anyMatch(p -> headerName.equalsIgnoreCase(p.getName()));
     }
 
     private boolean isPublicRoute(HandlerMethod handlerMethod) {

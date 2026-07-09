@@ -94,7 +94,13 @@ develop2 (= main d'intégration)   ← le socle. Toujours vert.
 Voir [sécurité — défense en profondeur](../architecture/securite-defense-profondeur.md) et la checklist
 sécurité par PR qui s'y trouve.
 
-## 11. Definition of Done (par PR)
+## 11. Tests manuels E2E
+
+Voir [parcours de test E2E](test-e2e-parcours-complet.md) et le script
+[`scripts/e2e-parcours.sh`](../../scripts/e2e-parcours.sh). Utiliser le **JWT** (`Authorization: Bearer`)
+sur toutes les routes protégées après login — ne pas mélanger clé BC et JWT dans un même parcours.
+
+## 12. Definition of Done (par PR)
 
 - [ ] Compile et démarre ; endpoints testés (Swagger/Postman).
 - [ ] Tests unitaires des use cases + au moins un test d'intégration kernel.
@@ -102,7 +108,7 @@ sécurité par PR qui s'y trouve.
 - [ ] Aucun fichier hors de mes packages modifié (sauf mon changelog feature).
 - [ ] CI verte ; code réactif (pas de `.block()`).
 
-## 12. Ordre de démarrage
+## 13. Ordre de démarrage
 
 1. Lead : socle livré (fait).
 2. Les 4 features démarrent en parallèle. Dev 2 (Types) a une légère priorité : les autres déclarent

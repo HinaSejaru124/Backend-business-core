@@ -1,11 +1,9 @@
 package com.yowyob.businesscore.infrastructure.config;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
-import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Contact;
 import io.swagger.v3.oas.annotations.info.Info;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Configuration;
@@ -23,10 +21,15 @@ import org.springframework.context.annotation.Configuration;
                         et déclenche des Opérations. Le Business Core orchestre le kernel en façade.
 
                         ## Authentification
-                        - **Authorize** : secret `X-BC-Api-Key` (clé BC émise à l'inscription), ou JWT Bearer
-                          sur `GET /v1/auth/me` après login.
-                        - **Client-Id** : identifiant public (`X-BC-Client-Id`), saisi comme en-tête sur
-                          chaque requête protégée — ce n'est pas un secret et n'apparaît pas dans Authorize.
+                        Deux modes à l'exécution (l'un ou l'autre) :
+                        - **JWT** : `Authorize` → Bearer, token obtenu via `POST /v1/auth/login`.
+                        - **Clé BC (backend M2M)** : en-têtes `X-BC-Client-Id` + `X-BC-Api-Key` dans Try it out
+                          (secret stocké côté serveur du développeur — pas dans Authorize).
+
+                        Ni le Client-Id ni l'Api-Key ne figurent dans Authorize : ce sont des en-têtes HTTP.
+
+                        ## Tests E2E
+                        Après login, préférer le JWT Bearer sur toutes les routes pour un tenant kernel unique.
 
                         ## Conventions
                         - Versionnement de l'API dans l'URL /v1, distinct de la version d'un Type Métier.
@@ -35,9 +38,6 @@ import org.springframework.context.annotation.Configuration;
                         """,
                 contact = @Contact(name = "Équipe Business Core")
         ),
-        security = {
-                @SecurityRequirement(name = "bcApiKey")
-        },
         tags = {
                 @Tag(name = "Accès", description = "Inscription et gestion des clés d'API"),
                 @Tag(name = "Auth", description = "Login délégué kernel et profil utilisateur"),
@@ -50,21 +50,11 @@ import org.springframework.context.annotation.Configuration;
         }
 )
 @SecurityScheme(
-        name = "bcApiKey",
-        type = SecuritySchemeType.APIKEY,
-        in = SecuritySchemeIn.HEADER,
-        paramName = "X-BC-Api-Key",
-        description = """
-                Secret de la clé Business Core (affiché une seule fois à la création).
-                Requiert aussi l'en-tête X-BC-Client-Id (identifiant public, pas un secret).
-                """
-)
-@SecurityScheme(
         name = "bearerAuth",
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
         bearerFormat = "JWT",
-        description = "JWT kernel obtenu via POST /v1/auth/login"
+        description = "JWT kernel obtenu via POST /v1/auth/login. Alternative aux en-têtes X-BC-Client-Id / X-BC-Api-Key."
 )
 public class OpenApiConfig {
 }
