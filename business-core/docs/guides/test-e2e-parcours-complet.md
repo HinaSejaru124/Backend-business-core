@@ -22,18 +22,19 @@ export PASSWORD="MotDePasse1!Secur"
 
 ## Règle d'authentification (important)
 
-| Mode           | Headers                           | `tenantId` RLS                   | Usage recommandé                                     |
-| -------------- | --------------------------------- | -------------------------------- | ---------------------------------------------------- |
-| **JWT Bearer** | `Authorization: Bearer <token>`   | `tid` du kernel (JWT)            | **Tests E2E manuels — utiliser partout après login** |
-| Clé BC         | `X-BC-Client-Id` + `X-BC-Api-Key` | `kernel_tenant_id` du compte dev | Intégrations machine-to-machine (backend du dev)     |
+| Surface | Headers | Usage |
+| ------- | ------- | ----- |
+| **Console dev** | `Authorization: Bearer <JWT>` | `/v1/api-keys`, `/v1/dashboard`, `/v1/auth/me` |
+| **API intégration** | Bearer **obligatoire** + `X-BC-Client-Id` / `X-BC-Api-Key` **recommandés** | Types métier, entreprises, opérations… |
+| **Public** | aucun | `/health`, `/v1/registration`, `/v1/auth/login` |
 
-**Ne pas mélanger** clé BC et JWT dans un même parcours de test : le modèle métier créé sous un tenant
-ne sera pas visible lors de la création d'entreprise sous un autre tenant → **404 version introuvable**.
+Le **Bearer JWT** délègue l'identité utilisateur au kernel (création d'organisation, exécution d'opérations).
+Les headers **`X-BC-*`** identifient la clé API du développeur (suivi d'usage, acteur `X-BC-On-Behalf-Of`).
+Ils se complètent : Bearer seul suffit pour tester ; en production le backend du dev envoie les deux.
 
-Les en-têtes `X-BC-Client-Id` / `X-BC-Api-Key` sont des **headers HTTP** (identifiant public + secret).
-Dans Swagger UI : **Authorize** → JWT Bearer uniquement ; Client-Id et Api-Key sont des champs header dans **Try it out** (mode M2M).
+Dans Swagger : **Authorize** → JWT, puis renseigner `X-BC-*` dans Try it out sur les routes d'intégration.
 
-**À partir de l'étape 3**, toutes les routes protégées utilisent :
+**À partir de l'étape 3**, toutes les routes protégées utilisent au minimum :
 
 ```bash
 -H "Authorization: Bearer $JWT"
@@ -239,14 +240,13 @@ curl -s -X POST $BC_URL/v1/business-types/$TYPE_ID/versions/$VERSION/config \
 
 ## Phase kernel (manuel, hors BC)
 
-Sur le Swagger kernel (`https://kernel-core.yowyob.com/swagger-ui.html`), après création d'entreprise (étape 13) :
+Après `POST /v1/businesses`, BC provisionne automatiquement : approbation, services et agence principale.
+Il reste en général **manuel** sur le kernel :
 
-| Action                                      | Pourquoi                                           |
-| ------------------------------------------- | -------------------------------------------------- |
-| `POST /api/organizations/{id}/approve`      | Organisation utilisable                            |
-| `POST /api/organizations/{id}/services` × N | Souscrire COMMERCIAL, ACCOUNTING, CASHIER, PRODUCT |
-| Créer une caisse (cash register)            | UUID pour `caisse_principale`                      |
-| (Optionnel) Ouvrir session caisse           | Si `bills/pay` exige une session active            |
+| Action                           | Pourquoi                              |
+| -------------------------------- | ------------------------------------- |
+| Créer une caisse (cash register) | UUID pour `caisse_principale` en config |
+| (Optionnel) Ouvrir session caisse | Si `bills/pay` exige une session active |
 
 ---
 
@@ -264,7 +264,7 @@ export BUSINESS_ID="<id>"
 export ORG_ID="<organizationId>"
 ```
 
-Puis effectuer la phase kernel sur `$ORG_ID`.
+Puis configurer la caisse kernel (`caisse_principale`) — voir phase kernel ci-dessus.
 
 ```bash
 curl -s $BC_URL/v1/businesses -H "Authorization: Bearer $JWT" | jq .

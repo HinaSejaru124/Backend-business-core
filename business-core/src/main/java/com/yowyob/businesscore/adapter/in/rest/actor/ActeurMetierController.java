@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 @Tag(name = "Entreprises", description = "Instances de métier (niveau Entreprise)")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/v1/businesses/{businessId}/actors")
 public class ActeurMetierController {

@@ -47,6 +47,7 @@ public class RegistrationService implements RegistrationUseCase {
                             UUID.randomUUID(),
                             email,
                             parseUuid(signUpResult.tenantId()),
+                            signUpResult.id(),
                             null,
                             null,
                             plan);

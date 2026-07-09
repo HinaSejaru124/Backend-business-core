@@ -6,6 +6,8 @@ import com.yowyob.businesscore.adapter.in.rest.access.DashboardController;
 import com.yowyob.businesscore.adapter.in.rest.auth.AuthController;
 import com.yowyob.businesscore.adapter.in.rest.auth.LoginRequest;
 import com.yowyob.businesscore.adapter.in.rest.businesstype.BusinessTypeController;
+import com.yowyob.businesscore.adapter.in.rest.enterprise.CreerEntrepriseRequest;
+import com.yowyob.businesscore.adapter.in.rest.enterprise.EntrepriseController;
 import com.yowyob.businesscore.adapter.in.security.ApiKeyAuthenticationConverter;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.parameters.Parameter;
@@ -53,15 +55,30 @@ class BcClientIdHeaderOperationCustomizerTest {
     }
 
     @Test
-    @DisplayName("GET /v1/business-types : headers BC présents (API M2M)")
-    void businessTypes_avecHeadersBc() throws Exception {
+    @DisplayName("GET /v1/business-types : Bearer + headers BC documentés")
+    void businessTypes_integration() throws Exception {
         Operation operation = customize(
                 new BusinessTypeController(null, null, null),
                 BusinessTypeController.class.getDeclaredMethod("lister"));
 
-        assertThat(headerNames(operation)).containsExactly(
+        assertThat(headerNames(operation)).contains(
+                ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
+                ApiKeyAuthenticationConverter.HEADER_API_KEY,
+                ApiKeyAuthenticationConverter.HEADER_ON_BEHALF_OF);
+        assertThat(operation.getSecurity()).anyMatch(req -> req.containsKey("bearerAuth"));
+    }
+
+    @Test
+    @DisplayName("POST /v1/businesses : Bearer + headers BC documentés")
+    void businesses_integration() throws Exception {
+        Operation operation = customize(
+                new EntrepriseController(null),
+                EntrepriseController.class.getDeclaredMethod("creer", CreerEntrepriseRequest.class));
+
+        assertThat(headerNames(operation)).contains(
                 ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
                 ApiKeyAuthenticationConverter.HEADER_API_KEY);
+        assertThat(operation.getSecurity()).anyMatch(req -> req.containsKey("bearerAuth"));
     }
 
     @Test

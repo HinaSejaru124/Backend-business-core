@@ -14,4 +14,6 @@ public interface DeveloperAccountRepository extends ReactiveCrudRepository<Devel
     Mono<DeveloperAccountEntity> findByEmail(String email);
 
     Mono<DeveloperAccountEntity> findByKernelTenantId(UUID kernelTenantId);
+
+    Mono<DeveloperAccountEntity> findByKernelUserId(String kernelUserId);
 }

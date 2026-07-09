@@ -88,7 +88,6 @@ private static final String[] ROUTES_PUBLIQUES = {
                 .addFilterAfter(apiKeyFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 // Propagation du contexte vers le Reactor Context (lisible par use cases + KernelClient).
                 .addFilterAfter(new BusinessContextWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
-                .addFilterAfter(new KernelTokenWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
                 // Comptabilise l'usage par clé API (dashboard développeur).
                 .addFilterAfter(new UsageTrackingWebFilter(usageCompteur), SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();

@@ -6,12 +6,14 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 /**
- * Port de sortie — crée l'organisation réelle d'une entreprise.
- * Mappe : POST /api/organizations ; POST /api/organizations/{orgId}/agencies.
+ * Port de sortie — provisionnement et cycle de vie d'une organisation kernel.
+ *
+ * <p>Chaîne auto lors de {@code POST /v1/businesses} (sans {@code organizationId}) :
+ * actor → organisation → approbation → services → agence.
  */
 public interface PersisterEntreprise {
 
-    /** Onboarding du business actor propriétaire puis création de l'organisation ; renvoie les deux réfs. */
+    /** Résout le business actor puis crée l'organisation ; renvoie les deux références. */
     Mono<OrganisationProvisionnee> creerOrganisation(String nom);
 
     Mono<UUID> creerAgence(UUID organizationId, String nom);

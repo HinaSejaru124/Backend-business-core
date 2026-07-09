@@ -21,6 +21,10 @@ public class ApiKeyAuthenticationConverter implements ServerAuthenticationConver
 
     @Override
     public Mono<Authentication> convert(ServerWebExchange exchange) {
+        // Bearer présent → le Resource Server JWT prend le relais ; ne pas écraser par la clé BC.
+        if (aBearer(exchange)) {
+            return Mono.empty();
+        }
         HttpHeaders headers = exchange.getRequest().getHeaders();
         String clientId = headers.getFirst(HEADER_CLIENT_ID);
         String apiKey = headers.getFirst(HEADER_API_KEY);
@@ -29,5 +33,10 @@ public class ApiKeyAuthenticationConverter implements ServerAuthenticationConver
         }
         String onBehalfOf = headers.getFirst(HEADER_ON_BEHALF_OF);
         return Mono.just(ApiKeyAuthenticationToken.unauthenticated(clientId, apiKey, onBehalfOf));
+    }
+
+    private static boolean aBearer(ServerWebExchange exchange) {
+        String authorization = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        return authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7);
     }
 }

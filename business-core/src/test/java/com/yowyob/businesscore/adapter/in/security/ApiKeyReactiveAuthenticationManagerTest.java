@@ -38,7 +38,7 @@ class ApiKeyReactiveAuthenticationManagerTest {
     }
 
     private DeveloperAccountEntity compte(UUID tenantId) {
-        return DeveloperAccountEntity.nouveau(UUID.randomUUID(), "dev@x.co", tenantId, null, null, "FREE");
+        return DeveloperAccountEntity.nouveau(UUID.randomUUID(), "dev@x.co", tenantId, null, null, null, "FREE");
     }
 
     @Test

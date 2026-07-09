@@ -20,8 +20,8 @@ flowchart TB
   Base["Barriere 3 - base (RLS PostgreSQL)"] -->|"refuse physiquement les lignes d'un autre tenant"| PG[(PostgreSQL)]
 ```
 
-1. **Entrée** — la chaîne Spring Security 7 lit `X-BC-Client-Id` / `X-BC-Api-Key`, valide la clé et
-   construit le `BusinessContext` (avec `tenantId`) propagé dans le `Context` Reactor. Pas de tenant → 401.
+1. **Entrée** — JWT Bearer et/ou clé BC (`X-BC-Client-Id` / `X-BC-Api-Key`) construisent le
+   `BusinessContext` (avec `tenantId`) propagé dans le `Context` Reactor. Pas de tenant → 401.
 2. **Application** — les use cases lisent le tenant **du `BusinessContext`, jamais du payload client** ;
    tout `id` reçu est revérifié comme appartenant au tenant courant (`TenantGuard`).
 3. **Base** — **PostgreSQL Row-Level Security**, via un rôle applicatif **non-owner** (`bc_app`) :
@@ -38,11 +38,13 @@ traverser deux protections indépendantes.
 
 ## Authentification
 
-- **Développeur → Business Core** : clé Business Core (`X-BC-Client-Id` / `X-BC-Api-Key`), stockée
-  **hachée** (BCrypt), affichée une seule fois à l'inscription.
-- **Business Core → kernel** : chaîne à deux niveaux. La clé kernel de chaque développeur est
-  provisionnée (`POST /api/client-applications`), stockée **chiffrée** (AES-256-GCM), échangée contre
-  un JWT court (`/oauth2/token`) mis en cache Redis. Le secret kernel n'est jamais exposé au développeur.
+- **Développeur → Business Core** :
+  - **JWT Bearer** (login kernel délégué) : identité utilisateur et délégation vers le kernel.
+  - **Clé BC** (`X-BC-Client-Id` / `X-BC-Api-Key`) : identifie la clé API du développeur sur les routes
+    d'intégration (hachée BCrypt, révocation, suivi d'usage). Complète le JWT ; ne le remplace pas pour
+    les appels kernel.
+- **Business Core → kernel** : credentials plateforme (`KERNEL_CLIENT_ID`/`SECRET`) + Bearer utilisateur
+  re-transmis + `X-Tenant-Id`. Voir ADR-003.
 
 ## Autorisation et identité de l'acteur
 

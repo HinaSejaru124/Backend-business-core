@@ -65,12 +65,13 @@ Les plus utiles : `POST /api/auth/sign-up`, `/api/auth/login`, `/api/auth/login/
 
 > ⚠️ **Piège n°1 corrigé.** Créer une organisation a un **prérequis** et exige bien plus que `{name}`.
 
-### Le flux correct de création d'entreprise (`PersisterEntreprise`)
+### Le flux correct de création d'entreprise (`PersisterEntreprise` + `EntrepriseService`)
 ```
-1. POST /api/actors/onboarding   → crée le business actor, récupère businessActorId
-2. POST /api/organizations       → crée l'organisation (businessActorId requis)
-3. POST /api/organizations/{id}/agencies   → ajoute une agence
-4. POST /api/organizations/{id}/services   → souscrit les services nécessaires
+1. GET/POST /api/actors/onboarding   → business actor (1 par utilisateur)
+2. POST /api/organizations           → organisation
+3. POST /api/organizations/{id}/approve → activation (auto à la création BC)
+4. POST /api/organizations/{id}/services  → souscrire les services
+5. POST /api/organizations/{id}/agencies  → agence principale
 ```
 
 **Business actor (`BusinessActorRequest`)** : `name*`, `code`, `type`, `role`, `isIndividual`, `isActive`, `businessId`, `niu`, `tradeRegistryNumber`…

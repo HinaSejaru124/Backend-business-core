@@ -3,13 +3,17 @@ package com.yowyob.businesscore.adapter.out.kernel;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
-import com.yowyob.businesscore.application.security.KernelTokenHolder;
+import com.yowyob.businesscore.application.error.ProblemException;
+import com.yowyob.businesscore.application.security.JwtDelegueResolver;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 import tools.jackson.databind.ObjectMapper;
@@ -42,6 +46,8 @@ import java.util.UUID;
  */
 @Component
 public class KernelClient {
+
+    private static final Logger log = LoggerFactory.getLogger(KernelClient.class);
 
     public static final String HEADER_CLIENT_ID = "X-Client-Id";
     public static final String HEADER_API_KEY = "X-Api-Key";
@@ -103,10 +109,20 @@ public class KernelClient {
     }
 
     private <T> Mono<T> exchange(HttpMethod method, String path, Object body, Class<T> type, UUID organizationId) {
-        return KernelTokenHolder.currentToken().flatMap(tokenDelegue ->
-                tokenDelegue.isPresent()
-                        ? exchangeDelegue(method, path, body, type, organizationId, tokenDelegue.get())
-                        : exchangeMachine(method, path, body, type, organizationId));
+        return JwtDelegueResolver.courant()
+                .flatMap(tokenDelegue -> {
+                    if (tokenDelegue.isPresent()) {
+                        return exchangeDelegue(method, path, body, type, organizationId, tokenDelegue.get());
+                    }
+                    return BusinessContextHolder.currentContext()
+                            .hasElement()
+                            .flatMap(contextPresent -> contextPresent
+                                    ? Mono.error(ProblemException.forbidden(
+                                            "JWT délégué requis pour appeler le kernel "
+                                                    + "(connectez-vous via POST /v1/auth/login et transmettez Authorization: Bearer)"))
+                                    : exchangeMachine(method, path, body, type, organizationId));
+                })
+                .onErrorResume(WebClientResponseException.class, KernelClient::relayerErreurTransport);
     }
 
     /**
@@ -121,8 +137,7 @@ public class KernelClient {
     }
 
     /**
-     * Flux <b>machine</b> (client-credentials) : repli quand aucun token délégué n'est présent dans le
-     * contexte (appels système ou routes non encore migrées). Comportement historique inchangé.
+     * Flux <b>machine</b> (client-credentials) : réservé aux appels système sans contexte utilisateur JWT.
      */
     private <T> Mono<T> exchangeMachine(HttpMethod method, String path, Object body, Class<T> type,
                                         UUID organizationId) {
@@ -163,10 +178,68 @@ public class KernelClient {
     }
 
     private Mono<byte[]> exchangeBytes(HttpMethod method, String path, UUID organizationId) {
-        return KernelTokenHolder.currentToken().flatMap(tokenDelegue ->
-                tokenDelegue.isPresent()
-                        ? exchangeBytesDelegue(method, path, organizationId, tokenDelegue.get())
-                        : exchangeBytesMachine(method, path, organizationId));
+        return JwtDelegueResolver.courant()
+                .flatMap(tokenDelegue -> {
+                    if (tokenDelegue.isPresent()) {
+                        return exchangeBytesDelegue(method, path, organizationId, tokenDelegue.get());
+                    }
+                    return BusinessContextHolder.currentContext()
+                            .hasElement()
+                            .flatMap(contextPresent -> contextPresent
+                                    ? Mono.error(ProblemException.forbidden(
+                                            "JWT délégué requis pour appeler le kernel "
+                                                    + "(connectez-vous via POST /v1/auth/login et transmettez Authorization: Bearer)"))
+                                    : exchangeBytesMachine(method, path, organizationId));
+                })
+                .onErrorResume(WebClientResponseException.class, KernelClient::relayerErreurTransport);
+    }
+
+    /**
+     * Les erreurs 4xx du kernel sont relayées telles quelles (gestion métier dans les adapters).
+     * Les 5xx et timeouts sont traduits en {@link ProblemException#badGateway(String)}.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> Mono<T> relayerErreurTransport(WebClientResponseException ex) {
+        log.warn("Kernel HTTP {} : {}", cheminRequete(ex), detailReponse(ex));
+        if (ex.getStatusCode().is4xxClientError()) {
+            return Mono.error(ex);
+        }
+        return Mono.error(versErreurKernel(ex));
+    }
+
+    /** Détail lisible d'une erreur HTTP kernel (chemin + extrait corps). */
+    public static String detailReponse(WebClientResponseException ex) {
+        String extrait = corpsReponse(ex);
+        return "HTTP " + ex.getStatusCode().value() + " : " + extrait;
+    }
+
+    public static String cheminRequete(WebClientResponseException ex) {
+        if (ex.getRequest() == null || ex.getRequest().getURI() == null) {
+            return "?";
+        }
+        String method = ex.getRequest().getMethod() != null
+                ? ex.getRequest().getMethod().name()
+                : "HTTP";
+        return method + " " + ex.getRequest().getURI().getPath();
+    }
+
+    public static ProblemException versErreurKernel(WebClientResponseException ex) {
+        String path = ex.getRequest() != null && ex.getRequest().getURI() != null
+                ? ex.getRequest().getURI().getPath()
+                : "?";
+        String detail = "Kernel " + detailReponse(ex) + " sur " + path;
+        if (path.contains("/oauth2/token")) {
+            detail += " (vérifiez KERNEL_CLIENT_ID/SECRET ou utilisez un JWT utilisateur via POST /v1/auth/login)";
+        }
+        return ProblemException.badGateway(detail);
+    }
+
+    private static String corpsReponse(WebClientResponseException ex) {
+        String corps = ex.getResponseBodyAsString();
+        if (corps == null || corps.isBlank()) {
+            return ex.getStatusText();
+        }
+        return corps.length() > 300 ? corps.substring(0, 300) + "…" : corps;
     }
 
     private Mono<byte[]> exchangeBytesDelegue(HttpMethod method, String path, UUID organizationId,
@@ -222,17 +295,17 @@ public class KernelClient {
     }
 
     private <T> Mono<T> resilience(Mono<T> source) {
-    Mono<T> avecTimeout = source.timeout(timeout);
-    return maxRetries > 0
-            ? avecTimeout.retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(200))
-                    .filter(this::estRetryable))
-            : avecTimeout;
-}
-
-private boolean estRetryable(Throwable e) {
-    if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException ex) {
-        return ex.getStatusCode().is5xxServerError();
+        Mono<T> avecTimeout = source.timeout(timeout);
+        return maxRetries > 0
+                ? avecTimeout.retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(200))
+                        .filter(this::estRetryable))
+                : avecTimeout;
     }
-    return !(e instanceof java.util.concurrent.TimeoutException) || true; // timeouts restent retryable
-}
+
+    private boolean estRetryable(Throwable e) {
+        if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException ex) {
+            return ex.getStatusCode().is5xxServerError();
+        }
+        return !(e instanceof java.util.concurrent.TimeoutException) || true;
+    }
 }

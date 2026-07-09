@@ -36,6 +36,8 @@ businesscore:
     base-url: ${KERNEL_BASE_URL:https://kernel-core.yowyob.com}
     client-id: ${KERNEL_CLIENT_ID:prod-platform-backend}
     client-secret: ${KERNEL_CLIENT_SECRET:VbWi225xzYPoD8rQ2FRniTAqkylh34XYeWxa9HCU}
+    organization-service: ${KERNEL_ORGANIZATION_SERVICE:ORGANIZATION}
+    business-actor-role: ${KERNEL_BUSINESS_ACTOR_ROLE:OWNER}
     timeout-ms: 5000
     max-retries: 2
   auth:

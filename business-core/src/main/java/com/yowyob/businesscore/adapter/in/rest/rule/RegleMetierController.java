@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Contenu de version", description = "Offres, rôles, règles, opérations et configuration d'une version")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/v1")
 public class RegleMetierController {

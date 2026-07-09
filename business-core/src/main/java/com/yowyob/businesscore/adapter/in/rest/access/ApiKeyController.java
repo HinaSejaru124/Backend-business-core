@@ -1,10 +1,7 @@
 package com.yowyob.businesscore.adapter.in.rest.access;
 
-import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
-import com.yowyob.businesscore.application.context.BusinessContext;
-import com.yowyob.businesscore.application.context.BusinessContextHolder;
-import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.usecase.access.ApiKeyService;
+import com.yowyob.businesscore.application.usecase.access.ResoudreDeveloppeurCourant;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,9 +18,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Accès", description = "Inscription et gestion des clés d'API")
@@ -33,12 +30,12 @@ import java.util.UUID;
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;
-    private final DeveloperAccountRepository developerRepository;
+    private final ResoudreDeveloppeurCourant developpeurCourant;
 
     public ApiKeyController(ApiKeyService apiKeyService,
-                           DeveloperAccountRepository developerRepository) {
+                           ResoudreDeveloppeurCourant developpeurCourant) {
         this.apiKeyService = apiKeyService;
-        this.developerRepository = developerRepository;
+        this.developpeurCourant = developpeurCourant;
     }
 
     @Operation(summary = "Créer une clé API",
@@ -51,18 +48,18 @@ public class ApiKeyController {
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<CleApiCreeeResponse> creer(@RequestBody(required = false) CreerCleRequest requete) {
         String nom = requete == null ? null : requete.name();
-        return developerCourant()
+        return developpeurCourant.id()
                 .flatMap(developerId -> apiKeyService.creer(developerId, nom))
                 .map(CleApiCreeeResponse::depuis);
     }
 
-    @Operation(summary = "Lister ses clés API", description = "Retourne les clés sans le secret.")
+    @Operation(summary = "Lister ses clés API actives", description = "Retourne les clés ACTIVE sans le secret.")
     @ApiResponse(responseCode = "200", description = "Liste des clés")
     @GetMapping
-    public Flux<CleApiResponse> lister() {
-        return developerCourant()
-                .flatMapMany(apiKeyService::lister)
-                .map(CleApiResponse::depuis);
+    public Mono<List<CleApiResponse>> lister() {
+        return developpeurCourant.id()
+                .flatMap(apiKeyService::listerCollect)
+                .map(cles -> cles.stream().map(CleApiResponse::depuis).toList());
     }
 
     @Operation(summary = "Renommer une clé API")
@@ -74,7 +71,7 @@ public class ApiKeyController {
     public Mono<CleApiResponse> renommer(
             @Parameter(description = "Identifiant de la clé") @PathVariable UUID id,
             @Valid @RequestBody RenommerCleRequest requete) {
-        return developerCourant()
+        return developpeurCourant.id()
                 .flatMap(developerId -> apiKeyService.renommer(developerId, id, requete.name()))
                 .map(CleApiResponse::depuis);
     }
@@ -86,17 +83,8 @@ public class ApiKeyController {
     })
     @PostMapping("/{id}:revoke")
     public Mono<CleApiResponse> revoquer(@PathVariable UUID id) {
-        return developerCourant()
+        return developpeurCourant.id()
                 .flatMap(developerId -> apiKeyService.revoquer(developerId, id))
                 .map(CleApiResponse::depuis);
-    }
-
-    private Mono<UUID> developerCourant() {
-        return BusinessContextHolder.currentContext()
-                .switchIfEmpty(Mono.error(ProblemException.forbidden("Contexte d'authentification absent")))
-                .map(ctx -> ctx.tenantId())
-                .flatMap(developerRepository::findByKernelTenantId)
-                .map(account -> account.getId())
-                .switchIfEmpty(Mono.error(ProblemException.notFound("Compte développeur introuvable")));
     }
 }

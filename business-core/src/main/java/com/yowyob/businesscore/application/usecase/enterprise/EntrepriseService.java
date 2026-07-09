@@ -54,20 +54,31 @@ public class EntrepriseService {
     }
 
     /**
-     * Si aucun {@code organizationId} n'est fourni, provisionne l'organisation kernel (onboarding du
-     * business actor + organisation + agence principale) et renvoie les références à mémoriser.
+     * Provisionne l'organisation kernel si aucun {@code organizationId} n'est fourni.
+     *
+     * <p>Chaîne kernel (ordre imposé par la gouvernance) :
+     * <ol>
+     *   <li>Résoudre le business actor (onboarding ou profil existant),</li>
+     *   <li>Créer l'organisation,</li>
+     *   <li>Approuver l'organisation ({@code POST .../approve}),</li>
+     *   <li>Souscrire les services kernel,</li>
+     *   <li>Créer l'agence principale.</li>
+     * </ol>
      */
+    private static final String MOTIF_APPROBATION_AUTO = "Approbation initiale";
+
     private Mono<RefsKernel> resoudreOrganisation(UUID organizationId, String nom) {
         if (organizationId != null) {
             return Mono.just(new RefsKernel(null, organizationId, null));
         }
         return persisterEntreprise.creerOrganisation(nom)
                 .flatMap(prov -> persisterEntreprise
-                        .creerAgence(prov.organizationId(), nom + " — agence principale")
-                        .flatMap(agencyId -> persisterEntreprise
-                                .souscrireServices(prov.organizationId())
-                                .thenReturn(new RefsKernel(
-                                        prov.businessActorId(), prov.organizationId(), agencyId))));
+                        .approuverOrganisation(prov.organizationId(), MOTIF_APPROBATION_AUTO)
+                        .then(persisterEntreprise.souscrireServices(prov.organizationId()))
+                        .then(persisterEntreprise.creerAgence(
+                                prov.organizationId(), nom + " — agence principale"))
+                        .map(agencyId -> new RefsKernel(
+                                prov.businessActorId(), prov.organizationId(), agencyId)));
     }
 
     /** Références kernel à mémoriser dans l'entité Entreprise. */

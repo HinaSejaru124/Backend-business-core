@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 @Tag(name = "Entreprises", description = "Instances de métier épinglées à une version de Type")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/v1/businesses")
 public class EntrepriseController {
@@ -35,7 +37,9 @@ public class EntrepriseController {
     }
 
     @Operation(summary = "Créer une entreprise",
-            description = "Instancie un Type Métier à une version donnée. Provisionne l'organisation kernel si absente.")
+            description = """
+                    Instancie un Type Métier à une version donnée. Provisionne l'organisation kernel si absente
+                    (actor → org → approve → services → agence principale).""")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Entreprise créée"),
             @ApiResponse(responseCode = "404", description = "Version de type introuvable"),

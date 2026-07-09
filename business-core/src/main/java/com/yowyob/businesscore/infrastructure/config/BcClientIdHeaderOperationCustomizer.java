@@ -1,12 +1,10 @@
 package com.yowyob.businesscore.infrastructure.config;
 
 import com.yowyob.businesscore.adapter.in.security.ApiKeyAuthenticationConverter;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.Parameter;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
 import org.springdoc.core.customizers.OperationCustomizer;
-import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,48 +15,58 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.method.HandlerMethod;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
- * Documente {@code X-BC-Client-Id} et {@code X-BC-Api-Key} comme en-têtes Try it out sur les routes
- * API consommables (M2M). Les routes console développeur n'affichent que le JWT ({@code bearerAuth}).
+ * Documente l'authentification dans Swagger selon {@link AuthRouteClassifier} :
+ * <ul>
+ *   <li>Console dev : JWT via {@code bearerAuth} uniquement (controllers annotés).</li>
+ *   <li>API intégration : {@code bearerAuth} obligatoire + headers {@code X-BC-*} optionnels
+ *       (identifient la clé API du développeur).</li>
+ * </ul>
  */
 @Component
 public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer {
 
     private static final String CLIENT_ID_HEADER = ApiKeyAuthenticationConverter.HEADER_CLIENT_ID;
     private static final String API_KEY_HEADER = ApiKeyAuthenticationConverter.HEADER_API_KEY;
+    private static final String ON_BEHALF_HEADER = ApiKeyAuthenticationConverter.HEADER_ON_BEHALF_OF;
     private static final String BEARER_SCHEME = "bearerAuth";
-
-    /** Aligné sur {@code SecurityConfig.ROUTES_PUBLIQUES} (partie controllers). */
-    private static final Set<String> PUBLIC_PATHS = Set.of(
-            "/health",
-            "/v1/registration",
-            "/v1/auth/login"
-    );
-
-    /** Routes console développeur : JWT uniquement dans Swagger (pas de headers BC). */
-    private static final Set<String> JWT_ONLY_PREFIXES = Set.of(
-            "/v1/auth",
-            "/v1/api-keys",
-            "/v1/dashboard"
-    );
 
     @Override
     public io.swagger.v3.oas.models.Operation customize(io.swagger.v3.oas.models.Operation operation,
                                                         HandlerMethod handlerMethod) {
-        if (isPublicRoute(handlerMethod) || isJwtOnlyRoute(handlerMethod, operation)) {
-            return operation;
-        }
+        return switch (AuthRouteClassifier.classify(resolvePath(handlerMethod))) {
+            case PUBLIC, CONSOLE_JWT -> operation;
+            case API_INTEGRATION -> documenterIntegration(operation);
+        };
+    }
+
+    private io.swagger.v3.oas.models.Operation documenterIntegration(io.swagger.v3.oas.models.Operation operation) {
+        assurerBearerSecurity(operation);
         addHeaderIfAbsent(operation, CLIENT_ID_HEADER,
-                "Identifiant public de la clé BC (préfixe, émis à l'inscription). Alternative : JWT via Authorize.",
+                "Identifiant public de la clé BC (préfixe). Recommandé pour identifier votre application développeur.",
                 "bck_live_abc123", false);
         addHeaderIfAbsent(operation, API_KEY_HEADER,
-                "Secret de la clé BC (backend M2M). Requiert aussi X-BC-Client-Id. Alternative : JWT via Authorize.",
+                "Secret de la clé BC. À utiliser avec X-BC-Client-Id. Complète le Bearer pour le suivi d'usage.",
+                null, false);
+        addHeaderIfAbsent(operation, ON_BEHALF_HEADER,
+                "Acteur métier asserté par le backend du développeur (UUID, optionnel).",
                 null, false);
         return operation;
+    }
+
+    private void assurerBearerSecurity(io.swagger.v3.oas.models.Operation operation) {
+        List<SecurityRequirement> security = operation.getSecurity();
+        if (security == null) {
+            security = new ArrayList<>();
+        }
+        boolean deja = security.stream().anyMatch(req -> req.containsKey(BEARER_SCHEME));
+        if (!deja) {
+            security.add(new SecurityRequirement().addList(BEARER_SCHEME));
+            operation.setSecurity(security);
+        }
     }
 
     private void addHeaderIfAbsent(io.swagger.v3.oas.models.Operation operation, String name,
@@ -86,13 +94,10 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
                 .anyMatch(p -> headerName.equalsIgnoreCase(p.getName()));
     }
 
-    private boolean isPublicRoute(HandlerMethod handlerMethod) {
-        return PUBLIC_PATHS.contains(resolvePath(handlerMethod));
-    }
-
     private String resolvePath(HandlerMethod handlerMethod) {
         StringBuilder path = new StringBuilder();
-        appendPath(path, AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getBeanType(), RequestMapping.class));
+        appendPath(path, org.springframework.core.annotation.AnnotatedElementUtils
+                .findMergedAnnotation(handlerMethod.getBeanType(), RequestMapping.class));
         if (handlerMethod.hasMethodAnnotation(GetMapping.class)) {
             appendPath(path, handlerMethod.getMethodAnnotation(GetMapping.class));
         } else if (handlerMethod.hasMethodAnnotation(PostMapping.class)) {
@@ -131,35 +136,5 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
             }
             path.append(segments[0]);
         }
-    }
-
-    private boolean isJwtOnlyRoute(HandlerMethod handlerMethod, io.swagger.v3.oas.models.Operation operation) {
-        String path = resolvePath(handlerMethod);
-        for (String prefix : JWT_ONLY_PREFIXES) {
-            if (path.equals(prefix) || path.startsWith(prefix + "/")) {
-                return true;
-            }
-        }
-        if (hasBearerSecurityRequirement(handlerMethod.getBeanType())) {
-            return true;
-        }
-        Operation annotation = handlerMethod.getMethodAnnotation(Operation.class);
-        if (annotation != null && annotation.security().length == 1) {
-            SecurityRequirement req = annotation.security()[0];
-            if (BEARER_SCHEME.equals(req.name()) && req.scopes().length == 0) {
-                return true;
-            }
-        }
-        List<io.swagger.v3.oas.models.security.SecurityRequirement> security = operation.getSecurity();
-        if (security != null && security.size() == 1) {
-            Map<String, List<String>> req = security.get(0);
-            return req.size() == 1 && req.containsKey(BEARER_SCHEME);
-        }
-        return false;
-    }
-
-    private boolean hasBearerSecurityRequirement(Class<?> type) {
-        SecurityRequirement requirement = AnnotatedElementUtils.findMergedAnnotation(type, SecurityRequirement.class);
-        return requirement != null && BEARER_SCHEME.equals(requirement.name());
     }
 }

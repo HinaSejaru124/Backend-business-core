@@ -47,11 +47,12 @@ public record KernelProperties(
         clientId = clientId == null ? "" : clientId;
         clientSecret = clientSecret == null ? "" : clientSecret;
         organizationService = (organizationService == null || organizationService.isBlank())
-                ? "BUSINESS_CORE" : organizationService;
+                ? "ORGANIZATION" : organizationService;
         businessActorRole = (businessActorRole == null || businessActorRole.isBlank())
                 ? "OWNER" : businessActorRole;
         if (organizationServices == null || organizationServices.isEmpty()) {
-            organizationServices = List.of("BILLING", "CASHIER", "COMMERCIAL", "ACCOUNTING");
+            // Repli si le catalogue kernel est indisponible (dépendances connues : BILLING→COMMERCIAL, CASHIER→ACCOUNTING).
+            organizationServices = List.of("COMMERCIAL", "ACCOUNTING", "BILLING", "CASHIER");
         }
     }
 

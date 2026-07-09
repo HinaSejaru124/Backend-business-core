@@ -16,5 +16,7 @@ public interface ApiKeyRepository extends ReactiveCrudRepository<ApiKeyEntity, U
 
     Flux<ApiKeyEntity> findByDeveloperId(UUID developerId);
 
+    Flux<ApiKeyEntity> findByDeveloperIdAndStatus(UUID developerId, String status);
+
     Mono<Long> countByDeveloperIdAndStatus(UUID developerId, String status);
 }

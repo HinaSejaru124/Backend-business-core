@@ -79,4 +79,9 @@ public class ProblemException extends RuntimeException {
     public static ProblemException badRequest(String detail) {
         return new ProblemException(HttpStatus.BAD_REQUEST, "Requête invalide", detail);
     }
+
+    /** Échec d'appel au kernel (transport ou auth inter-services). */
+    public static ProblemException badGateway(String detail) {
+        return new ProblemException(HttpStatus.BAD_GATEWAY, "Service kernel indisponible", detail);
+    }
 }

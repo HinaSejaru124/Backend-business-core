@@ -114,10 +114,11 @@ class ApiKeyServiceTest {
     void lister() {
         ApiKeyService service = service(5);
         UUID dev = UUID.randomUUID();
-        when(repository.findByDeveloperId(dev)).thenReturn(reactor.core.publisher.Flux.just(
+        when(repository.findByDeveloperIdAndStatus(dev, ApiKeyEntity.STATUT_ACTIVE))
+                .thenReturn(reactor.core.publisher.Flux.just(
                 ApiKeyEntity.nouveau(UUID.randomUUID(), dev, "bck_1", "h", "A")));
 
         StepVerifier.create(service.lister(dev)).expectNextCount(1).verifyComplete();
-        verify(repository).findByDeveloperId(eq(dev));
+        verify(repository).findByDeveloperIdAndStatus(eq(dev), eq(ApiKeyEntity.STATUT_ACTIVE));
     }
 }

@@ -12,6 +12,7 @@ import reactor.core.publisher.Mono;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -65,7 +66,12 @@ public class ApiKeyService {
     }
 
     public Flux<ApiKeyEntity> lister(UUID developerId) {
-        return repository.findByDeveloperId(developerId);
+        return repository.findByDeveloperIdAndStatus(developerId, ApiKeyEntity.STATUT_ACTIVE);
+    }
+
+    /** Variante collectée pour éviter la re-souscription WebFlux sur {@code Flux} de controller. */
+    public Mono<List<ApiKeyEntity>> listerCollect(UUID developerId) {
+        return repository.findByDeveloperIdAndStatus(developerId, ApiKeyEntity.STATUT_ACTIVE).collectList();
     }
 
     public Mono<ApiKeyEntity> renommer(UUID developerId, UUID keyId, String name) {

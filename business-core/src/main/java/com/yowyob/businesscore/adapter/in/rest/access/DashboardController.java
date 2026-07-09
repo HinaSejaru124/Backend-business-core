@@ -1,10 +1,7 @@
 package com.yowyob.businesscore.adapter.in.rest.access;
 
-import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
-import com.yowyob.businesscore.application.context.BusinessContext;
-import com.yowyob.businesscore.application.context.BusinessContextHolder;
-import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.usecase.access.DashboardService;
+import com.yowyob.businesscore.application.usecase.access.ResoudreDeveloppeurCourant;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -15,8 +12,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
-import java.util.UUID;
-
 @Tag(name = "Accès", description = "Inscription et gestion des clés d'API")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
@@ -24,12 +19,12 @@ import java.util.UUID;
 public class DashboardController {
 
     private final DashboardService dashboardService;
-    private final DeveloperAccountRepository developerRepository;
+    private final ResoudreDeveloppeurCourant developpeurCourant;
 
     public DashboardController(DashboardService dashboardService,
-                              DeveloperAccountRepository developerRepository) {
+                              ResoudreDeveloppeurCourant developpeurCourant) {
         this.dashboardService = dashboardService;
-        this.developerRepository = developerRepository;
+        this.developpeurCourant = developpeurCourant;
     }
 
     @Operation(summary = "Tableau de bord développeur",
@@ -41,17 +36,8 @@ public class DashboardController {
     })
     @GetMapping
     public Mono<DashboardResponse> tableau() {
-        return developerCourant()
+        return developpeurCourant.id()
                 .flatMap(dashboardService::pour)
                 .map(DashboardResponse::depuis);
-    }
-
-    private Mono<UUID> developerCourant() {
-        return BusinessContextHolder.currentContext()
-                .switchIfEmpty(Mono.error(ProblemException.forbidden("Contexte d'authentification absent")))
-                .map(ctx -> ctx.tenantId())
-                .flatMap(developerRepository::findByKernelTenantId)
-                .map(account -> account.getId())
-                .switchIfEmpty(Mono.error(ProblemException.notFound("Compte développeur introuvable")));
     }
 }

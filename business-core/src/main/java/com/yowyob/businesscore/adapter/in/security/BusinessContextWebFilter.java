@@ -2,16 +2,19 @@ package com.yowyob.businesscore.adapter.in.security;
 
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
+import com.yowyob.businesscore.application.security.KernelTokenHolder;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
 /**
- * Après authentification, copie le {@link BusinessContext} (porté par l'Authentication) dans le
- * Reactor Context, afin qu'il soit lisible par les use cases ET par le pool R2DBC tenant-aware
- * (Barrière 2/3). Ajouté juste après le filtre d'authentification dans la chaîne de sécurité.
+ * Après authentification, copie le {@link BusinessContext} et, en flux JWT, le token brut kernel
+ * dans le Reactor Context ({@link BusinessContextHolder}, {@link KernelTokenHolder}) pour les
+ * use cases, le pool R2DBC tenant-aware et {@code KernelClient}.
  */
 public class BusinessContextWebFilter implements WebFilter {
 
@@ -21,9 +24,38 @@ public class BusinessContextWebFilter implements WebFilter {
                 .map(securityContext -> securityContext.getAuthentication())
                 .filter(auth -> auth != null && auth.isAuthenticated()
                         && auth.getPrincipal() instanceof BusinessContext)
-                .map(auth -> (BusinessContext) auth.getPrincipal())
-                .flatMap(businessContext -> chain.filter(exchange)
-                        .contextWrite(ctx -> BusinessContextHolder.withContext(ctx, businessContext)))
+                .flatMap(auth -> {
+                    BusinessContext businessContext = (BusinessContext) auth.getPrincipal();
+                    String jwtDelegue = resoudreBearer(auth, exchange);
+                    return chain.filter(exchange)
+                            .contextWrite(ctx -> {
+                                Context enrichi = BusinessContextHolder.withContext(ctx, businessContext);
+                                return jwtDelegue != null
+                                        ? KernelTokenHolder.withToken(enrichi, jwtDelegue)
+                                        : enrichi;
+                            });
+                })
                 .switchIfEmpty(chain.filter(exchange));
+    }
+
+    /**
+     * JWT depuis les credentials (flux JWT) ou, en secours, l'en-tête {@code Authorization} de la requête
+     * (cas Bearer + clé BC sans écrasement du token).
+     */
+    private static String resoudreBearer(org.springframework.security.core.Authentication auth,
+                                         ServerWebExchange exchange) {
+        if (auth.getCredentials() instanceof String token && !token.isBlank()) {
+            return token;
+        }
+        return extraireBearer(exchange);
+    }
+
+    private static String extraireBearer(ServerWebExchange exchange) {
+        String authorization = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (authorization == null || !authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return null;
+        }
+        String token = authorization.substring(7).trim();
+        return token.isBlank() ? null : token;
     }
 }

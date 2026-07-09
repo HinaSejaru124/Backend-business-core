@@ -21,17 +21,20 @@ import org.springframework.context.annotation.Configuration;
                         et déclenche des Opérations. Le Business Core orchestre le kernel en façade.
 
                         ## Authentification
-                        Deux surfaces distinctes :
-                        - **Console développeur** (`/v1/auth`, `/v1/api-keys`, `/v1/dashboard`) :
-                          JWT via `Authorize` (token obtenu via `POST /v1/auth/login`). Pas de headers BC.
-                        - **API consommable M2M** (types métier, entreprises, opérations…) :
-                          en-têtes `X-BC-Client-Id` + `X-BC-Api-Key` dans Try it out
-                          (secret stocké côté serveur du développeur — pas dans Authorize).
+                        L'API identifie le **développeur** et délègue l'**utilisateur** au kernel :
+                        - **JWT Bearer** (`Authorize`, via `POST /v1/auth/login`) : obligatoire sur toutes les
+                          routes protégées qui appellent le kernel (entreprises, opérations, etc.).
+                        - **Headers `X-BC-*`** (Try it out) : identifient la clé API du développeur sur les
+                          routes d'intégration (`/v1/business-types`, `/v1/businesses`, opérations…).
+                          Recommandés pour le backend du dev (suivi d'usage, `X-BC-On-Behalf-Of`).
+                        - **Console développeur** (`/v1/api-keys`, `/v1/dashboard`, `/v1/auth/me`) : JWT seul.
 
-                        À l'exécution, JWT et clé BC restent mutuellement exclusifs sur un même appel.
+                        Le Business Core transmet au kernel : credentials plateforme (`X-Client-Id`/`X-Api-Key`
+                        serveur) + Bearer utilisateur + `X-Tenant-Id`.
 
                         ## Tests E2E
-                        Après login, utiliser le JWT Bearer sur les routes console dev et le parcours métier.
+                        Après login : `Authorization: Bearer $JWT` sur tout le parcours métier.
+                        Optionnel : ajouter `X-BC-Client-Id` / `X-BC-Api-Key` sur les routes d'intégration.
 
                         ## Conventions
                         - Versionnement de l'API dans l'URL /v1, distinct de la version d'un Type Métier.
@@ -56,7 +59,7 @@ import org.springframework.context.annotation.Configuration;
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
         bearerFormat = "JWT",
-        description = "JWT kernel obtenu via POST /v1/auth/login. Alternative aux en-têtes X-BC-Client-Id / X-BC-Api-Key."
+        description = "JWT kernel obtenu via POST /v1/auth/login. Obligatoire pour les appels kernel (entreprises, opérations…)."
 )
 public class OpenApiConfig {
 }

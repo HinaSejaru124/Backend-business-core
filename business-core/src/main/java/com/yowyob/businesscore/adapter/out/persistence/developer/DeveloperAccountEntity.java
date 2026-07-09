@@ -33,6 +33,9 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
     @Column("kernel_tenant_id")
     private UUID kernelTenantId;
 
+    @Column("kernel_user_id")
+    private String kernelUserId;
+
     @Column("kernel_client_id")
     private String kernelClientId;
 
@@ -53,12 +56,13 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
     }
 
     public static DeveloperAccountEntity nouveau(UUID id, String email, UUID kernelTenantId,
-                                                 String kernelClientId, String kernelSecretEncrypted,
-                                                 String plan) {
+                                                 String kernelUserId, String kernelClientId,
+                                                 String kernelSecretEncrypted, String plan) {
         DeveloperAccountEntity e = new DeveloperAccountEntity();
         e.id = id;
         e.email = email;
         e.kernelTenantId = kernelTenantId;
+        e.kernelUserId = kernelUserId;
         e.kernelClientId = kernelClientId;
         e.kernelSecretEncrypted = kernelSecretEncrypted;
         e.plan = plan;
@@ -84,6 +88,10 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
 
     public UUID getKernelTenantId() {
         return kernelTenantId;
+    }
+
+    public String getKernelUserId() {
+        return kernelUserId;
     }
 
     public String getKernelClientId() {
@@ -116,6 +124,10 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
 
     public void setKernelTenantId(UUID kernelTenantId) {
         this.kernelTenantId = kernelTenantId;
+    }
+
+    public void setKernelUserId(String kernelUserId) {
+        this.kernelUserId = kernelUserId;
     }
 
     public void setKernelClientId(String kernelClientId) {

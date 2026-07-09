@@ -98,7 +98,8 @@ sécurité par PR qui s'y trouve.
 
 Voir [parcours de test E2E](test-e2e-parcours-complet.md) et le script
 [`scripts/e2e-parcours.sh`](../../scripts/e2e-parcours.sh). Utiliser le **JWT** (`Authorization: Bearer`)
-sur toutes les routes protégées après login — ne pas mélanger clé BC et JWT dans un même parcours.
+sur toutes les routes protégées après login. Sur les routes d'intégration, ajouter optionnellement
+`X-BC-Client-Id` / `X-BC-Api-Key` pour identifier la clé API du développeur.
 
 ## 12. Definition of Done (par PR)
 

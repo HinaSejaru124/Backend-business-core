@@ -308,10 +308,9 @@ if should_run 13; then
   if [[ "$SKIP_KERNEL_MANUAL" != true ]]; then
     echo ""
     echo "────────────────────────────────────────────────────────────"
-    echo "PAUSE — Phase kernel manuelle requise sur ORG_ID=$ORG_ID"
-    echo "  1. POST /api/organizations/$ORG_ID/approve"
-    echo "  2. POST /api/organizations/$ORG_ID/services (COMMERCIAL, ACCOUNTING, CASHIER, PRODUCT)"
-    echo "  3. Créer une caisse → export CAISSE_KERNEL_ID=<uuid> puis relancer --from-step 12"
+    echo "PAUSE — Phase kernel manuelle requise (caisse principale)"
+    echo "  1. Créer une caisse sur ORG_ID=$ORG_ID → export CAISSE_KERNEL_ID=<uuid>"
+    echo "  2. Relancer avec --from-step 12 si besoin"
     echo "────────────────────────────────────────────────────────────"
     read -r -p "Appuyer sur Entrée pour continuer (ou Ctrl-C)..."
   fi
