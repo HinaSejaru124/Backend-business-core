@@ -82,7 +82,8 @@ public class ApiKeyReactiveAuthenticationManager implements ReactiveAuthenticati
                 null,
                 UUID.randomUUID().toString(),
                 Locale.getDefault());
-        return ApiKeyAuthenticationToken.authenticated(context, apiKeyId);
+        // developerId + plan portés par le token : lus par la porte de quota et le comptage mensuel.
+        return ApiKeyAuthenticationToken.authenticated(context, apiKeyId, account.getId(), account.getPlan());
     }
 
     private UUID parseActor(String onBehalfOf) {

@@ -50,6 +50,16 @@ businesscore:
       allowed-origins: ${BC_CORS_ORIGINS:*}
   events:
     topic-prefix: business-core
+  billing:
+    # Quota mensuel de requêtes par plan (quota-mensuel < 0 => illimité).
+    # Prix/paiement réels gérés par Kernel Core (indisponible) ; ici seul le quota est appliqué.
+    plans:
+      FREE:
+        quota-mensuel: 1000
+      PRO:
+        quota-mensuel: 100000
+      ENTERPRISE:
+        quota-mensuel: -1
 
 springdoc:
   swagger-ui:

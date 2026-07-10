@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  /* Blanc cassé légèrement bleu (moins agressif que le blanc pur) */
+  background-color: #f3f6fd;
+  color: #101828;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 16.5px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@layer base {
+  * {
+    border-color: #e2e7f0;
+  }
+  ::selection {
+    background: #1b4df5;
+    color: #fff;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    color: #0b1b3a;
+    letter-spacing: -0.02em;
+  }
+  :focus-visible {
+    outline: 2px solid #1b4df5;
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Motifs de fond techniques */
+  .dotgrid {
+    background-image: radial-gradient(rgba(11, 27, 58, 0.08) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .linegrid {
+    background-image: linear-gradient(to right, rgba(11, 27, 58, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(11, 27, 58, 0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Image « environnement de code » (fond dev). Overlay géré côté composant. */
+  .code-photo {
+    background-image: url("https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=1600&q=70");
+    background-size: cover;
+    background-position: center;
+  }
+
+  /* Apparition au scroll (piloté par le composant Reveal) */
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Soulignement animé des liens de navigation */
+  .navlink {
+    position: relative;
+    transition: color 0.2s ease, transform 0.2s ease;
+  }
+  .navlink::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -18px;
+    height: 2px;
+    background: #1b4df5;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .navlink:hover {
+    color: #0b1b3a;
+    transform: translateY(1px);
+  }
+  .navlink:hover::after,
+  .navlink[data-active="true"]::after {
+    transform: scaleX(1);
+  }
+
+  /* Curseur clignotant (effet frappe) */
+  .caret {
+    display: inline-block;
+    width: 7px;
+    height: 1.05em;
+    margin-left: 2px;
+    background: #1b4df5;
+    vertical-align: text-bottom;
+    animation: blink 1s steps(1) infinite;
+  }
+}
+
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
