@@ -70,6 +70,7 @@ private static final String[] ROUTES_PUBLIQUES = {
     private static final String[] ROUTES_INTEGRATION_TERMINAL = {
             "/v1/sync", "/v1/sync/**",
             "/v1/businesses/me",
+            "/v1/businesses/*/actors:login", "/v1/businesses/*/actors:register",
             "/v1/businesses/*/operations", "/v1/businesses/*/operations/**",
             "/v1/businesses/*/traces", "/v1/businesses/*/traces/**",
             "/v1/businesses/*/transactions", "/v1/businesses/*/transactions/**",

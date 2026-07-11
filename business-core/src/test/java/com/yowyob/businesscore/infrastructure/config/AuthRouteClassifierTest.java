@@ -50,4 +50,18 @@ class AuthRouteClassifierTest {
         assertThat(AuthRouteClassifier.classify("/v1/businesses/{businessId}/orders/{orderId}"))
                 .isEqualTo(AuthRouteClassifier.AuthSurface.API_INTEGRATION);
     }
+
+    @Test
+    @DisplayName("API à clé seule : inscription/connexion acteur, Bearer refusé à l'application")
+    void cleSeule() {
+        assertThat(AuthRouteClassifier.classify("/v1/businesses/{businessId}/actors:login"))
+                .isEqualTo(AuthRouteClassifier.AuthSurface.API_CLE_SEULE);
+        assertThat(AuthRouteClassifier.classify("/v1/businesses/{businessId}/actors:register"))
+                .isEqualTo(AuthRouteClassifier.AuthSurface.API_CLE_SEULE);
+        // Ne doit pas déborder sur le CRUD acteurs (JWT-only) ni sur /actors/me (JWT-only, cf. controller).
+        assertThat(AuthRouteClassifier.classify("/v1/businesses/{businessId}/actors"))
+                .isEqualTo(AuthRouteClassifier.AuthSurface.CONSOLE_JWT);
+        assertThat(AuthRouteClassifier.classify("/v1/businesses/{businessId}/actors/me"))
+                .isEqualTo(AuthRouteClassifier.AuthSurface.CONSOLE_JWT);
+    }
 }

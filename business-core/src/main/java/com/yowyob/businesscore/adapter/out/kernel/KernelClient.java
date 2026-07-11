@@ -2,6 +2,7 @@ package com.yowyob.businesscore.adapter.out.kernel;
 
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
+import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.security.JwtDelegueResolver;
@@ -115,12 +116,13 @@ public class KernelClient {
                         return exchangeDelegue(method, path, body, type, organizationId, tokenDelegue.get());
                     }
                     return BusinessContextHolder.currentContext()
-                            .hasElement()
-                            .flatMap(contextPresent -> contextPresent
-                                    ? Mono.error(ProblemException.forbidden(
+                            .flatMap((BusinessContext ctx) -> ctx.businessId() == null
+                                    ? Mono.<T>error(ProblemException.forbidden(
                                             "JWT délégué requis pour appeler le kernel "
                                                     + "(connectez-vous via POST /v1/auth/login et transmettez Authorization: Bearer)"))
-                                    : exchangeMachine(method, path, body, type, organizationId));
+                                    : exchangeMachine(method, path, body, type, organizationId))
+                            .switchIfEmpty(Mono.defer(() ->
+                                    exchangeMachine(method, path, body, type, organizationId)));
                 })
                 .onErrorResume(WebClientResponseException.class, KernelClient::relayerErreurTransport);
     }
@@ -184,12 +186,12 @@ public class KernelClient {
                         return exchangeBytesDelegue(method, path, organizationId, tokenDelegue.get());
                     }
                     return BusinessContextHolder.currentContext()
-                            .hasElement()
-                            .flatMap(contextPresent -> contextPresent
-                                    ? Mono.error(ProblemException.forbidden(
+                            .flatMap((BusinessContext ctx) -> ctx.businessId() == null
+                                    ? Mono.<byte[]>error(ProblemException.forbidden(
                                             "JWT délégué requis pour appeler le kernel "
                                                     + "(connectez-vous via POST /v1/auth/login et transmettez Authorization: Bearer)"))
-                                    : exchangeBytesMachine(method, path, organizationId));
+                                    : exchangeBytesMachine(method, path, organizationId))
+                            .switchIfEmpty(Mono.defer(() -> exchangeBytesMachine(method, path, organizationId)));
                 })
                 .onErrorResume(WebClientResponseException.class, KernelClient::relayerErreurTransport);
     }

@@ -37,10 +37,16 @@ public class ActeurMetierController {
         this.gestion = gestion;
     }
 
-    @Operation(summary = "Rattacher un acteur",
-            description = "Associe une personne (identifiant kernel) à un rôle métier de l'entreprise.")
+    @Operation(summary = "Rattacher un acteur déjà connu",
+            description = """
+                    Associe une identité déjà connue à un rôle métier de l'entreprise. Ne crée ni ne résout
+                    aucune identité kernel : pour OPERATEUR, fournir acteurKernelId (une personne inconnue
+                    doit s'inscrire elle-même via POST .../actors:register) ; pour BENEFICIAIRE, fournir
+                    identifiantPersonne (RG-04, pas d'identifiants de connexion).
+                    """)
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Acteur rattaché"),
+            @ApiResponse(responseCode = "400", description = "Champ requis manquant pour cette catégorie de rôle"),
             @ApiResponse(responseCode = "404", description = "Entreprise ou rôle introuvable"),
             @ApiResponse(responseCode = "409", description = "Acteur déjà rattaché")
     })
@@ -49,7 +55,7 @@ public class ActeurMetierController {
     public Mono<ActeurReponse> rattacher(@PathVariable UUID businessId,
                                          @Valid @RequestBody RattacherActeurRequete req) {
         return gestion.rattacher(new RattacherActeurCommande(
-                        businessId, req.roleMetierId(), req.identifiantPersonne()))
+                        businessId, req.roleMetierId(), req.acteurKernelId(), req.identifiantPersonne()))
                 .map(ActeurReponse::de);
     }
 

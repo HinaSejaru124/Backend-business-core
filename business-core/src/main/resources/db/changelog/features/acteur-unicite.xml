@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Un acteur kernel (acteur_kernel_id) est un compte Yow unique, réutilisable dans N entreprises avec
+      un rôle différent dans chacune — pas une identité recréée par entreprise. Ce qui doit rester unique,
+      ce n'est donc pas acteur_kernel_id seul, mais le couple (acteur_kernel_id, entreprise_id) sur les
+      rattachements actifs : au plus une ligne acteur_metier active par (acteur, entreprise). Index unique
+      partiel, même schéma que uq_api_key_entreprise_active (auth-api-key-entreprise.xml) : ne collisionne
+      que sur les lignes actives (valide_jusqua IS NULL), un détachement puis un nouveau rattachement ne
+      viole jamais la contrainte.
+    -->
+    <changeSet id="au-001-unique-acteur-actif-par-entreprise" author="claude">
+        <sql>
+            CREATE UNIQUE INDEX uq_acteur_metier_entreprise_actif
+                ON acteur_metier (entreprise_id, acteur_kernel_id) WHERE valide_jusqua IS NULL;
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_acteur_metier_entreprise_actif;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

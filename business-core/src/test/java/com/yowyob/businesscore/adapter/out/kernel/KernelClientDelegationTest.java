@@ -3,6 +3,7 @@ package com.yowyob.businesscore.adapter.out.kernel;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.yowyob.businesscore.adapter.in.security.JwtAuthenticationToken;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
+import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore.KernelCreds;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
@@ -39,6 +40,7 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * Vérifie le flux <b>délégué</b> de KernelClient : quand un token utilisateur est présent dans le Reactor
@@ -50,6 +52,7 @@ class KernelClientDelegationTest {
     private WireMockServer wireMock;
     private KernelClient kernel;
     private KernelTokenService tokenService;
+    private KernelCredentialStore credentialStore;
 
     public record Echo(String value) {
     }
@@ -62,8 +65,9 @@ class KernelClientDelegationTest {
                 "http://localhost:" + wireMock.port(), 5000, 0, "bc-app", "bc-secret", "ORGANIZATION", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
         tokenService = mock(KernelTokenService.class);
+        credentialStore = mock(KernelCredentialStore.class);
         kernel = new KernelClient(
-                webClient, tokenService, mock(KernelCredentialStore.class),
+                webClient, tokenService, credentialStore,
                 JsonMapper.builder().build(), props);
     }
 
@@ -136,6 +140,31 @@ class KernelClientDelegationTest {
 
         wireMock.verify(0, postRequestedFor(urlMatching("/oauth2/token")));
         verifyNoInteractions(tokenService);
+    }
+
+    @Test
+    @DisplayName("BusinessContext scopé à un business (clé API, pas de JWT possible) → repli machine, pas 403")
+    void contexte_scope_business_bascule_en_machine() {
+        UUID tenant = UUID.randomUUID();
+        UUID businessId = UUID.randomUUID();
+        wireMock.stubFor(get(urlEqualTo("/api/echo"))
+                .willReturn(okJson("{\"success\":true,\"data\":{\"value\":\"ok\"},\"errorCode\":null}")));
+        when(credentialStore.pourTenantCourant()).thenReturn(Mono.just(new KernelCreds("tenant-client", "tenant-secret")));
+        when(tokenService.tokenPour("tenant-client", "tenant-secret")).thenReturn(Mono.just("machine-jwt"));
+
+        // Authentifié via X-BC-Client-Id/X-BC-Api-Key (ApiKeyReactiveAuthenticationManager) : businessId
+        // non nul, et par construction aucun JWT à déléguer — ce n'est pas une anomalie.
+        BusinessContext ctx = new BusinessContext(tenant, null, Set.of(), businessId, "trace", Locale.FRENCH);
+
+        StepVerifier.create(kernel.get("/api/echo", Echo.class)
+                        .contextWrite(c -> BusinessContextHolder.withContext(c, ctx)))
+                .assertNext(echo -> assertThat(echo.value()).isEqualTo("ok"))
+                .verifyComplete();
+
+        wireMock.verify(getRequestedFor(urlEqualTo("/api/echo"))
+                .withHeader("Authorization", equalTo("Bearer machine-jwt"))
+                .withHeader("X-Client-Id", equalTo("tenant-client"))
+                .withHeader("X-Api-Key", equalTo("tenant-secret")));
     }
 
     @Test

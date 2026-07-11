@@ -6,12 +6,25 @@
             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-      Inclut tous les changelogs du dossier features/, triés par nom de fichier.
-      _socle.xml (préfixe '_') s'applique en premier : conventions, rôle applicatif, tables socle.
-      Chaque dev ajoute SON fichier feature ici (business-types.xml, offers-actors.xml, rules.xml,
-      operations.xml) et ne modifie JAMAIS un changelog existant.
-      errorIfMissingOrEmpty=false : tolère l'absence de fichiers features au démarrage du socle.
+      Inclusion explicite (pas includeAll) : l'ordre alphabétique plaçait auth-api-key-entreprise.xml
+      (FK vers entreprise) avant enterprise.xml (qui crée la table) — cassait toute migration sur une
+      base fraîche (Testcontainers), invisible sur une base dev déjà migrée incrémentalement. L'ordre
+      ci-dessous respecte les dépendances FK réelles entre fichiers ; chaque nouveau fichier feature
+      s'ajoute à la fin (sauf s'il dépend d'un fichier listé après lui), et ne modifie JAMAIS un
+      changelog existant. Le chemin de chaque <include> reste identique à l'ancien nom trié par
+      includeAll — aucun changeset ne change d'identité dans DATABASECHANGELOG.
     -->
-    <includeAll path="db/changelog/features/" errorIfMissingOrEmpty="false"/>
+    <include file="db/changelog/features/_socle.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/enterprise.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/auth-api-key-entreprise.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/auth-developer-kernel-user.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/auth-kernel-nullable.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/business-types.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/offers-actors.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/acteur-unicite.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/operations.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/produit-entreprise.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/rules.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/sync-event.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

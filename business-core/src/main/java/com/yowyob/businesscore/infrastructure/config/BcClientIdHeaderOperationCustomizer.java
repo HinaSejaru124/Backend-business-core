@@ -24,6 +24,9 @@ import java.util.List;
  *   <li>Console dev : JWT via {@code bearerAuth} uniquement (controllers annotés).</li>
  *   <li>API intégration : {@code bearerAuth} obligatoire + headers {@code X-BC-*} optionnels
  *       (identifient la clé API du développeur).</li>
+ *   <li>API à clé seule : pas de cadenas {@code bearerAuth} (Bearer refusé à l'application, cf.
+ *       {@code ActeurAuthController.exigerCleEntreprise}) — seuls les headers {@code X-BC-*} sont
+ *       documentés, marqués requis.</li>
  * </ul>
  */
 @Component
@@ -40,6 +43,7 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
         return switch (AuthRouteClassifier.classify(resolvePath(handlerMethod))) {
             case PUBLIC, CONSOLE_JWT -> operation;
             case API_INTEGRATION -> documenterIntegration(operation);
+            case API_CLE_SEULE -> documenterCleSeule(operation);
         };
     }
 
@@ -58,6 +62,19 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
         return operation;
     }
 
+    /** Pas de {@code bearerAuth} : le Bearer est explicitement refusé sur cette route (un seul mode d'appel). */
+    private io.swagger.v3.oas.models.Operation documenterCleSeule(io.swagger.v3.oas.models.Operation operation) {
+        retirerBearerSecurity(operation);
+        addHeaderIfAbsent(operation, CLIENT_ID_HEADER,
+                "Identifiant développeur stable (voir GET /v1/auth/me) — ne change jamais, quelle que "
+                        + "soit l'entreprise ciblée.",
+                "00000000-0000-0000-0000-000000000000", true);
+        addHeaderIfAbsent(operation, API_KEY_HEADER,
+                "Secret de la clé de l'entreprise ciblée. À utiliser avec X-BC-Client-Id.",
+                null, true);
+        return operation;
+    }
+
     private void assurerBearerSecurity(io.swagger.v3.oas.models.Operation operation) {
         List<SecurityRequirement> security = operation.getSecurity();
         if (security == null) {
@@ -68,6 +85,14 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
             security.add(new SecurityRequirement().addList(BEARER_SCHEME));
             operation.setSecurity(security);
         }
+    }
+
+    /** Retire tout {@code bearerAuth} déjà présent (ex. hérité d'une annotation de classe). */
+    private void retirerBearerSecurity(io.swagger.v3.oas.models.Operation operation) {
+        if (operation.getSecurity() == null) {
+            return;
+        }
+        operation.getSecurity().removeIf(req -> req.containsKey(BEARER_SCHEME));
     }
 
     private void addHeaderIfAbsent(io.swagger.v3.oas.models.Operation operation, String name,

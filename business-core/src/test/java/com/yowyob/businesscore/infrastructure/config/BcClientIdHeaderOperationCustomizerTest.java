@@ -1,6 +1,8 @@
 package com.yowyob.businesscore.infrastructure.config;
 
 import com.yowyob.businesscore.adapter.in.rest.access.DashboardController;
+import com.yowyob.businesscore.adapter.in.rest.actor.ActeurAuthController;
+import com.yowyob.businesscore.adapter.in.rest.actor.InscrireActeurRequete;
 import com.yowyob.businesscore.adapter.in.rest.auth.AuthController;
 import com.yowyob.businesscore.adapter.in.rest.auth.LoginRequest;
 import com.yowyob.businesscore.adapter.in.rest.businesstype.BusinessTypeController;
@@ -8,6 +10,7 @@ import com.yowyob.businesscore.adapter.in.rest.enterprise.CreerEntrepriseRequest
 import com.yowyob.businesscore.adapter.in.rest.enterprise.EntrepriseController;
 import com.yowyob.businesscore.adapter.in.rest.sync.SyncController;
 import com.yowyob.businesscore.adapter.in.security.ApiKeyAuthenticationConverter;
+import java.util.UUID;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,6 +90,41 @@ class BcClientIdHeaderOperationCustomizerTest {
                 AuthController.class.getDeclaredMethod("login", LoginRequest.class));
 
         assertThat(headerNames(operation)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("POST .../actors:login : headers BC requis, aucun cadenas bearerAuth (Bearer refusé)")
+    void actorsLogin_clientIdRequisSansBearer() throws Exception {
+        Operation operation = customize(
+                new ActeurAuthController(null, null),
+                ActeurAuthController.class.getDeclaredMethod("login", UUID.class,
+                        com.yowyob.businesscore.adapter.in.rest.auth.LoginRequest.class));
+
+        assertThat(headerNames(operation)).contains(
+                ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
+                ApiKeyAuthenticationConverter.HEADER_API_KEY);
+        assertThat(hasBearerSecurity(operation)).isFalse();
+        assertThat(operation.getParameters().stream()
+                .filter(p -> ApiKeyAuthenticationConverter.HEADER_CLIENT_ID.equals(p.getName()))
+                .findFirst().orElseThrow().getRequired()).isTrue();
+    }
+
+    @Test
+    @DisplayName("POST .../actors:register : headers BC requis, aucun cadenas bearerAuth (Bearer refusé)")
+    void actorsRegister_clientIdRequisSansBearer() throws Exception {
+        Operation operation = customize(
+                new ActeurAuthController(null, null),
+                ActeurAuthController.class.getDeclaredMethod("register", UUID.class, InscrireActeurRequete.class));
+
+        assertThat(headerNames(operation)).contains(
+                ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
+                ApiKeyAuthenticationConverter.HEADER_API_KEY);
+        assertThat(hasBearerSecurity(operation)).isFalse();
+    }
+
+    private boolean hasBearerSecurity(Operation operation) {
+        return operation.getSecurity() != null
+                && operation.getSecurity().stream().anyMatch(req -> req.containsKey("bearerAuth"));
     }
 
     private Operation customize(Object controller, Method method) {

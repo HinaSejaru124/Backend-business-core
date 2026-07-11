@@ -4,13 +4,17 @@ import java.util.Set;
 
 /**
  * Classifie les routes REST selon la surface d'authentification attendue — reflète exactement le
- * périmètre du filtre de clé API dans {@code SecurityConfig} (ROUTES_INTEGRATION_TERMINAL).
+ * périmètre du filtre de clé API dans {@code SecurityConfig} (ROUTES_INTEGRATION_TERMINAL) et les gardes
+ * applicatives ({@code exigerCleEntreprise} dans {@code ActeurAuthController}).
  *
  * <ul>
  *   <li>{@link AuthSurface#PUBLIC} — sans auth</li>
  *   <li>{@link AuthSurface#API_INTEGRATION} — usage runtime d'une entreprise par son backend terminal
- *       (synchronisation, opérations, traces, transactions) : Bearer (kernel) + headers {@code X-BC-*}
- *       documentés</li>
+ *       (synchronisation, opérations, traces, transactions) : Bearer (kernel) <b>ou</b> headers
+ *       {@code X-BC-*}, documentés comme deux voies possibles</li>
+ *   <li>{@link AuthSurface#API_CLE_SEULE} — même surface terminal, mais où le Bearer est délibérément
+ *       <b>refusé</b> à l'application (un seul mode d'appel, sans ambiguïté) : pas de cadenas Swagger,
+ *       seuls les headers {@code X-BC-*} sont documentés, marqués requis</li>
  *   <li>{@link AuthSurface#CONSOLE_JWT} — gestion de la plateforme (types métier, entreprises, clés,
  *       dashboard...), consommée par le front Business Core : Bearer uniquement</li>
  * </ul>
@@ -20,7 +24,8 @@ public final class AuthRouteClassifier {
     public enum AuthSurface {
         PUBLIC,
         CONSOLE_JWT,
-        API_INTEGRATION
+        API_INTEGRATION,
+        API_CLE_SEULE
     }
 
     private static final Set<String> PUBLIC_EXACT = Set.of(
@@ -29,6 +34,12 @@ public final class AuthRouteClassifier {
             "/v1/auth/login",
             "/v1/auth/discover",
             "/v1/auth/select"
+    );
+
+    /** Bearer refusé à l'application (cf. {@code ActeurAuthController.exigerCleEntreprise}) — exact only. */
+    private static final Set<String> API_CLE_SEULE_EXACT = Set.of(
+            "/v1/businesses/{businessId}/actors:login",
+            "/v1/businesses/{businessId}/actors:register"
     );
 
     private static final Set<String> API_INTEGRATION_PREFIXES = Set.of(
@@ -52,6 +63,9 @@ public final class AuthRouteClassifier {
                 : path;
         if (PUBLIC_EXACT.contains(normalise)) {
             return AuthSurface.PUBLIC;
+        }
+        if (API_CLE_SEULE_EXACT.contains(normalise)) {
+            return AuthSurface.API_CLE_SEULE;
         }
         for (String prefix : API_INTEGRATION_PREFIXES) {
             if (normalise.equals(prefix) || normalise.startsWith(prefix + "/")) {
