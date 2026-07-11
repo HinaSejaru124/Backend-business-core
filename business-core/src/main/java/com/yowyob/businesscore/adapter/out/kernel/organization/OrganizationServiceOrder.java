@@ -20,7 +20,7 @@ final class OrganizationServiceOrder {
     record CatalogEntry(String code, List<String> requiredDependencies) {
     }
 
-    @SuppressWarnings("unchecked")
+    
     static List<CatalogEntry> parserCatalogue(Object corps) {
         if (!(corps instanceof List<?> items)) {
             return List.of();
@@ -39,7 +39,7 @@ final class OrganizationServiceOrder {
         return entries;
     }
 
-    @SuppressWarnings("unchecked")
+    
     private static List<String> lireDependances(Object raw) {
         if (!(raw instanceof List<?> list)) {
             return List.of();

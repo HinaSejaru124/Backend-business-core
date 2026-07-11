@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Facturation (feature). Auto-inclus par includeAll après _socle.xml (qui crée developer_account).
+      NE MODIFIE aucun changelog existant. Préfixe d'IDs : billing-xxx.
+
+      plan_change_request : audit des demandes de changement de plan (upgrade/downgrade) et de leur issue
+      de paiement. Rattachée au compte développeur (pas de donnée métier tenant) -> pas de RLS, comme
+      developer_account / api_key / api_key_usage_daily.
+    -->
+    <changeSet id="billing-001-plan-change-request" author="billing">
+        <createTable tableName="plan_change_request">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="developer_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="plan_from" type="varchar(32)"/>
+            <column name="plan_to" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="statut" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payment_reference" type="varchar(128)"/>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="plan_change_request" baseColumnNames="developer_id"
+                                 referencedTableName="developer_account" referencedColumnNames="id"
+                                 constraintName="fk_plan_change_request_developer"/>
+        <createIndex tableName="plan_change_request" indexName="idx_plan_change_request_developer">
+            <column name="developer_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

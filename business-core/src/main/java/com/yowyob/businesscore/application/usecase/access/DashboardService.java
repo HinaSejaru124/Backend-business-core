@@ -4,11 +4,11 @@ import com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur;
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyEntity;
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyRepository;
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyUsageDailyRepository;
+import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
+import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseRepository;
 import com.yowyob.businesscore.adapter.out.persistence.trace.TraceOperationRepository;
-import com.yowyob.businesscore.adapter.out.persistence.trace.TraceOperationRepository.ActiviteRow;
-import com.yowyob.businesscore.adapter.out.persistence.trace.TraceOperationRepository.TopEntrepriseRow;
-import com.yowyob.businesscore.adapter.out.persistence.trace.TraceOperationRepository.TopOperationRow;
+import com.yowyob.businesscore.application.billing.PlanCatalogue;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -23,13 +23,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Agrège les données du tableau de bord développeur : usage global (30 jours, tous business confondus),
- * compteurs publics (entreprises, clés actives) et activité métier (top opérations/entreprises, activité
- * récente — depuis {@code trace_operation}). Aucune donnée secrète n'est exposée ici — pour la gestion
- * d'une clé précise (créer/renommer/révoquer), voir {@code /v1/businesses/{id}/api-keys}.
+ * Agrège les données du tableau de bord développeur : plan &amp; quota, usage global (30 jours),
+ * compteurs publics (entreprises, clés actives) et activité métier (top opérations/entreprises,
+ * activité récente — depuis {@code trace_operation}). Aucune donnée secrète n'est exposée ici —
+ * pour la gestion d'une clé précise (créer/renommer/révoquer), voir {@code /v1/businesses/{id}/api-keys}.
  *
  * <p>L'historique (jours passés) vient de la base ({@code api_key_usage_daily}) ; le jour courant vient
- * des compteurs Redis (source live), ce qui évite tout double comptage avec le flush.
+ * des compteurs Redis (source live), ce qui évite tout double comptage avec le flush. Le quota mensuel
+ * et les requêtes restantes sont dérivés du plan du compte et du {@link PlanCatalogue}.
  */
 @Service
 public class DashboardService {
@@ -43,17 +44,23 @@ public class DashboardService {
     private final ApiKeyUsageCompteur compteur;
     private final EntrepriseRepository entrepriseRepository;
     private final TraceOperationRepository traceRepository;
+    private final DeveloperAccountRepository developerRepository;
+    private final PlanCatalogue catalogue;
 
     public DashboardService(ApiKeyRepository apiKeyRepository,
                             ApiKeyUsageDailyRepository usageRepository,
                             ApiKeyUsageCompteur compteur,
                             EntrepriseRepository entrepriseRepository,
-                            TraceOperationRepository traceRepository) {
+                            TraceOperationRepository traceRepository,
+                            DeveloperAccountRepository developerRepository,
+                            PlanCatalogue catalogue) {
         this.apiKeyRepository = apiKeyRepository;
         this.usageRepository = usageRepository;
         this.compteur = compteur;
         this.entrepriseRepository = entrepriseRepository;
         this.traceRepository = traceRepository;
+        this.developerRepository = developerRepository;
+        this.catalogue = catalogue;
     }
 
     public record PointJour(LocalDate jour, long total) {
@@ -70,6 +77,10 @@ public class DashboardService {
     }
 
     public record DashboardData(
+            String plan,
+            long quotaMensuel,
+            long requetesRestantes,
+            boolean bloque,
             long requetesCeMois,
             long requetesAujourdhui,
             long erreursAujourdhui,
@@ -83,6 +94,13 @@ public class DashboardService {
     }
 
     public Mono<DashboardData> pour(UUID developerId, UUID tenantId) {
+        return developerRepository.findById(developerId)
+                .map(DeveloperAccountEntity::getPlan)
+                .defaultIfEmpty(PlanCatalogue.PLAN_DEFAUT)
+                .flatMap(plan -> donnees(developerId, tenantId, plan));
+    }
+
+    private Mono<DashboardData> donnees(UUID developerId, UUID tenantId, String plan) {
         Instant depuisTrace = LocalDate.now().minusDays(FENETRE_JOURS - 1L).atStartOfDay(ZoneOffset.UTC).toInstant();
 
         Mono<List<TopOperation>> topOperations = traceRepository
@@ -105,18 +123,21 @@ public class DashboardService {
                 apiKeyRepository.findByDeveloperIdAndStatus(developerId, ApiKeyEntity.STATUT_ACTIVE)
                         .map(ApiKeyEntity::getId).collectList(),
                 topOperations, topEntreprises, activiteRecente
-        ).flatMap(t -> usageEtAssemblage(t.getT1(), t.getT2(), t.getT3(), t.getT4(), t.getT5(), t.getT6()));
+        ).flatMap(t -> usageEtAssemblage(plan, t.getT1(), t.getT2(), t.getT3(), t.getT4(), t.getT5(), t.getT6()));
     }
 
-    private Mono<DashboardData> usageEtAssemblage(long nombreEntreprises, long nombreClesActives, List<UUID> ids,
+    private Mono<DashboardData> usageEtAssemblage(String plan,
+                                                  long nombreEntreprises, long nombreClesActives, List<UUID> ids,
                                                   List<TopOperation> topOperations, List<TopEntreprise> topEntreprises,
                                                   List<ActiviteItem> activiteRecente) {
-        if (ids.isEmpty()) {
-            return Mono.just(new DashboardData(0, 0, 0, 0.0, List.of(), nombreEntreprises, nombreClesActives,
-                    topOperations, topEntreprises, activiteRecente));
-        }
         LocalDate today = LocalDate.now();
         LocalDate depuis = today.minusDays(FENETRE_JOURS - 1L);
+
+        if (ids.isEmpty()) {
+            return Mono.just(assembler(plan, nombreEntreprises, nombreClesActives,
+                    today, depuis, Map.of(), new long[]{0L, 0L},
+                    topOperations, topEntreprises, activiteRecente));
+        }
 
         Mono<Map<LocalDate, Long>> histo = usageRepository
                 .findByApiKeyIdInAndJourGreaterThanEqual(ids, depuis)
@@ -135,12 +156,15 @@ public class DashboardService {
                 });
 
         return Mono.zip(histo, live)
-                .map(t -> assembler(nombreEntreprises, nombreClesActives, today, depuis, t.getT1(), t.getT2(),
+                .map(t -> assembler(plan, nombreEntreprises, nombreClesActives,
+                        today, depuis, t.getT1(), t.getT2(),
                         topOperations, topEntreprises, activiteRecente));
     }
 
-    private DashboardData assembler(long nombreEntreprises, long nombreClesActives, LocalDate today,
-                                    LocalDate depuis, Map<LocalDate, Long> histo, long[] live,
+    private DashboardData assembler(String plan,
+                                    long nombreEntreprises, long nombreClesActives,
+                                    LocalDate today, LocalDate depuis,
+                                    Map<LocalDate, Long> histo, long[] live,
                                     List<TopOperation> topOperations, List<TopEntreprise> topEntreprises,
                                     List<ActiviteItem> activiteRecente) {
         long totalAujourdhui = live[0];
@@ -159,7 +183,17 @@ public class DashboardService {
         double tauxErreur = totalAujourdhui == 0 ? 0.0
                 : (double) erreursAujourdhui / (double) totalAujourdhui;
 
-        return new DashboardData(ceMois, totalAujourdhui, erreursAujourdhui, tauxErreur, sparkline,
-                nombreEntreprises, nombreClesActives, topOperations, topEntreprises, activiteRecente);
+        String planNorm = catalogue.normaliser(plan);
+        boolean illimite = catalogue.illimite(planNorm);
+        long quota = catalogue.quotaMensuel(planNorm);
+        long quotaAffiche = illimite ? -1 : quota;
+        long restant = illimite ? -1 : Math.max(0, quota - ceMois);
+        boolean bloque = !illimite && ceMois >= quota;
+
+        return new DashboardData(
+                planNorm, quotaAffiche, restant, bloque,
+                ceMois, totalAujourdhui, erreursAujourdhui, tauxErreur, sparkline,
+                nombreEntreprises, nombreClesActives,
+                topOperations, topEntreprises, activiteRecente);
     }
 }

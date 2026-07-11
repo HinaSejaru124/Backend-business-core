@@ -1,0 +1,31 @@
+server:
+  port: ${SERVER_PORT:9090}
+
+spring:
+  application:
+    name: pharmacie-backend
+  datasource:
+    url: ${PHARMACORE_JDBC_URL:jdbc:postgresql://localhost:5432/pharmacore}
+    username: ${PHARMACORE_DB_USER:pharmacore_app}
+    password: ${PHARMACORE_DB_PASSWORD:pharmacore_app}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# Configuration du client Business Core (BCaaS).
+# CLIENT_ID/API_KEY ne sont JAMAIS commités — fournis via variables d'environnement (.env.local, gitignoré).
+pharmacore:
+  bcaas:
+    base-url: ${BCAAS_BASE_URL:http://localhost:8081}
+    client-id: ${BCAAS_CLIENT_ID:}
+    api-key: ${BCAAS_API_KEY:}
+    type-id: ${BCAAS_TYPE_ID:}
+    version-number: ${BCAAS_VERSION_NUMBER:1}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

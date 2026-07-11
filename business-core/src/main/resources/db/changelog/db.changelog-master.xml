@@ -26,5 +26,5 @@
     <include file="db/changelog/features/produit-entreprise.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/features/rules.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/features/sync-event.xml" relativeToChangelogFile="false"/>
-
+    <include file="db/changelog/features/billing.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

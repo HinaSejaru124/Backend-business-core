@@ -1,5 +1,6 @@
 package com.yowyob.businesscore.adapter.out.kernel.auth;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -62,14 +63,18 @@ public Mono<ResultatLogin> login(String principal, String motDePasse) {
             .bodyValue(discoverBody)
             .retrieve()
             .onStatus(status -> status.value() == 401 || status.value() == 403,
-                    reponse -> reponse.bodyToMono(String.class).defaultIfEmpty("").flatMap(body -> {
-                        System.err.println("KERNEL discover-contexts " + reponse.statusCode() + " body: " + body);
+                    reponse -> reponse.bodyToMono(Map.class).defaultIfEmpty(Map.of()).flatMap(corps -> {
+                        String message = corps.get("message") instanceof String s
+                                ? s : "Identifiant ou mot de passe invalide.";
                         return Mono.error(new ProblemException(
-                                HttpStatus.UNAUTHORIZED, "Authentification refusée",
-                                "Identifiant ou mot de passe invalide."));
+                                HttpStatus.UNAUTHORIZED, "Authentification refusée", message));
                     }))
             .bodyToMono(Map.class)
-            .flatMap(discoverReponse -> selectPremierContexte(discoverReponse, principal, motDePasse));
+            .timeout(Duration.ofMillis(kernelProperties.timeoutMs()))
+            .flatMap(discoverReponse -> selectPremierContexte(discoverReponse, principal, motDePasse))
+            .onErrorMap(ex -> !(ex instanceof ProblemException), ex -> new ProblemException(
+                    HttpStatus.SERVICE_UNAVAILABLE, "Service indisponible",
+                    "Le service d'authentification est momentanément indisponible. Réessayez dans quelques instants."));
 }
 
 private Mono<ResultatLogin> selectPremierContexte(Map<?, ?> discoverReponse,
@@ -86,12 +91,42 @@ private Mono<ResultatLogin> selectPremierContexte(Map<?, ?> discoverReponse,
                 "Aucun contexte disponible pour cet utilisateur."));
     }
 
-    // Sélection automatique du premier contexte
-    Map<?, ?> premierContexte = (Map<?, ?>) contexts.get(0);
-    String contextId = texte(premierContexte.get("contextId"));
+    return essayerContexte(contexts, 0, selectionToken, null);
+}
+
+/**
+ * BUG #3 — essaie les contextes renvoyés par discover-contexts un par un jusqu'à ce que l'un
+ * fonctionne, au lieu de ne tenter que {@code contexts.get(0)}.
+ *
+ * <p>Cause : un même principal (email) peut correspondre à plusieurs contextes/tenants kernel —
+ * notamment quand deux comptes développeur distincts ont été créés par erreur pour la même adresse
+ * (ex. avant qu'une contrainte d'unicité soit appliquée côté inscription). {@code discover-contexts}
+ * renvoie alors tous les contextes trouvés, dans un ordre qui n'est pas garanti stable. L'ancien code
+ * ne tentait que le premier : si ce premier contexte précis était inutilisable (ex. email non vérifié
+ * sur CE compte-là précisément) alors qu'un autre contexte du même utilisateur était parfaitement
+ * valide, la connexion échouait quand même — de façon intermittente et déroutante pour l'utilisateur.
+ *
+ * <p>Reproduit empiriquement le 2026-07-09 sur un compte de test ayant deux contextes kernel
+ * distincts (deux {@code userId} différents pour le même email) : connexion tantôt réussie, tantôt
+ * en échec sur "Sélection de contexte refusée", sans aucun changement de notre côté entre les deux
+ * tentatives — uniquement l'ordre des contextes renvoyés par le kernel qui variait.
+ *
+ * <p>En cas d'échec de tous les contextes, on renvoie la toute première erreur rencontrée (la plus
+ * probable pour l'utilisateur), pas la dernière.
+ */
+private Mono<ResultatLogin> essayerContexte(List<?> contexts, int index, String selectionToken,
+                                             ProblemException premiereErreur) {
+    if (index >= contexts.size()) {
+        return Mono.error(premiereErreur != null ? premiereErreur : new ProblemException(
+                HttpStatus.UNAUTHORIZED, "Authentification refusée",
+                "Aucun contexte utilisable pour cet utilisateur."));
+    }
+
+    Map<?, ?> contexte = (Map<?, ?>) contexts.get(index);
+    String contextId = texte(contexte.get("contextId"));
 
     // Récupère l'organizationId si disponible
-    List<?> orgs = premierContexte.get("organizations") instanceof List<?> l ? l : List.of();
+    List<?> orgs = contexte.get("organizations") instanceof List<?> l ? l : List.of();
     String organizationId = orgs.isEmpty() ? null
             : texte(((Map<?, ?>) orgs.get(0)).get("organizationId"));
 
@@ -111,16 +146,27 @@ private Mono<ResultatLogin> selectPremierContexte(Map<?, ?> discoverReponse,
             .bodyValue(selectBody)
             .retrieve()
             .onStatus(status -> status.value() == 401 || status.value() == 403,
-                    reponse -> reponse.bodyToMono(String.class).defaultIfEmpty("").flatMap(body -> {
-                        System.err.println("KERNEL select-context " + reponse.statusCode()
-                                + " body: " + body + " | selectionToken=" + selectionToken
-                                + " contextId=" + contextId + " organizationId=" + organizationId);
-                        return Mono.error(new ProblemException(
-                                HttpStatus.UNAUTHORIZED, "Authentification refusée",
-                                "Sélection de contexte refusée."));
-                    }))
+                    reponse -> reponse.bodyToMono(Map.class).defaultIfEmpty(Map.of()).flatMap(corps ->
+                            Mono.error(erreurSelectContexte(corps))))
             .bodyToMono(Map.class)
-            .flatMap(this::versResultat);
+            .timeout(Duration.ofMillis(kernelProperties.timeoutMs()))
+            .flatMap(this::versResultat)
+            .onErrorResume(ProblemException.class, ex -> essayerContexte(
+                    contexts, index + 1, selectionToken, premiereErreur != null ? premiereErreur : ex));
+}
+
+/** Traduit le refus de select-context en message actionnable — notamment l'email non vérifié. */
+private ProblemException erreurSelectContexte(Map<?, ?> corps) {
+    String errorCode = corps.get("errorCode") instanceof String s ? s : null;
+    if ("EMAIL_NOT_VERIFIED".equals(errorCode)) {
+        return new ProblemException(HttpStatus.UNAUTHORIZED, "Adresse email non vérifiée",
+                "Votre adresse email n'est pas encore vérifiée. Consultez votre boîte mail "
+                        + "(et vos spams) et cliquez sur le lien de vérification avant de vous connecter.")
+                .with("errorCode", errorCode);
+    }
+    String message = corps.get("message") instanceof String s ? s : "Sélection de contexte refusée.";
+    return new ProblemException(HttpStatus.UNAUTHORIZED, "Authentification refusée", message)
+            .with("errorCode", errorCode);
 }
 
 
@@ -129,8 +175,7 @@ private Mono<ResultatLogin> versResultat(Map<?, ?> corps) {
     if (corps.containsKey("success") && corps.containsKey("data")) {
         Object errorCode = corps.get("errorCode");
         if (errorCode != null) {
-            return Mono.error(new ProblemException(HttpStatus.UNAUTHORIZED, "Authentification refusée",
-                    String.valueOf(corps.get("message"))));
+            return Mono.error(erreurSelectContexte(corps));
         }
         charge = corps.get("data");
     }
@@ -209,13 +254,18 @@ private Mono<ResultatLogin> versResultat(Map<?, ?> corps) {
                 .bodyValue(corps)
                 .retrieve()
                 .onStatus(status -> status.is4xxClientError(),
-                        reponse -> reponse.bodyToMono(String.class).flatMap(body -> {
-                            System.err.println("KERNEL 400 body: " + body);
+                        reponse -> reponse.bodyToMono(Map.class).flatMap(erreur -> {
+                            String message = erreur.get("message") instanceof String s
+                                    ? s : "Les informations fournies sont invalides.";
                             return Mono.error(new ProblemException(
-                                    HttpStatus.BAD_REQUEST, "Inscription refusée", body));
+                                    HttpStatus.BAD_REQUEST, "Inscription refusée", message));
                         }))
                 .bodyToMono(Map.class)
-                .map(this::versSignUpResult);
+                .timeout(Duration.ofMillis(kernelProperties.timeoutMs()))
+                .map(this::versSignUpResult)
+                .onErrorMap(ex -> !(ex instanceof ProblemException), ex -> new ProblemException(
+                        HttpStatus.SERVICE_UNAVAILABLE, "Service indisponible",
+                        "Le service d'inscription est momentanément indisponible. Réessayez dans quelques instants."));
     }
 
     
