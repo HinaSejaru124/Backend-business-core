@@ -4,22 +4,23 @@ import { useCallback, useEffect, useState } from "react";
 import CodeWindow from "@/components/CodeWindow";
 import Field from "@/components/Field";
 import { Button } from "@/components/Button";
+import { Banner, EmptyState, LoadingBlock } from "@/components/Feedback";
+import { useAuth } from "@/lib/auth-context";
 import {
   API_BASE,
   ApiError,
-  createApiKey,
-  listApiKeys,
-  renameApiKey,
-  revokeApiKey,
-  type ApiKey,
-  type ApiKeyCreated,
+  createBusinessApiKey,
+  getBusinessApiKey,
+  listBusinesses,
+  renameBusinessApiKey,
+  revokeBusinessApiKey,
+  type Business,
+  type BusinessApiKey,
+  type BusinessApiKeyCreated,
 } from "@/lib/api";
 import { IconCopy, IconCheck, IconEye, IconEyeOff, IconClose } from "@/components/icons";
 import { cn } from "@/lib/cn";
 
-const MAX_CLES = 5;
-
-/** Copie un texte dans le presse-papier et bascule un drapeau « copié » 1,4 s. */
 function useCopie(): [string | null, (texte: string, id: string) => void] {
   const [copie, setCopie] = useState<string | null>(null);
   const copier = useCallback((texte: string, id: string) => {
@@ -42,57 +43,85 @@ function formatDate(iso: string | null): string {
 }
 
 export default function ApiKeyPage() {
-  const [cles, setCles] = useState<ApiKey[]>([]);
+  const { profil } = useAuth();
+  const developerId = profil?.developerId ?? "<developerId>";
+
+  const [businesses, setBusinesses] = useState<Business[] | null>(null);
+  const [selectedId, setSelectedId] = useState("");
+  const [cle, setCle] = useState<BusinessApiKey | null>(null);
+  const [pasDeCle, setPasDeCle] = useState(false);
   const [etat, setEtat] = useState<"loading" | "error" | "ok">("loading");
   const [erreur, setErreur] = useState<string | null>(null);
 
-  // Création
   const [formOuvert, setFormOuvert] = useState(false);
   const [nouveauNom, setNouveauNom] = useState("");
   const [creation, setCreation] = useState(false);
-  const [creee, setCreee] = useState<ApiKeyCreated | null>(null); // secret affiché une seule fois
+  const [creee, setCreee] = useState<BusinessApiKeyCreated | null>(null);
 
-  // Renommage inline
-  const [editionId, setEditionId] = useState<string | null>(null);
   const [editionNom, setEditionNom] = useState("");
-
-  // Révocation (confirmation inline)
-  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  const [edition, setEdition] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [action, setAction] = useState(false);
 
   const [copie, copier] = useCopie();
   const [revelerCree, setRevelerCree] = useState(true);
 
-  const charger = useCallback(async () => {
-    setEtat("loading");
+  const chargerBusinesses = useCallback(async () => {
     try {
-      const data = await listApiKeys();
-      setCles(data);
+      const data = await listBusinesses();
+      setBusinesses(data);
+      if (data.length > 0 && !selectedId) setSelectedId(data[0].id);
+      return data;
+    } catch (e) {
+      setErreur(e instanceof ApiError ? e.detail || e.title : "Chargement des entreprises impossible.");
+      setEtat("error");
+      return [];
+    }
+  }, [selectedId]);
+
+  const chargerCle = useCallback(async (businessId: string) => {
+    if (!businessId) return;
+    setEtat("loading");
+    setErreur(null);
+    setPasDeCle(false);
+    setCle(null);
+    try {
+      const k = await getBusinessApiKey(businessId);
+      setCle(k);
+      setEditionNom(k.name);
       setEtat("ok");
     } catch (e) {
-      setErreur(e instanceof ApiError ? e.detail || e.title : "Chargement impossible.");
-      setEtat("error");
+      if (e instanceof ApiError && e.status === 404) {
+        setPasDeCle(true);
+        setEtat("ok");
+      } else {
+        setErreur(e instanceof ApiError ? e.detail || e.title : "Chargement impossible.");
+        setEtat("error");
+      }
     }
   }, []);
 
   useEffect(() => {
-    void charger();
-  }, [charger]);
+    void chargerBusinesses();
+  }, [chargerBusinesses]);
 
-  const actives = cles.length; // le backend ne renvoie que les clés ACTIVE
-  const limiteAtteinte = actives >= MAX_CLES;
+  useEffect(() => {
+    if (selectedId) void chargerCle(selectedId);
+  }, [selectedId, chargerCle]);
+
+  const entrepriseCourante = businesses?.find((b) => b.id === selectedId);
 
   async function onCreer() {
-    if (creation) return;
+    if (!selectedId || creation) return;
     setErreur(null);
     setCreation(true);
     try {
-      const c = await createApiKey(nouveauNom);
+      const c = await createBusinessApiKey(selectedId, nouveauNom);
       setCreee(c);
       setRevelerCree(true);
       setNouveauNom("");
       setFormOuvert(false);
-      await charger();
+      await chargerCle(selectedId);
     } catch (e) {
       setErreur(e instanceof ApiError ? e.detail || e.title : "Création impossible.");
     } finally {
@@ -100,18 +129,15 @@ export default function ApiKeyPage() {
     }
   }
 
-  async function onRenommer(id: string) {
+  async function onRenommer() {
     const nom = editionNom.trim();
-    if (!nom) {
-      setEditionId(null);
-      return;
-    }
+    if (!selectedId || !nom) return;
     setAction(true);
     setErreur(null);
     try {
-      await renameApiKey(id, nom);
-      setEditionId(null);
-      await charger();
+      const k = await renameBusinessApiKey(selectedId, nom);
+      setCle(k);
+      setEdition(false);
     } catch (e) {
       setErreur(e instanceof ApiError ? e.detail || e.title : "Renommage impossible.");
     } finally {
@@ -119,13 +145,15 @@ export default function ApiKeyPage() {
     }
   }
 
-  async function onRevoquer(id: string) {
+  async function onRevoquer() {
+    if (!selectedId) return;
     setAction(true);
     setErreur(null);
     try {
-      await revokeApiKey(id);
-      setConfirmRevoke(null);
-      await charger();
+      await revokeBusinessApiKey(selectedId);
+      setConfirmRevoke(false);
+      setCle(null);
+      setPasDeCle(true);
     } catch (e) {
       setErreur(e instanceof ApiError ? e.detail || e.title : "Révocation impossible.");
     } finally {
@@ -133,37 +161,62 @@ export default function ApiKeyPage() {
     }
   }
 
-  // Exemple d'utilisation : basé sur une clé réelle (la dernière créée, sinon la première active).
-  const clientIdExemple = creee?.clientId || cles[0]?.prefix || "bck_xxxxxxxx";
   const secretExemple = creee && revelerCree ? creee.apiKey : "••••••••••••••••";
   const usage = `curl ${API_BASE}/v1/business-types \\
-  -H "X-BC-Client-Id: ${clientIdExemple}" \\
+  -H "X-BC-Client-Id: ${developerId}" \\
   -H "X-BC-Api-Key: ${secretExemple}"`;
 
   return (
     <div className="animate-fade-up">
-      {/* En-tête */}
       <div className="border-b border-line pb-6">
         <div className="font-mono text-[12px] uppercase tracking-wider text-brand">Accès</div>
         <h1 className="mt-2 font-display text-3xl font-bold text-ink">Clés d&apos;API</h1>
         <p className="mt-1 text-sm text-muted">
-          Créez jusqu&apos;à {MAX_CLES} clés pour authentifier vos applications auprès de Business Core.
-          Chaque clé est propre à votre compte et révocable à tout moment.
+          Chaque entreprise dispose d&apos;une clé API active à la fois.{" "}
+          <code className="font-mono text-[12px]">X-BC-Client-Id</code> est votre identifiant
+          développeur stable (<code className="font-mono text-[12px]">GET /v1/auth/me</code>).
         </p>
       </div>
 
-      {/* Bandeau secret — affiché UNE SEULE FOIS après création */}
+      {businesses && businesses.length === 0 && (
+        <div className="mt-6">
+          <EmptyState
+            title="Aucune entreprise"
+            description="Créez d'abord une entreprise pour générer une clé API scopée à celle-ci."
+            actionHref="/console/businesses"
+            actionLabel="Créer une entreprise →"
+          />
+        </div>
+      )}
+
+      {businesses && businesses.length > 0 && (
+        <div className="mt-6">
+          <label className="block max-w-md">
+            <span className="mb-1.5 block text-[13px] font-medium text-ink">Entreprise</span>
+            <select
+              value={selectedId}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="h-11 w-full border border-line bg-white px-3 text-sm outline-none focus:border-brand"
+            >
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nom} — v{b.versionNumber}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
       {creee && (
         <div className="mt-6 border-2 border-brand bg-tint p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="font-display text-lg font-bold text-ink">
-                Clé « {creee.name} » créée
+                Clé « {creee.name} » créée pour {entrepriseCourante?.nom}
               </h2>
               <p className="mt-1 text-sm text-ink">
-                Copiez le secret maintenant : <strong>il ne sera plus jamais affiché</strong> après
-                la fermeture de ce panneau. Le backend n&apos;en conserve qu&apos;une empreinte
-                chiffrée.
+                Copiez le secret maintenant : <strong>il ne sera plus jamais affiché</strong>.
               </p>
             </div>
             <button
@@ -179,16 +232,16 @@ export default function ApiKeyPage() {
           <dl className="mt-5 space-y-4">
             <div>
               <dt className="font-mono text-xs uppercase tracking-wider text-muted">
-                Client-Id (X-BC-Client-Id)
+                Developer ID (X-BC-Client-Id)
               </dt>
               <dd className="mt-1 flex items-center justify-between gap-2 border border-line bg-white p-2.5">
-                <code className="truncate font-mono text-sm text-ink select-all">{creee.clientId}</code>
+                <code className="truncate font-mono text-sm text-ink select-all">{developerId}</code>
                 <button
                   type="button"
-                  onClick={() => copier(creee.clientId, "cid")}
+                  onClick={() => copier(developerId, "did")}
                   className="flex-none text-xs font-medium text-brand hover:underline"
                 >
-                  {copie === "cid" ? "Copié !" : "Copier"}
+                  {copie === "did" ? "Copié !" : "Copier"}
                 </button>
               </dd>
             </div>
@@ -228,98 +281,72 @@ export default function ApiKeyPage() {
       )}
 
       {erreur && (
-        <div className="mt-6 border-l-2 border-danger bg-danger/5 px-4 py-3 text-sm text-danger">
-          {erreur}
+        <div className="mt-6">
+          <Banner variant="error">{erreur}</Banner>
         </div>
       )}
 
-      {/* Liste des clés */}
-      <section className="mt-8">
-        <div className="flex flex-col justify-between gap-3 border-b border-line pb-4 sm:flex-row sm:items-center">
-          <div className="flex items-baseline gap-3">
-            <h2 className="font-display text-lg font-semibold text-ink">Vos clés</h2>
-            <span className="font-mono text-[12px] text-muted">
-              {etat === "ok" ? `${actives} / ${MAX_CLES} actives` : ""}
-            </span>
+      {businesses && businesses.length > 0 && (
+        <section className="mt-8">
+          <div className="flex flex-col justify-between gap-3 border-b border-line pb-4 sm:flex-row sm:items-center">
+            <h2 className="font-display text-lg font-semibold text-ink">
+              Clé de {entrepriseCourante?.nom ?? "l'entreprise"}
+            </h2>
+            {pasDeCle && !formOuvert && (
+              <Button size="sm" onClick={() => setFormOuvert(true)}>
+                + Créer la clé
+              </Button>
+            )}
           </div>
-          <Button
-            size="sm"
-            onClick={() => setFormOuvert((o) => !o)}
-            disabled={limiteAtteinte || formOuvert}
-            title={limiteAtteinte ? `Limite de ${MAX_CLES} clés atteinte` : undefined}
-          >
-            + Nouvelle clé
-          </Button>
-        </div>
 
-        {limiteAtteinte && (
-          <p className="mt-3 border-l-2 border-brand bg-tint px-4 py-2.5 text-xs text-ink">
-            Vous avez atteint la limite de {MAX_CLES} clés actives. Révoquez une clé existante pour en
-            créer une nouvelle.
-          </p>
-        )}
-
-        {/* Formulaire de création */}
-        {formOuvert && !limiteAtteinte && (
-          <div className="mt-4 border border-line bg-white p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex-1">
-                <Field
-                  label="Nom de la clé (optionnel)"
-                  id="nom-cle"
-                  placeholder="ex. Production, PharmaCore, Staging…"
-                  value={nouveauNom}
-                  maxLength={64}
-                  onChange={(e) => setNouveauNom(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void onCreer();
-                  }}
-                  hint="Un libellé pour reconnaître à quoi sert cette clé. Par défaut : « Default »."
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button size="md" onClick={() => void onCreer()} disabled={creation}>
-                  {creation ? "Création…" : "Créer la clé"}
-                </Button>
-                <Button
-                  size="md"
-                  variant="secondary"
-                  onClick={() => {
-                    setFormOuvert(false);
-                    setNouveauNom("");
-                  }}
-                  disabled={creation}
-                >
-                  Annuler
-                </Button>
+          {formOuvert && pasDeCle && (
+            <div className="mt-4 border border-line bg-white p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex-1">
+                  <Field
+                    label="Nom de la clé (optionnel)"
+                    id="nom-cle"
+                    placeholder="ex. Production, Staging…"
+                    value={nouveauNom}
+                    maxLength={64}
+                    onChange={(e) => setNouveauNom(e.target.value)}
+                    hint="Par défaut : « Default »."
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="md" onClick={() => void onCreer()} disabled={creation}>
+                    {creation ? "Création…" : "Créer la clé"}
+                  </Button>
+                  <Button
+                    size="md"
+                    variant="secondary"
+                    onClick={() => {
+                      setFormOuvert(false);
+                      setNouveauNom("");
+                    }}
+                    disabled={creation}
+                  >
+                    Annuler
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tableau */}
-        <div className="mt-4 border border-line bg-white">
-          {etat === "loading" && <div className="p-5 text-sm text-muted">Chargement…</div>}
-          {etat === "error" && (
-            <div className="p-5 text-sm text-danger">Impossible de charger vos clés.</div>
-          )}
-          {etat === "ok" && cles.length === 0 && (
-            <div className="p-6 text-center text-sm text-muted">
-              Vous n&apos;avez aucune clé active. Créez-en une avec « Nouvelle clé ».
-            </div>
-          )}
-          {etat === "ok" &&
-            cles.map((cle, i) => (
-              <div
-                key={cle.id}
-                className={cn(
-                  "flex flex-col gap-3 p-5 sm:flex-row sm:items-center",
-                  i !== 0 && "border-t border-line"
-                )}
-              >
-                {/* Nom + prefix */}
+          <div className="mt-4 border border-line bg-white">
+            {etat === "loading" && <LoadingBlock lines={2} />}
+            {etat === "error" && (
+              <div className="p-5 text-sm text-danger">Impossible de charger la clé.</div>
+            )}
+            {etat === "ok" && pasDeCle && !formOuvert && (
+              <div className="p-6 text-center text-sm text-muted">
+                Aucune clé active pour cette entreprise. Créez-en une avec le bouton ci-dessus.
+              </div>
+            )}
+            {etat === "ok" && cle && (
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
                 <div className="min-w-0 flex-1">
-                  {editionId === cle.id ? (
+                  {edition ? (
                     <div className="flex items-center gap-2">
                       <input
                         autoFocus
@@ -327,14 +354,14 @@ export default function ApiKeyPage() {
                         maxLength={64}
                         onChange={(e) => setEditionNom(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") void onRenommer(cle.id);
-                          if (e.key === "Escape") setEditionId(null);
+                          if (e.key === "Enter") void onRenommer();
+                          if (e.key === "Escape") setEdition(false);
                         }}
-                        className="h-9 w-48 border border-line bg-white px-2.5 text-sm text-ink outline-none focus:border-brand"
+                        className="h-9 w-48 border border-line bg-white px-2.5 text-sm outline-none focus:border-brand"
                       />
                       <button
                         type="button"
-                        onClick={() => void onRenommer(cle.id)}
+                        onClick={() => void onRenommer()}
                         disabled={action}
                         className="text-xs font-medium text-brand hover:underline"
                       >
@@ -342,7 +369,7 @@ export default function ApiKeyPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEditionId(null)}
+                        onClick={() => setEdition(false)}
                         className="text-xs text-muted hover:text-ink"
                       >
                         Annuler
@@ -350,13 +377,11 @@ export default function ApiKeyPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-display text-[15px] font-semibold text-ink">
-                        {cle.name}
-                      </span>
+                      <span className="font-display text-[15px] font-semibold text-ink">{cle.name}</span>
                       <button
                         type="button"
                         onClick={() => {
-                          setEditionId(cle.id);
+                          setEdition(true);
                           setEditionNom(cle.name);
                         }}
                         className="text-xs text-muted hover:text-brand"
@@ -365,47 +390,27 @@ export default function ApiKeyPage() {
                       </button>
                     </div>
                   )}
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <code className="truncate font-mono text-[13px] text-muted">{cle.prefix}</code>
-                    <button
-                      type="button"
-                      onClick={() => copier(cle.prefix, `p-${cle.id}`)}
-                      className="flex-none text-muted hover:text-brand"
-                      aria-label="Copier le Client-Id"
-                    >
-                      {copie === `p-${cle.id}` ? (
-                        <IconCheck className="h-3.5 w-3.5 text-ok" />
-                      ) : (
-                        <IconCopy className="h-3.5 w-3.5" />
-                      )}
-                    </button>
+                  <div className="mt-1 font-mono text-[12px] text-muted">
+                    Statut : <span className="text-ok">{cle.status}</span>
                   </div>
                 </div>
-
-                {/* Dates */}
-                <div className="flex flex-none gap-6 sm:gap-8">
+                <div className="flex gap-6">
                   <div>
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
-                      Créée
-                    </div>
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Créée</div>
                     <div className="mt-0.5 text-[13px] text-ink">{formatDate(cle.createdAt)}</div>
                   </div>
                   <div>
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-muted">
-                      Dernier usage
-                    </div>
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-muted">Dernier usage</div>
                     <div className="mt-0.5 text-[13px] text-ink">{formatDate(cle.lastUsedAt)}</div>
                   </div>
                 </div>
-
-                {/* Révocation */}
                 <div className="flex-none">
-                  {confirmRevoke === cle.id ? (
+                  {confirmRevoke ? (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted">Confirmer ?</span>
                       <button
                         type="button"
-                        onClick={() => void onRevoquer(cle.id)}
+                        onClick={() => void onRevoquer()}
                         disabled={action}
                         className="text-xs font-semibold text-danger hover:underline"
                       >
@@ -413,7 +418,7 @@ export default function ApiKeyPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setConfirmRevoke(null)}
+                        onClick={() => setConfirmRevoke(false)}
                         className="text-xs text-muted hover:text-ink"
                       >
                         Non
@@ -422,7 +427,7 @@ export default function ApiKeyPage() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setConfirmRevoke(cle.id)}
+                      onClick={() => setConfirmRevoke(true)}
                       className="border border-line px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:border-danger hover:bg-danger/5"
                     >
                       Révoquer
@@ -430,11 +435,11 @@ export default function ApiKeyPage() {
                   )}
                 </div>
               </div>
-            ))}
-        </div>
-      </section>
+            )}
+          </div>
+        </section>
+      )}
 
-      {/* Exemple d'utilisation */}
       <section className="mt-10">
         <h3 className="font-mono text-[12px] uppercase tracking-wider text-muted">
           Exemple d&apos;utilisation
@@ -444,11 +449,12 @@ export default function ApiKeyPage() {
         </CodeWindow>
         <div className="mt-4 border-l-2 border-brand bg-tint p-4 text-xs leading-relaxed text-ink">
           <span className="mb-1 block font-bold">Authentification machine-à-machine :</span>
-          Vos applications fournissent les en-têtes{" "}
-          <code className="bg-white/60 px-1 font-mono text-[11px]">X-BC-Client-Id</code> et{" "}
-          <code className="bg-white/60 px-1 font-mono text-[11px]">X-BC-Api-Key</code> à chaque requête.
-          Le secret n&apos;est visible qu&apos;au moment de la création d&apos;une clé — conservez-le
-          dans le coffre de votre application.
+          Vos applications fournissent{" "}
+          <code className="bg-white/60 px-1 font-mono text-[11px]">X-BC-Client-Id</code> (votre{" "}
+          <code className="font-mono text-[11px]">developerId</code>) et{" "}
+          <code className="bg-white/60 px-1 font-mono text-[11px]">X-BC-Api-Key</code> (secret de
+          l&apos;entreprise). Connectez-vous au moins une fois via{" "}
+          <code className="font-mono text-[11px]">POST /v1/auth/login</code> pour activer la clé.
         </div>
       </section>
     </div>

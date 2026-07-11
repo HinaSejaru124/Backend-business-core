@@ -12,7 +12,7 @@ Le frontend est composé de **deux espaces distincts**, séparés physiquement (
 | Espace | Chrome | Pages | Authentification |
 |---|---|---|---|
 | **Site vitrine** (public) | `Navbar` (marketing) + `Footer` | `/`, `/docs`, `/pricing`, `/login` | Aucune — navbar toujours identique : *Se connecter* / *Créer un compte* |
-| **Espace développeur** (`/console/*`) | Shell plein écran dédié (`app/console/layout.tsx`) : sidebar gauche fixe + barre supérieure | `/console`, `/console/docs`, `/console/pricing`, `/console/audit`, `/console/api-key` | Gardée en un seul point (`ConsoleLayout`) : session vérifiée auprès du backend (`GET /v1/auth/me`), jamais de localStorage lu directement par l'UI |
+| **Espace développeur** (`/console/*`) | Shell plein écran dédié (`app/console/layout.tsx`) : sidebar gauche fixe + barre supérieure | `/console`, `/console/businesses`, `/console/api-key`, `/console/docs`, `/console/pricing`, `/console/audit` | Gardée en un seul point (`ConsoleLayout`) : session vérifiée auprès du backend (`GET /v1/auth/me`), jamais de localStorage lu directement par l'UI |
 
 L'état d'authentification global vit dans `lib/auth-context.tsx` (`AuthProvider` / `useAuth`) — **source de vérité unique** consommée par la navbar, la console et toutes les gardes. Statuts : `loading` / `anon` / `authed`.
 
@@ -33,9 +33,11 @@ app/
     docs/page.tsx                 Documentation (vue développeur connecté)
     pricing/page.tsx               Activité réelle + plan (pas de quotas/prix inventés)
     audit/page.tsx                 Sélecteur d'entreprise réel + traces d'opération
-    api-key/page.tsx               Affichage des identifiants générés à l'inscription
+    api-key/page.tsx               Gestion des clés API par entreprise
+    businesses/page.tsx            Création et liste des entreprises
 
 components/
+  Feedback.tsx                  Bannières, états vides, skeletons, checklist onboarding
   SiteChrome.tsx                Bascule vitrine / app selon le pathname
   Navbar.tsx, Footer.tsx         Chrome vitrine (public uniquement)
   Button.tsx, Field.tsx, PasswordField.tsx   Primitives de formulaire
@@ -58,7 +60,12 @@ lib/
 |---|---|---|---|
 | `login()` | `POST /v1/auth/login` | `AuthController` | public |
 | `me()` | `GET /v1/auth/me` | `AuthController` | Bearer |
-| `requestApiKey()` | `POST /v1/registration` | `RegistrationController` → `RegistrationService` | public |
+| `registerDeveloper()` | `POST /v1/registration` | `RegistrationController` → `RegistrationService` | public |
+| `getDashboard()` | `GET /v1/dashboard` | `DashboardController` | Bearer |
+| `getPlans()` / `upgradePlan()` | `GET /v1/plans`, `POST /v1/plan/upgrade` | `PlanController` | public / Bearer |
+| `getBusinessApiKey()` etc. | `/v1/businesses/{id}/api-keys*` | `BusinessApiKeyController` | Bearer |
+| `createBusiness()` | `POST /v1/businesses` | `EntrepriseController` | Bearer |
+| `listBusinessTypeVersions()` | `GET /v1/business-types/{id}/versions` | `BusinessTypeController` | Bearer |
 | `listBusinessTypes()` | `GET /v1/business-types` | `BusinessTypeController` | Bearer |
 | `listBusinesses()` | `GET /v1/businesses` | `EntrepriseController` | Bearer |
 | `listTraces()` | `GET /v1/businesses/{id}/traces` | `TraceController` | Bearer |
@@ -82,9 +89,26 @@ Tous les endpoints affichés dans les pages Documentation (`lib/endpoints.ts`) s
 - Un seul point de vérification (`app/console/layout.tsx`) : `loading` → spinner ; `anon` → invite propre à se connecter (jamais de « faux » écran connecté avec un token périmé) ; `authed` → shell complet avec identité réelle (`principal`, `profil.owner`).
 - Purge automatique du token sur `401` (`apiFetch`), pour éliminer les sessions fantômes.
 
-### Inscription unifiée avec clé d'API réelle
-- Le formulaire d'inscription (`/login?tab=register`) appelle directement `POST /v1/registration` — un seul geste : compte kernel + clé Business Core (`clientId`, `apiKey`, `plan`), affichée **une seule fois**, conforme au comportement réel du backend (`RegistrationService`).
-- Le plan choisi sur `/pricing` est transmis via `?plan=` jusqu'au formulaire d'inscription.
+### Inscription alignée sur le backend post-merge (develop2)
+- `POST /v1/registration` renvoie `{ plan, message }` — **aucune clé API** à l'inscription.
+- Le formulaire affiche une checklist de démarrage (email → connexion → entreprise → clé).
+- Erreur 409 (email dupliqué) gérée explicitement.
+
+### Clés API scopées par entreprise
+- Routes `/v1/businesses/{businessId}/api-keys` (une clé active par entreprise).
+- `X-BC-Client-Id` = `developerId` stable (`GET /v1/auth/me`).
+- Page `/console/api-key` : sélecteur d'entreprise, création/révocation/renommage.
+
+### Dashboard enrichi
+- `GET /v1/dashboard` : `nombreEntreprises`, `nombreClesActives`, `topOperations`, `topEntreprises`, `activiteRecente`.
+- Widget parcours de démarrage sur le tableau de bord.
+
+### Création d'entreprise depuis l'UI
+- Page `/console/businesses` : liste + formulaire `POST /v1/businesses` (owner uniquement).
+
+### Retours visuels partagés (`components/Feedback.tsx`)
+- `Banner`, `EmptyState`, `LoadingBlock`, `OnboardingSteps`.
+- Bannière session expirée dans `console/layout.tsx`.
 
 ### Documentation corrigée pour correspondre exactement au contrat backend
 - L'exemple curl de `POST /v1/registration` utilisait un champ `nom` inexistant et omettait `firstName`/`lastName`/`password` (pourtant `@NotBlank` dans `RegistrationRequest.java`) → corrigé sur `/docs` et `/console/docs`.
@@ -111,10 +135,8 @@ Tous les endpoints affichés dans les pages Documentation (`lib/endpoints.ts`) s
 
 Ces points ne sont **pas des bugs frontend** — ce sont des fonctionnalités backend qui n'existent pas encore. Le frontend ne les invente pas ; il les documente honnêtement ou masque l'UI correspondante :
 
-1. **Régénération de clé d'API pour un compte déjà connecté** : aucune route backend ne le permet. La seule route (`POST /v1/registration`) crée compte + clé en un seul geste.
-2. **Consommation/quotas détaillés par plan** : aucun endpoint de métriques n'existe. `/console/pricing` affiche uniquement des compteurs réels (types, entreprises, traces), pas de quotas.
-3. **Lecture du plan courant d'un compte déjà inscrit** : aucun endpoint `GET` ne renvoie le plan associé à un compte. Le plan n'est connu que juste après l'inscription (réponse de `POST /v1/registration`), et stocké côté navigateur (`localStorage`) — invisible depuis un autre appareil/navigateur.
-4. **Provisionnement Kernel réel par plan** (quotas, accès différencié) : port `ProvisionnerAccesDev` stubé côté backend, non implémenté, non appelé.
+1. **Création de type métier depuis l'UI** : uniquement via API (`POST /v1/business-types`).
+2. **Provisionnement Kernel réel par plan** (quotas différenciés côté Kernel) : port stub côté backend.
 
 ---
 

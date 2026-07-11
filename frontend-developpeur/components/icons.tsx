@@ -148,6 +148,14 @@ export function IconEyeOff(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function IconBuilding(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} {...p}>
+      <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
+    </svg>
+  );
+}
+
 export function IconLogout(p: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(p)}>

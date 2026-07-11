@@ -6,7 +6,8 @@ import Field from "@/components/Field";
 import PasswordField from "@/components/PasswordField";
 import CodeWindow from "@/components/CodeWindow";
 import { Button } from "@/components/Button";
-import { login, requestApiKey, ApiError, type ApiKeyResponse } from "@/lib/api";
+import { Banner, OnboardingSteps } from "@/components/Feedback";
+import { login, registerDeveloper, ApiError, type InscriptionResponse } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/cn";
 import { IconCheck } from "@/components/icons";
@@ -20,9 +21,15 @@ const SNIP_REQ = `POST /v1/registration
   "password":  "••••••",
   "planCode":  "PRO" }`;
 const SNIP_RES = `→ 201 Created
-{ "clientId": "bck_m9sA2b...",
-  "apiKey":   "aBcDeF123...",
-  "plan":     "PRO" }`;
+{ "plan":    "PRO",
+  "message": "Compte créé. Vérifiez votre email…" }`;
+
+const POST_REGISTER_STEPS = [
+  { label: "Vérifier votre e-mail de confirmation", done: false },
+  { label: "Se connecter avec votre compte", done: false, href: undefined },
+  { label: "Créer une entreprise", done: false, href: "/console/businesses" },
+  { label: "Générer une clé API pour cette entreprise", done: false, href: "/console/api-key" },
+];
 
 function LoginFormContent() {
   const router = useRouter();
@@ -36,18 +43,15 @@ function LoginFormContent() {
   const initialPlan = ["FREE", "PRO", "ENTERPRISE"].includes(planParam) ? planParam : "FREE";
   const [selectedPlan, setSelectedPlan] = useState(initialPlan);
 
-  // Déjà connecté ? Cette page n'a pas de sens : direction la console.
   useEffect(() => {
     if (auth.status === "authed") router.replace("/console");
   }, [auth.status, router]);
 
-  // Connexion (réelle → /v1/auth/login)
   const [principal, setPrincipal] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Inscription (réelle → /v1/registration)
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -56,18 +60,7 @@ function LoginFormContent() {
   const [accept, setAccept] = useState(false);
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
-  const [regSuccess, setRegSuccess] = useState<string | null>(null);
-  const [regSuccessData, setRegSuccessData] = useState<ApiKeyResponse | null>(null);
-  const [copiedKey, setCopiedKey] = useState(false);
-  const [copiedId, setCopiedId] = useState(false);
-
-  async function copyToClipboard(text: string, setCopied: (v: boolean) => void) {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1400);
-    } catch { }
-  }
+  const [regSuccess, setRegSuccess] = useState<InscriptionResponse | null>(null);
 
   async function onLogin(e: FormEvent) {
     e.preventDefault();
@@ -75,7 +68,7 @@ function LoginFormContent() {
     setLoading(true);
     try {
       await login(principal, password);
-      await auth.refresh(); // met à jour l'état global (navbar, console) AVANT la redirection
+      await auth.refresh();
       router.push("/console");
     } catch (err) {
       setError(
@@ -92,36 +85,31 @@ function LoginFormContent() {
     e.preventDefault();
     setRegError(null);
     setRegSuccess(null);
-    setRegSuccessData(null);
     if (regPassword !== regConfirm) {
       setRegError("Les mots de passe ne correspondent pas.");
       return;
     }
     setRegLoading(true);
     try {
-      const res = await requestApiKey(firstName, lastName, email, regPassword, selectedPlan);
-      setRegSuccessData(res);
-      setRegSuccess("Information de clé d'API générée avec succès.");
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("bc_client_id", res.clientId);
-        window.localStorage.setItem("bc_api_key", res.apiKey);
-        window.localStorage.setItem("bc_plan", res.plan);
-      }
+      const res = await registerDeveloper(firstName, lastName, email, regPassword, selectedPlan);
+      setRegSuccess(res);
     } catch (err) {
-      setRegError(
-        err instanceof ApiError
-          ? err.detail || err.title
-          : "Inscription impossible — vérifiez que le backend est démarré."
-      );
+      if (err instanceof ApiError && err.status === 409) {
+        setRegError("Cet e-mail est déjà utilisé. Connectez-vous ou utilisez une autre adresse.");
+      } else {
+        setRegError(
+          err instanceof ApiError
+            ? err.detail || err.title
+            : "Inscription impossible — vérifiez que le backend est démarré."
+        );
+      }
     } finally {
       setRegLoading(false);
     }
   }
 
-
   return (
     <div className="grid h-[calc(100vh-4rem)] overflow-hidden lg:grid-cols-2">
-      {/* ── Présentation (GAUCHE) — hauteur figée, ne bouge jamais ── */}
       <div className="relative order-2 hidden overflow-hidden bg-ink lg:order-1 lg:block">
         <div className="code-photo absolute inset-0 opacity-25" aria-hidden />
         <div className="absolute inset-0 bg-gradient-to-br from-ink/95 to-ink/75" aria-hidden />
@@ -152,10 +140,8 @@ function LoginFormContent() {
         </div>
       </div>
 
-      {/* ── Formulaire (DROITE) — cadre figé ; seul le contenu du formulaire défile si besoin ── */}
       <div className="order-1 flex h-full items-center justify-center overflow-hidden border-b border-line px-6 py-6 lg:order-2 lg:border-b-0 lg:border-l">
         <div className="flex max-h-full w-full max-w-sm flex-col">
-          {/* Onglets FIXES — ne bougent jamais, quel que soit le formulaire actif */}
           <div className="flex flex-none border border-line">
             {(
               [
@@ -180,7 +166,6 @@ function LoginFormContent() {
             ))}
           </div>
 
-          {/* Seul le formulaire change (animé) — défile en interne si trop grand, le cadre autour ne bouge pas */}
           <div key={tab} className="mt-6 min-h-0 flex-1 animate-fade-up overflow-y-auto pr-1">
             {tab === "login" ? (
               <form onSubmit={onLogin} className="space-y-5">
@@ -207,9 +192,7 @@ function LoginFormContent() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-                {error && (
-                  <p className="border-l-2 border-danger bg-danger/5 px-3 py-2 text-sm text-danger">{error}</p>
-                )}
+                {error && <Banner variant="error">{error}</Banner>}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Connexion…" : "Se connecter"}
                 </Button>
@@ -222,66 +205,35 @@ function LoginFormContent() {
                 <div>
                   <h1 className="font-display text-xl font-bold text-ink">Créer un compte.</h1>
                   <p className="mt-1 text-sm text-muted">
-                    Obtenez votre clé d&apos;API Business Core et créez votre compte développeur.
+                    Créez votre compte développeur Business Core. La clé API sera générée après
+                    connexion, pour chaque entreprise.
                   </p>
                 </div>
 
-                {regSuccessData ? (
-                  <div className="border border-line bg-white p-6 space-y-4">
+                {regSuccess ? (
+                  <div className="space-y-4 border border-line bg-white p-6">
                     <div className="flex flex-col items-center text-center">
                       <IconCheck className="h-8 w-8 text-brand" />
-                      <h2 className="mt-2 font-display text-xl font-bold text-ink">Compte et Clé créés</h2>
+                      <h2 className="mt-2 font-display text-xl font-bold text-ink">Compte créé</h2>
                       <p className="mt-1 text-xs text-muted">
-                        Votre clé d&apos;API ne sera affichée <strong>qu&apos;une seule fois</strong>. Veuillez la sauvegarder.
+                        Plan <strong>{regSuccess.plan}</strong>
                       </p>
                     </div>
 
-                    <div className="space-y-3 pt-2 text-left">
-                      <div>
-                        <div className="text-[11px] font-medium uppercase tracking-wider text-muted font-mono">Client ID</div>
-                        <div className="mt-1 flex items-center justify-between border border-line bg-subtle p-2">
-                          <code className="truncate font-mono text-xs text-ink">{regSuccessData.clientId}</code>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(regSuccessData.clientId, setCopiedId)}
-                            className="text-xs text-brand hover:underline pl-2 font-medium"
-                          >
-                            {copiedId ? "Copié !" : "Copier"}
-                          </button>
-                        </div>
-                      </div>
+                    <Banner variant="info">{regSuccess.message}</Banner>
 
-                      <div>
-                        <div className="text-[11px] font-medium uppercase tracking-wider text-muted font-mono">Clé d&apos;API</div>
-                        <div className="mt-1 flex items-center justify-between border border-line bg-subtle p-2">
-                          <code className="truncate font-mono text-xs text-brand font-semibold">{regSuccessData.apiKey}</code>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(regSuccessData.apiKey, setCopiedKey)}
-                            className="text-xs text-brand hover:underline pl-2 font-medium"
-                          >
-                            {copiedKey ? "Copié !" : "Copier"}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[11px] font-medium uppercase tracking-wider text-muted font-mono">Plan de démarrage</div>
-                        <div className="mt-1 font-mono text-xs text-ink font-semibold">{regSuccessData.plan}</div>
-                      </div>
-                    </div>
+                    <OnboardingSteps steps={POST_REGISTER_STEPS} title="Prochaines étapes" />
 
                     <Button
                       type="button"
-                      className="mt-4 w-full"
+                      className="w-full"
                       onClick={() => {
                         setTab("login");
                         setPrincipal(email);
-                        setRegSuccessData(null);
                         setRegSuccess(null);
                       }}
                     >
-                      Se connecter maintenant
+                      Aller à la connexion
                     </Button>
                   </div>
                 ) : (
@@ -315,7 +267,7 @@ function LoginFormContent() {
                       required
                     />
                     <label className="block">
-                      <span className="mb-1.5 block text-[13px] font-medium text-ink">Plan initial de clé d&apos;API</span>
+                      <span className="mb-1.5 block text-[13px] font-medium text-ink">Plan initial</span>
                       <select
                         value={selectedPlan}
                         onChange={(e) => setSelectedPlan(e.target.value)}
@@ -357,11 +309,7 @@ function LoginFormContent() {
                         J&apos;accepte les conditions d&apos;utilisation et la politique de confidentialité.
                       </span>
                     </label>
-                    {regError && (
-                      <p className="border-l-2 border-danger bg-danger/5 px-3 py-2 text-sm text-danger">
-                        {regError}
-                      </p>
-                    )}
+                    {regError && <Banner variant="error">{regError}</Banner>}
                     <Button type="submit" className="w-full" disabled={!accept || regLoading}>
                       {regLoading ? "Création…" : "Créer mon compte"}
                     </Button>

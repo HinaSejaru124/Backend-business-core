@@ -7,7 +7,7 @@ import { ENDPOINTS } from "@/lib/endpoints";
 import { cn } from "@/lib/cn";
 
 const CODE_BEARER = `curl $API/v1/business-types \\
-  -H "X-BC-Client-Id: <clientId>" \\
+  -H "X-BC-Client-Id: <developerId>" \\
   -H "X-BC-Api-Key: <apiKey>"`;
 
 const CODE_ERROR = `HTTP/1.1 422 Unprocessable Entity
@@ -41,8 +41,10 @@ export default function ConsoleDocsPage() {
 
                     <h2 className="mt-12 font-display text-xl font-semibold text-ink">Démarrage rapide</h2>
                     <p className="mt-3 text-sm leading-relaxed text-body">
-                        Configurez votre clé d&apos;API obtenue lors de l&apos;inscription (visible dans{" "}
-                        <span className="font-medium text-ink">Clé d&apos;API</span>) et utilisez-la pour vos premiers appels.
+                        Après inscription et connexion, créez une entreprise puis générez sa clé API dans{" "}
+                        <span className="font-medium text-ink">Clés d&apos;API</span>. Utilisez votre{" "}
+                        <code className="font-mono text-[13px]">developerId</code> (GET /v1/auth/me) comme{" "}
+                        <code className="font-mono text-[13px]">X-BC-Client-Id</code>.
                     </p>
                     <CodeWindow className="mt-5" filename="appel-api.sh" lang="bash" copyText={CODE_BEARER}>
                         {CODE_BEARER}
@@ -55,9 +57,13 @@ export default function ConsoleDocsPage() {
                         Chaque appel à l&apos;API Business Core doit inclure deux en-têtes obligatoires :
                     </p>
                     <ul className="mt-3 space-y-2 text-sm text-body pl-5 list-disc">
-                        <li><code className="bg-subtle px-1 font-mono text-[13px] text-ink">X-BC-Client-Id</code> : L&apos;identifiant de votre tenant développeur.</li>
-                        <li><code className="bg-subtle px-1 font-mono text-[13px] text-ink">X-BC-Api-Key</code> : Votre clé d&apos;API secrète générée à l&apos;inscription.</li>
+                        <li><code className="bg-subtle px-1 font-mono text-[13px] text-ink">X-BC-Client-Id</code> : Votre identifiant développeur stable (<code className="font-mono text-[13px]">developerId</code> via GET /v1/auth/me).</li>
+                        <li><code className="bg-subtle px-1 font-mono text-[13px] text-ink">X-BC-Api-Key</code> : Le secret de la clé API d&apos;une entreprise (généré via POST /v1/businesses/&#123;id&#125;/api-keys).</li>
                     </ul>
+                    <p className="mt-3 text-sm text-muted">
+                        La console utilise un JWT (<code className="font-mono text-[13px]">Authorization: Bearer</code>) ;
+                        les applications externes utilisent les en-têtes ci-dessus.
+                    </p>
                 </section>
 
                 <section id="reference" className="mt-14 scroll-mt-24">

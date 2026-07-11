@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/Button";
+import { EmptyState, LoadingBlock } from "@/components/Feedback";
 import {
   listBusinesses,
   listTraces,
@@ -82,11 +83,12 @@ export default function ConsoleAuditPage() {
         )}
 
         {businesses && businesses.length === 0 && (
-          <div className="border border-dashed border-line bg-white p-6 text-sm text-muted">
-            Aucune entreprise sur votre tenant pour l&apos;instant — il n&apos;y a donc pas encore de traces.
-            Créez une entreprise via l&apos;API (<code className="font-mono text-[12px]">POST /v1/businesses</code>),
-            exécutez une opération, puis revenez ici.
-          </div>
+          <EmptyState
+            title="Aucune entreprise"
+            description="Créez une entreprise, exécutez une opération, puis revenez consulter les traces d'audit."
+            actionHref="/console/businesses"
+            actionLabel="Créer une entreprise →"
+          />
         )}
 
         {businesses && businesses.length > 0 && (
@@ -111,7 +113,7 @@ export default function ConsoleAuditPage() {
           </div>
         )}
 
-        {!businesses && !bizError && <p className="text-sm text-muted">Chargement de vos entreprises…</p>}
+        {!businesses && !bizError && <LoadingBlock lines={1} />}
       </div>
 
       {error && (

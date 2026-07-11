@@ -5,14 +5,14 @@ import DocsNav from "@/components/DocsNav";
 import { ENDPOINTS } from "@/lib/endpoints";
 import { cn } from "@/lib/cn";
 
-const CODE_KEY = `# 1. Créer votre compte développeur et obtenir votre clé d'API (une seule fois)
+const CODE_KEY = `# 1. Créer votre compte développeur (pas de clé API à l'inscription)
 curl -X POST $API/v1/registration \\
   -H "Content-Type: application/json" \\
   -d '{ "firstName": "Miguel", "lastName": "Techlan",
         "email": "dev@exemple.com", "password": "••••••",
         "planCode": "FREE" }'
 
-# → { "clientId": "bck_...", "apiKey": "...", "plan": "FREE" }`;
+# → { "plan": "FREE", "message": "Compte créé. Vérifiez votre email…" }`;
 
 const CODE_LOGIN = `# 2. Vérifiez votre e-mail (lien envoyé par le Kernel), puis connectez-vous
 curl -X POST $API/v1/auth/login \\
@@ -22,7 +22,8 @@ curl -X POST $API/v1/auth/login \\
 # → { "accessToken": "eyJ...", "expiresInSeconds": 900, "owner": true }`;
 
 const CODE_BEARER = `curl $API/v1/business-types \\
-  -H "Authorization: Bearer <accessToken>"`;
+  -H "X-BC-Client-Id: <developerId>" \\
+  -H "X-BC-Api-Key: <apiKey>"`;
 
 const CODE_ERROR = `HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
@@ -54,8 +55,9 @@ export default function DocsPage() {
 
           <h2 className="mt-12 font-display text-xl font-semibold text-ink">Démarrage rapide</h2>
           <p className="mt-3 text-sm leading-relaxed text-body">
-            Récupérez votre clé d&apos;API, puis effectuez votre premier appel. La base d&apos;URL est
-            configurable via <code className="bg-subtle px-1 font-mono text-[13px] text-ink">NEXT_PUBLIC_API_BASE_URL</code>.
+            Créez votre compte, connectez-vous, instanciez une entreprise puis générez une clé API pour
+            celle-ci. La base d&apos;URL est configurable via{" "}
+            <code className="bg-subtle px-1 font-mono text-[13px] text-ink">NEXT_PUBLIC_API_BASE_URL</code>.
           </p>
           <CodeWindow className="mt-5" filename="obtenir-cle.sh" lang="bash" copyText={CODE_KEY}>
             {CODE_KEY}
@@ -65,9 +67,14 @@ export default function DocsPage() {
         <section id="authentification" className="mt-14 scroll-mt-24">
           <h2 className="font-display text-xl font-semibold text-ink">Authentification</h2>
           <p className="mt-3 text-sm leading-relaxed text-body">
-            La connexion est <strong>déléguée au Kernel</strong>. Vous obtenez un JWT que vous rejouez en
-            en-tête <code className="bg-subtle px-1 font-mono text-[13px] text-ink">Authorization: Bearer</code> sur
-            les appels protégés. Le token expire (~15 min) ; reconnectez-vous alors.
+            La console développeur utilise un <strong>JWT</strong> (
+            <code className="bg-subtle px-1 font-mono text-[13px] text-ink">Authorization: Bearer</code>
+            ). Les appels machine-à-machine utilisent{" "}
+            <code className="bg-subtle px-1 font-mono text-[13px] text-ink">X-BC-Client-Id</code> (votre{" "}
+            <code className="font-mono text-[13px]">developerId</code> via{" "}
+            <code className="font-mono text-[13px]">GET /v1/auth/me</code>) et{" "}
+            <code className="bg-subtle px-1 font-mono text-[13px] text-ink">X-BC-Api-Key</code> (secret
+            scopé à une entreprise).
           </p>
           <CodeWindow className="mt-5" filename="login.sh" lang="bash" copyText={CODE_LOGIN}>
             {CODE_LOGIN}

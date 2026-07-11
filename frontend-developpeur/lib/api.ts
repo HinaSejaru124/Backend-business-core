@@ -70,9 +70,6 @@ export async function apiFetch<T>(
   }
   const res = await fetch(`${API_BASE}${path}`, { ...rest, body, headers: h });
   if (res.status === 401 && auth) {
-    // Token expiré/invalide : on purge la session locale ET on prévient l'app (AuthProvider)
-    // pour que l'état affiché (navbar, garde console) ne reste pas figé sur "connecté" alors
-    // que le token réel est mort — sinon l'UI ment jusqu'au prochain rechargement complet.
     clearToken();
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("bc:session-expired"));
@@ -107,9 +104,13 @@ export type Me = {
   actorId: string | null;
   permissions: string[];
   owner: boolean;
+  /** Identifiant développeur BC stable — valeur de X-BC-Client-Id. */
+  developerId: string;
+  email: string;
+  plan: string;
 };
 
-// ─── Appels ───────────────────────────────────────────────────────────────
+// ─── Appels auth ──────────────────────────────────────────────────────────
 
 /** POST /v1/auth/login — connexion (public). Stocke le token + l'identité en cas de succès. */
 export async function login(principal: string, password: string): Promise<LoginResult> {
@@ -132,111 +133,115 @@ export function logout(): void {
   clearToken();
 }
 
-// ─── Clé d'API (inscription développeur = création de compte + émission de clé) ─
-// Le backend expose aussi POST /v1/auth/register (compte kernel seul, sans clé) ;
-// le frontend utilise exclusivement le flux unifié ci-dessous (POST /v1/registration).
+// ─── Inscription développeur ──────────────────────────────────────────────
+// POST /v1/registration crée le compte kernel + compte développeur local.
+// Aucune clé API n'est émise : le développeur se connecte, crée une entreprise,
+// puis génère une clé scopée à cette entreprise.
 
-export type ApiKeyResponse = {
-  clientId: string;
-  apiKey: string;
+export type InscriptionResponse = {
   plan: string;
+  message: string;
 };
 
-/** POST /v1/registration — émet une clé Business Core (affichée une seule fois). Public. */
-export function requestApiKey(
+/** POST /v1/registration — crée un compte développeur (public). */
+export function registerDeveloper(
   firstName: string,
   lastName: string,
   email: string,
   password: string,
   planCode?: string
-): Promise<ApiKeyResponse> {
-  return apiFetch<ApiKeyResponse>("/v1/registration", {
+): Promise<InscriptionResponse> {
+  return apiFetch<InscriptionResponse>("/v1/registration", {
     method: "POST",
     auth: false,
     body: JSON.stringify({ firstName, lastName, email, password, planCode }),
   });
 }
 
-// ─── Gestion multi-clés (console développeur, JWT) ──────────────────────────
-// Chaque appel est authentifié par le Bearer JWT du développeur connecté ; le
-// backend (ResoudreDeveloppeurCourant) résout SON compte à partir du token, si
-// bien que chaque développeur ne voit et ne gère QUE ses propres clés. Aucune
-// isolation à faire côté frontend — elle est garantie côté serveur.
+// ─── Clés API par entreprise (console développeur, JWT) ─────────────────────
+// Une seule clé ACTIVE par entreprise. X-BC-Client-Id = developerId (GET /v1/auth/me).
 
-/** Une clé API telle que listée par le backend (jamais le secret). */
-export type ApiKey = {
+/** Clé API d'une entreprise (jamais le secret). */
+export type BusinessApiKey = {
   id: string;
-  /** Préfixe public = `X-BC-Client-Id`. */
-  prefix: string;
   name: string;
   status: "ACTIVE" | "REVOKED";
   createdAt: string | null;
   lastUsedAt: string | null;
+  entrepriseId: string;
 };
 
 /** Clé fraîchement créée — le secret (`apiKey`) n'est renvoyé qu'ici, une seule fois. */
-export type ApiKeyCreated = {
+export type BusinessApiKeyCreated = {
   id: string;
-  clientId: string;
   apiKey: string;
   name: string;
+  entrepriseId: string;
 };
 
-/** GET /v1/api-keys — clés ACTIVE du développeur courant (Bearer). */
-export function listApiKeys(): Promise<ApiKey[]> {
-  return apiFetch<ApiKey[]>("/v1/api-keys");
+/** GET /v1/businesses/{businessId}/api-keys — clé de l'entreprise (Bearer). */
+export function getBusinessApiKey(businessId: string): Promise<BusinessApiKey> {
+  return apiFetch<BusinessApiKey>(`/v1/businesses/${encodeURIComponent(businessId)}/api-keys`);
 }
 
-/** POST /v1/api-keys — crée une clé. Le secret n'est présent que dans cette réponse. */
-export function createApiKey(name?: string): Promise<ApiKeyCreated> {
-  return apiFetch<ApiKeyCreated>("/v1/api-keys", {
+/** POST /v1/businesses/{businessId}/api-keys — crée une clé. Secret affiché une seule fois. */
+export function createBusinessApiKey(businessId: string, name?: string): Promise<BusinessApiKeyCreated> {
+  return apiFetch<BusinessApiKeyCreated>(`/v1/businesses/${encodeURIComponent(businessId)}/api-keys`, {
     method: "POST",
     body: JSON.stringify({ name: name && name.trim() ? name.trim() : null }),
   });
 }
 
-/** PATCH /v1/api-keys/{id} — renomme une clé. */
-export function renameApiKey(id: string, name: string): Promise<ApiKey> {
-  return apiFetch<ApiKey>(`/v1/api-keys/${encodeURIComponent(id)}`, {
+/** PATCH /v1/businesses/{businessId}/api-keys — renomme la clé active. */
+export function renameBusinessApiKey(businessId: string, name: string): Promise<BusinessApiKey> {
+  return apiFetch<BusinessApiKey>(`/v1/businesses/${encodeURIComponent(businessId)}/api-keys`, {
     method: "PATCH",
     body: JSON.stringify({ name }),
   });
 }
 
-/** POST /v1/api-keys/{id}:revoke — révocation immédiate d'une clé. */
-export function revokeApiKey(id: string): Promise<ApiKey> {
-  return apiFetch<ApiKey>(`/v1/api-keys/${encodeURIComponent(id)}:revoke`, {
-    method: "POST",
-  });
+/** POST /v1/businesses/{businessId}/api-keys:revoke — révocation immédiate. */
+export function revokeBusinessApiKey(businessId: string): Promise<BusinessApiKey> {
+  return apiFetch<BusinessApiKey>(
+    `/v1/businesses/${encodeURIComponent(businessId)}/api-keys:revoke`,
+    { method: "POST" }
+  );
 }
 
 // ─── Tableau de bord d'usage (console développeur, JWT) ─────────────────────
-// Alimenté par le comptage réel des requêtes authentifiées par clé API
-// (UsageTrackingWebFilter → Redis → api_key_usage_daily). Zéro tant qu'aucune
-// requête n'a été faite — c'est réel, pas simulé.
 
 export type UsagePoint = { jour: string; total: number };
 
+export type TopOperation = { nom: string; total: number };
+
+export type TopEntreprise = { entrepriseId: string; nom: string; total: number };
+
+export type ActiviteItem = {
+  entrepriseId: string;
+  entrepriseNom: string;
+  operationNom: string;
+  statut: string;
+  creeLe: string;
+};
+
 export type Dashboard = {
-  /** Plan tarifaire courant (FREE / PRO / ENTERPRISE). */
   plan: string;
-  /** Quota mensuel de requêtes (-1 = illimité). */
   quotaMensuel: number;
-  /** Requêtes restantes ce mois (-1 = illimité). */
   requetesRestantes: number;
-  /** Quota atteint : le compte est bloqué en clé API jusqu'à l'upgrade. */
   bloque: boolean;
   requetesCeMois: number;
   requetesAujourdhui: number;
   erreursAujourdhui: number;
-  /** Taux d'erreur du jour, 0–1. */
   tauxErreur: number;
-  /** 30 derniers jours, du plus ancien au plus récent. */
   sparkline: UsagePoint[];
-  cles: ApiKey[];
+  nombreEntreprises: number;
+  nombreClesActives: number;
+  topOperations: TopOperation[];
+  topEntreprises: TopEntreprise[];
+  activiteRecente: ActiviteItem[];
 };
 
-/** GET /v1/dashboard — synthèse d'usage (30 j) + plan/quota + clés du développeur courant (Bearer). */
+/** GET /v1/dashboard — synthèse d'usage + métriques agrégées (Bearer). */
 export function getDashboard(): Promise<Dashboard> {
   return apiFetch<Dashboard>("/v1/dashboard");
 }
@@ -245,10 +250,8 @@ export function getDashboard(): Promise<Dashboard> {
 
 export type Plan = {
   code: string;
-  /** Quota mensuel (-1 = illimité). */
   quotaMensuel: number;
   illimite: boolean;
-  /** Prix d'affichage (le paiement réel est géré par Kernel Core). */
   prixMensuel: number;
   devise: string;
 };
@@ -260,13 +263,12 @@ export function getPlans(): Promise<Plan[]> {
 
 export type UpgradeResult = {
   plan: string;
-  /** CONFIRME = plan actif tout de suite ; EN_ATTENTE = paiement à finaliser. */
   statut: "CONFIRME" | "EN_ATTENTE";
   urlPaiement: string | null;
   reference: string | null;
 };
 
-/** POST /v1/plan/upgrade — change de plan (paiement via Kernel Core, simulé pour l'instant). Bearer. */
+/** POST /v1/plan/upgrade — change de plan (Bearer). */
 export function upgradePlan(targetPlan: string): Promise<UpgradeResult> {
   return apiFetch<UpgradeResult>("/v1/plan/upgrade", {
     method: "POST",
@@ -274,8 +276,7 @@ export function upgradePlan(targetPlan: string): Promise<UpgradeResult> {
   });
 }
 
-
-// ─── Types métier & Entreprises (données réelles du tenant) ─────────────────
+// ─── Types métier & Entreprises ─────────────────────────────────────────────
 
 export type BusinessType = {
   id: string;
@@ -289,6 +290,22 @@ export function listBusinessTypes(): Promise<BusinessType[]> {
   return apiFetch<BusinessType[]>("/v1/business-types");
 }
 
+export type BusinessTypeVersion = {
+  id: string;
+  typeMetierId: string;
+  numero: number;
+  immuable: boolean;
+  publieeLe: string | null;
+  libelle: string;
+};
+
+/** GET /v1/business-types/{typeId}/versions — versions d'un type (Bearer). */
+export function listBusinessTypeVersions(typeId: string): Promise<BusinessTypeVersion[]> {
+  return apiFetch<BusinessTypeVersion[]>(
+    `/v1/business-types/${encodeURIComponent(typeId)}/versions`
+  );
+}
+
 export type Business = {
   id: string;
   nom: string;
@@ -298,12 +315,26 @@ export type Business = {
   cycleVie: string;
 };
 
+export type CreateBusinessRequest = {
+  typeId: string;
+  versionNumber: number;
+  nom: string;
+};
+
 /** GET /v1/businesses — entreprises du tenant courant (Bearer). */
 export function listBusinesses(): Promise<Business[]> {
   return apiFetch<Business[]>("/v1/businesses");
 }
 
-// ─── Traces d'opération (Audit) ──────────────────────────────────────────────
+/** POST /v1/businesses — crée une entreprise (Bearer). */
+export function createBusiness(req: CreateBusinessRequest): Promise<Business> {
+  return apiFetch<Business>("/v1/businesses", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+// ─── Traces d'opération (Audit) ─────────────────────────────────────────────
 
 export type StatutTrace = "EN_COURS" | "COMPLETEE" | "COMPENSEE";
 

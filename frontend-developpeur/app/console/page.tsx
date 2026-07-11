@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
+import { LoadingBlock, OnboardingSteps } from "@/components/Feedback";
 import { useAuth } from "@/lib/auth-context";
 import {
   listBusinessTypes,
@@ -12,12 +13,11 @@ import {
   type Business,
   type Dashboard,
 } from "@/lib/api";
-import { IconArrowRight, IconKey, IconActivity, IconBook, IconBolt } from "@/components/icons";
+import { IconArrowRight, IconKey, IconActivity, IconBook, IconBolt, IconBuilding, IconCopy, IconCheck } from "@/components/icons";
 import { cn } from "@/lib/cn";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
 
-/** Mini-courbe d'usage (30 jours) en barres — sans dépendance externe. */
 function Sparkline({ points }: { points: { jour: string; total: number }[] }) {
   const max = Math.max(1, ...points.map((p) => p.total));
   return (
@@ -34,9 +34,29 @@ function Sparkline({ points }: { points: { jour: string; total: number }[] }) {
   );
 }
 
+function BarChart({ items, labelKey }: { items: { [k: string]: string | number }[]; labelKey: string }) {
+  const max = Math.max(1, ...items.map((i) => Number(i.total)));
+  return (
+    <div className="space-y-2">
+      {items.map((item) => (
+        <div key={String(item[labelKey])} className="flex items-center gap-3">
+          <span className="w-28 truncate text-sm text-ink">{String(item[labelKey])}</span>
+          <div className="h-2 flex-1 bg-subtle">
+            <div
+              className="h-full bg-brand"
+              style={{ width: `${(Number(item.total) / max) * 100}%` }}
+            />
+          </div>
+          <span className="w-12 text-right font-mono text-[12px] text-muted">{Number(item.total)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatutBadge({ value }: { value: string }) {
   const style =
-    value === "PUBLIE" || value === "ACTIVE"
+    value === "PUBLIE" || value === "ACTIVE" || value === "COMPLETEE"
       ? "text-ok border-ok/30 bg-ok/5"
       : value === "ARCHIVE" || value === "FERMEE"
         ? "text-muted border-line bg-subtle"
@@ -44,6 +64,30 @@ function StatutBadge({ value }: { value: string }) {
   return (
     <span className={cn("inline-block border px-2 py-0.5 font-mono text-[11px]", style)}>{value}</span>
   );
+}
+
+function CopyableId({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  function copier() {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    });
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <span className="truncate font-mono text-sm text-ink">{value}</span>
+      <button type="button" onClick={copier} className="flex-none text-muted hover:text-brand" aria-label="Copier">
+        {copied ? <IconCheck className="h-3.5 w-3.5 text-ok" /> : <IconCopy className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+}
+
+function fmtInstant(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function ConsoleDashboard() {
@@ -64,9 +108,23 @@ export default function ConsoleDashboard() {
       .catch(() => setUsage({ state: "error", data: null }));
   }, []);
 
+  const dash = usage.data;
+  const onboardingSteps = [
+    { label: "Compte créé et connecté", done: true },
+    {
+      label: "Au moins une entreprise",
+      done: (dash?.nombreEntreprises ?? 0) > 0 || businesses.data.length > 0,
+      href: "/console/businesses",
+    },
+    {
+      label: "Au moins une clé API active",
+      done: (dash?.nombreClesActives ?? 0) > 0,
+      href: "/console/api-key",
+    },
+  ];
+
   return (
     <div className="animate-fade-up">
-      {/* En-tête */}
       <div className="flex flex-col justify-between gap-4 border-b border-line pb-6 sm:flex-row sm:items-end">
         <div>
           <div className="font-mono text-[12px] uppercase tracking-wider text-brand">Console</div>
@@ -74,15 +132,33 @@ export default function ConsoleDashboard() {
           <p className="mt-1 text-sm text-muted">
             Connecté en tant que <span className="font-medium text-ink">{principal}</span>
             {profil?.owner && <span className="text-brand"> · Owner</span>}
+            {profil?.plan && (
+              <span className="text-muted">
+                {" "}
+                · Plan <span className="font-mono text-ink">{profil.plan}</span>
+              </span>
+            )}
           </p>
         </div>
         <ButtonLink href="/console/api-key" size="sm">
-          <IconKey className="h-4 w-4" /> Ma clé d&apos;API
+          <IconKey className="h-4 w-4" /> Mes clés d&apos;API
         </ButtonLink>
       </div>
 
-      {/* Identité (données réelles du JWT vérifié par le backend) */}
-      <div className="mt-8 grid gap-px border border-line bg-line sm:grid-cols-2">
+      {/* Parcours de démarrage */}
+      <div className="mt-8">
+        <OnboardingSteps steps={onboardingSteps} />
+      </div>
+
+      {/* Identité */}
+      <div className="mt-8 grid gap-px border border-line bg-line sm:grid-cols-3">
+        <div className="bg-white p-5">
+          <div className="text-xs uppercase tracking-wider text-muted">Developer ID</div>
+          <div className="mt-1.5">
+            {profil?.developerId ? <CopyableId value={profil.developerId} /> : "—"}
+          </div>
+          <div className="mt-1 text-[11px] text-muted">Valeur de X-BC-Client-Id</div>
+        </div>
         <div className="bg-white p-5">
           <div className="text-xs uppercase tracking-wider text-muted">Tenant</div>
           <div className="mt-1.5 truncate font-mono text-sm text-ink">{profil?.tenantId}</div>
@@ -95,12 +171,32 @@ export default function ConsoleDashboard() {
 
       {!profil?.owner && (
         <p className="mt-4 border-l-2 border-brand bg-tint px-4 py-3 text-sm text-ink">
-          Pour créer une organisation, vous devez être <strong>OWNER</strong>. Rapprochez-vous de
+          Pour créer une entreprise, vous devez être <strong>OWNER</strong>. Rapprochez-vous de
           l&apos;administrateur.
         </p>
       )}
 
-      {/* Consommation d'API — comptage RÉEL des requêtes authentifiées par clé (GET /v1/dashboard) */}
+      {/* Résumé entreprises / clés */}
+      {dash && (
+        <div className="mt-8 grid gap-px border border-line bg-line sm:grid-cols-2">
+          <div className="bg-white p-5">
+            <div className="text-xs uppercase tracking-wider text-muted">Entreprises</div>
+            <div className="mt-1.5 font-display text-3xl font-bold text-ink">{dash.nombreEntreprises}</div>
+            <Link href="/console/businesses" className="mt-1 text-xs text-brand hover:underline">
+              Gérer →
+            </Link>
+          </div>
+          <div className="bg-white p-5">
+            <div className="text-xs uppercase tracking-wider text-muted">Clés API actives</div>
+            <div className="mt-1.5 font-display text-3xl font-bold text-ink">{dash.nombreClesActives}</div>
+            <Link href="/console/api-key" className="mt-1 text-xs text-brand hover:underline">
+              Gérer →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Consommation d'API */}
       <section className="mt-10">
         <div className="flex items-baseline justify-between">
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
@@ -114,7 +210,6 @@ export default function ConsoleDashboard() {
           </Link>
         </div>
 
-        {/* Plan & quota (données réelles : plan du compte + quota du catalogue backend) */}
         {usage.state === "ok" && usage.data && (
           <div
             className={cn(
@@ -148,10 +243,7 @@ export default function ConsoleDashboard() {
                 <div
                   className={cn("h-full", usage.data.bloque ? "bg-danger" : "bg-brand")}
                   style={{
-                    width: `${Math.min(
-                      100,
-                      (usage.data.requetesCeMois / usage.data.quotaMensuel) * 100
-                    )}%`,
+                    width: `${Math.min(100, (usage.data.requetesCeMois / usage.data.quotaMensuel) * 100)}%`,
                   }}
                 />
               </div>
@@ -170,7 +262,7 @@ export default function ConsoleDashboard() {
         )}
 
         <div className="mt-3 border border-line bg-white">
-          {usage.state === "loading" && <div className="p-5 text-sm text-muted">Chargement…</div>}
+          {usage.state === "loading" && <LoadingBlock />}
           {usage.state === "error" && (
             <div className="p-5 text-sm text-danger">Impossible de charger la consommation.</div>
           )}
@@ -195,14 +287,11 @@ export default function ConsoleDashboard() {
                   <span className="text-lg text-muted">%</span>
                 </div>
                 <div className="mt-0.5 text-[11px] text-muted">
-                  {usage.data.erreursAujourdhui} erreur{usage.data.erreursAujourdhui > 1 ? "s" : ""}{" "}
-                  aujourd&apos;hui
+                  {usage.data.erreursAujourdhui} erreur{usage.data.erreursAujourdhui > 1 ? "s" : ""} aujourd&apos;hui
                 </div>
               </div>
               <div className="bg-white p-5">
-                <div className="mb-2 text-xs uppercase tracking-wider text-muted">
-                  30 derniers jours
-                </div>
+                <div className="mb-2 text-xs uppercase tracking-wider text-muted">30 derniers jours</div>
                 {usage.data.sparkline.length > 0 ? (
                   <Sparkline points={usage.data.sparkline} />
                 ) : (
@@ -212,19 +301,64 @@ export default function ConsoleDashboard() {
             </div>
           )}
         </div>
-        {usage.state === "ok" && usage.data && usage.data.requetesCeMois === 0 && (
-          <p className="mt-3 text-xs text-muted">
-            Aucune requête comptée pour l&apos;instant. Dès que vos applications appellent l&apos;API
-            avec une clé <code className="font-mono">X-BC-Client-Id</code> /{" "}
-            <code className="font-mono">X-BC-Api-Key</code>, la consommation s&apos;affiche ici en
-            temps réel.
-          </p>
-        )}
       </section>
 
-      {/* Ressources réelles du tenant */}
+      {/* Top opérations & entreprises */}
+      {dash && (dash.topOperations.length > 0 || dash.topEntreprises.length > 0) && (
+        <div className="mt-10 grid gap-8 xl:grid-cols-2">
+          {dash.topOperations.length > 0 && (
+            <section>
+              <h2 className="font-display text-lg font-semibold text-ink">Top opérations (30 j)</h2>
+              <div className="mt-3 border border-line bg-white p-5">
+                <BarChart items={dash.topOperations.map((o) => ({ nom: o.nom, total: o.total }))} labelKey="nom" />
+              </div>
+            </section>
+          )}
+          {dash.topEntreprises.length > 0 && (
+            <section>
+              <h2 className="font-display text-lg font-semibold text-ink">Top entreprises (30 j)</h2>
+              <div className="mt-3 border border-line bg-white p-5">
+                <BarChart items={dash.topEntreprises.map((e) => ({ nom: e.nom, total: e.total }))} labelKey="nom" />
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {/* Activité récente */}
+      {dash && dash.activiteRecente.length > 0 && (
+        <section className="mt-10">
+          <h2 className="font-display text-lg font-semibold text-ink">Activité récente</h2>
+          <div className="mt-3 overflow-x-auto border border-line bg-white">
+            <table className="w-full min-w-[600px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-line bg-subtle text-left">
+                  {["Entreprise", "Opération", "Statut", "Date"].map((h) => (
+                    <th key={h} className="px-4 py-3 font-mono text-[11px] uppercase tracking-wider text-muted">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dash.activiteRecente.map((a, i) => (
+                  <tr key={`${a.entrepriseId}-${a.creeLe}-${i}`} className="border-b border-line last:border-0">
+                    <td className="px-4 py-3 font-medium text-ink">{a.entrepriseNom}</td>
+                    <td className="px-4 py-3 text-muted">{a.operationNom}</td>
+                    <td className="px-4 py-3">
+                      <StatutBadge value={a.statut} />
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[13px] text-muted">{fmtInstant(a.creeLe)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Ressources */}
       <div className="mt-10 grid gap-8 xl:grid-cols-2">
-        {/* Types métier */}
         <section>
           <div className="flex items-baseline justify-between">
             <h2 className="font-display text-lg font-semibold text-ink">Types métier</h2>
@@ -233,19 +367,16 @@ export default function ConsoleDashboard() {
             </span>
           </div>
           <div className="mt-3 border border-line bg-white">
-            {types.state === "loading" && (
-              <div className="p-5 text-sm text-muted">Chargement…</div>
-            )}
+            {types.state === "loading" && <LoadingBlock lines={2} />}
             {types.state === "error" && (
               <div className="p-5 text-sm text-danger">Impossible de charger les types métier.</div>
             )}
             {types.state === "ok" && types.data.length === 0 && (
               <div className="p-5 text-sm text-muted">
-                Aucun type métier pour l&apos;instant. Déclarez-en un via l&apos;API —{" "}
+                Aucun type métier.{" "}
                 <Link href="/console/docs" className="text-brand underline-offset-2 hover:underline">
-                  voir la documentation
+                  Voir la documentation
                 </Link>
-                .
               </div>
             )}
             {types.state === "ok" &&
@@ -264,24 +395,24 @@ export default function ConsoleDashboard() {
           </div>
         </section>
 
-        {/* Entreprises */}
         <section>
           <div className="flex items-baseline justify-between">
             <h2 className="font-display text-lg font-semibold text-ink">Entreprises</h2>
-            <span className="font-mono text-[12px] text-muted">
-              {businesses.state === "ok" ? `${businesses.data.length} au total` : ""}
-            </span>
+            <Link href="/console/businesses" className="font-mono text-[12px] text-brand hover:underline">
+              Gérer →
+            </Link>
           </div>
           <div className="mt-3 border border-line bg-white">
-            {businesses.state === "loading" && (
-              <div className="p-5 text-sm text-muted">Chargement…</div>
-            )}
+            {businesses.state === "loading" && <LoadingBlock lines={2} />}
             {businesses.state === "error" && (
               <div className="p-5 text-sm text-danger">Impossible de charger les entreprises.</div>
             )}
             {businesses.state === "ok" && businesses.data.length === 0 && (
               <div className="p-5 text-sm text-muted">
-                Aucune entreprise pour l&apos;instant. Créez-en une via l&apos;API (<code className="font-mono text-[12px]">POST /v1/businesses</code>).
+                Aucune entreprise.{" "}
+                <Link href="/console/businesses" className="text-brand underline-offset-2 hover:underline">
+                  Créer une entreprise
+                </Link>
               </div>
             )}
             {businesses.state === "ok" &&
@@ -301,11 +432,11 @@ export default function ConsoleDashboard() {
         </section>
       </div>
 
-      {/* Accès rapides */}
       <h2 className="mt-10 font-display text-lg font-semibold text-ink">Accès rapides</h2>
       <div className="mt-3 grid gap-4 md:grid-cols-3">
         {[
-          { href: "/console/api-key", icon: IconKey, t: "Clé d'API", d: "Générer la clé de vos applications." },
+          { href: "/console/businesses", icon: IconBuilding, t: "Entreprises", d: "Créer et lister vos entreprises." },
+          { href: "/console/api-key", icon: IconKey, t: "Clés d'API", d: "Gérer les clés par entreprise." },
           { href: "/console/audit", icon: IconActivity, t: "Audit", d: "Traces d'exécution de vos opérations." },
           { href: "/console/docs", icon: IconBook, t: "Documentation", d: "Référence complète de l'API." },
         ].map((c) => {

@@ -3,7 +3,7 @@
  * Utilisée par la page Documentation. Ne rien inventer ici.
  */
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 export type Endpoint = {
   method: HttpMethod;
@@ -21,9 +21,22 @@ export const ENDPOINTS: EndpointGroup[] = [
   {
     group: "Accès & Authentification",
     items: [
-      { method: "POST", path: "/v1/registration", usage: "Obtenir la clé d'API { clientId, apiKey, plan }", auth: "public" },
+      {
+        method: "POST",
+        path: "/v1/registration",
+        usage: "Créer un compte développeur → { plan, message } (pas de clé API)",
+        auth: "public",
+      },
       { method: "POST", path: "/v1/auth/login", usage: "Connexion → { accessToken, authorities, organisations, owner }", auth: "public" },
-      { method: "GET", path: "/v1/auth/me", usage: "Profil courant { tenantId, actorId, permissions, owner }", auth: "bearer" },
+      {
+        method: "GET",
+        path: "/v1/auth/me",
+        usage: "Profil courant { tenantId, actorId, permissions, owner, developerId, email, plan }",
+        auth: "bearer",
+      },
+      { method: "GET", path: "/v1/dashboard", usage: "Tableau de bord développeur (usage, top ops, activité)", auth: "bearer" },
+      { method: "GET", path: "/v1/plans", usage: "Catalogue des plans tarifaires", auth: "public" },
+      { method: "POST", path: "/v1/plan/upgrade", usage: "Changer de plan → { plan, statut, urlPaiement, reference }", auth: "bearer" },
     ],
   },
   {
@@ -58,6 +71,15 @@ export const ENDPOINTS: EndpointGroup[] = [
       { method: "POST", path: "/v1/businesses/{businessId}/actors", usage: "Rattacher un acteur", auth: "bearer" },
       { method: "GET", path: "/v1/businesses/{businessId}/actors", usage: "Lister les acteurs", auth: "bearer" },
       { method: "POST", path: "/v1/businesses/{businessId}/rules", usage: "Ajouter une règle locale", auth: "bearer" },
+      {
+        method: "POST",
+        path: "/v1/businesses/{businessId}/api-keys",
+        usage: "Créer une clé API pour l'entreprise (secret affiché une fois)",
+        auth: "bearer",
+      },
+      { method: "GET", path: "/v1/businesses/{businessId}/api-keys", usage: "Consulter la clé API de l'entreprise", auth: "bearer" },
+      { method: "PATCH", path: "/v1/businesses/{businessId}/api-keys", usage: "Renommer la clé API", auth: "bearer" },
+      { method: "POST", path: "/v1/businesses/{businessId}/api-keys:revoke", usage: "Révoquer la clé API", auth: "bearer" },
     ],
   },
   {

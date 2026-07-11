@@ -5,6 +5,7 @@ const MAP: Record<HttpMethod, string> = {
   GET: "text-brand border-brand/30 bg-brand/5",
   POST: "text-ink border-ink/25 bg-ink/5",
   PUT: "text-muted border-line bg-white",
+  PATCH: "text-muted border-line bg-white",
   DELETE: "text-danger border-danger/30 bg-danger/5",
 };
 

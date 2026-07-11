@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Logo from "@/components/Logo";
 import { ButtonLink } from "@/components/Button";
+import { Banner } from "@/components/Feedback";
 import {
   IconLayers,
   IconKey,
   IconActivity,
   IconBook,
   IconBolt,
+  IconBuilding,
   IconExternal,
   IconLogout,
   IconShield,
@@ -21,10 +23,11 @@ import { cn } from "@/lib/cn";
 
 const NAV = [
   { href: "/console", label: "Tableau de bord", icon: IconLayers, exact: true },
+  { href: "/console/businesses", label: "Entreprises", icon: IconBuilding },
+  { href: "/console/api-key", label: "Clés d'API", icon: IconKey },
   { href: "/console/audit", label: "Audit", icon: IconActivity },
   { href: "/console/docs", label: "Documentation", icon: IconBook },
   { href: "/console/pricing", label: "Tarifs & Consommation", icon: IconBolt },
-  { href: "/console/api-key", label: "Clé d'API", icon: IconKey },
 ];
 
 /**
@@ -37,6 +40,19 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { status, principal, profil, logout } = useAuth();
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  useEffect(() => {
+    function onExpired() {
+      setSessionExpired(true);
+    }
+    window.addEventListener("bc:session-expired", onExpired);
+    return () => window.removeEventListener("bc:session-expired", onExpired);
+  }, []);
+
+  useEffect(() => {
+    if (status === "authed") setSessionExpired(false);
+  }, [status]);
 
   // ── Garde : session en cours de vérification ──
   if (status === "loading") {
@@ -197,7 +213,16 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Contenu — pleine largeur */}
-        <div className="flex-1 px-6 py-8 md:px-10">{children}</div>
+        <div className="flex-1 px-6 py-8 md:px-10">
+          {sessionExpired && status === "anon" && (
+            <div className="mb-6">
+              <Banner variant="warning">
+                Session expirée — reconnectez-vous pour continuer.
+              </Banner>
+            </div>
+          )}
+          {children}
+        </div>
       </div>
     </div>
   );
