@@ -1,5 +1,7 @@
 package com.yowyob.businesscore.application.context;
 
+import com.yowyob.businesscore.application.error.ProblemException;
+
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -38,5 +40,21 @@ public record BusinessContext(
 
     public boolean hasRole(String role) {
         return roles.contains(role);
+    }
+
+    /**
+     * Vérifie qu'une requête ciblant {@code businessId} est légitime pour ce contexte.
+     *
+     * <p>Une clé API scopée (voir {@code ApiKeyReactiveAuthenticationManager}) porte un
+     * {@code businessId} non nul et ne doit jamais pouvoir agir sur une autre entreprise, même du même
+     * tenant — sinon le cloisonnement clé↔business promis au développeur (« révoquer la clé de A
+     * n'affecte pas B ») serait contourné en changeant simplement l'identifiant dans l'URL. Un contexte
+     * JWT (console développeur, {@code businessId == null}) n'est pas concerné : le tenant (RLS) fait
+     * foi, il gère plusieurs entreprises.
+     */
+    public void verifierAcces(UUID cibleBusinessId) {
+        if (businessId != null && !businessId.equals(cibleBusinessId)) {
+            throw ProblemException.forbidden("Cette clé API est scopée à une autre entreprise.");
+        }
     }
 }

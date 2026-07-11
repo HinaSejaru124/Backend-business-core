@@ -35,6 +35,7 @@ public class TraceController {
     @GetMapping("/businesses/{businessId}/traces")
     public Flux<OperationTraceResponse> lister(@PathVariable UUID businessId) {
         return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> ctx.verifierAcces(businessId))
                 .flatMapMany(ctx -> consulterTrace.listerParEntreprise(businessId, ctx))
                 .map(OperationTraceResponse::depuis);
     }
@@ -51,6 +52,7 @@ public class TraceController {
             @Parameter(description = "Identifiant de trace renvoyé par l'exécution")
             @PathVariable UUID traceId) {
         return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> ctx.verifierAcces(businessId))
                 .flatMap(ctx -> consulterTrace.trouver(businessId, traceId, ctx))
                 .map(OperationTraceResponse::depuis);
     }

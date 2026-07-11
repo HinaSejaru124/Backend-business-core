@@ -62,9 +62,12 @@ public Mono<ResultatLogin> login(String principal, String motDePasse) {
             .bodyValue(discoverBody)
             .retrieve()
             .onStatus(status -> status.value() == 401 || status.value() == 403,
-                    reponse -> Mono.error(new ProblemException(
-                            HttpStatus.UNAUTHORIZED, "Authentification refusée",
-                            "Identifiant ou mot de passe invalide.")))
+                    reponse -> reponse.bodyToMono(String.class).defaultIfEmpty("").flatMap(body -> {
+                        System.err.println("KERNEL discover-contexts " + reponse.statusCode() + " body: " + body);
+                        return Mono.error(new ProblemException(
+                                HttpStatus.UNAUTHORIZED, "Authentification refusée",
+                                "Identifiant ou mot de passe invalide."));
+                    }))
             .bodyToMono(Map.class)
             .flatMap(discoverReponse -> selectPremierContexte(discoverReponse, principal, motDePasse));
 }
@@ -108,9 +111,14 @@ private Mono<ResultatLogin> selectPremierContexte(Map<?, ?> discoverReponse,
             .bodyValue(selectBody)
             .retrieve()
             .onStatus(status -> status.value() == 401 || status.value() == 403,
-                    reponse -> Mono.error(new ProblemException(
-                            HttpStatus.UNAUTHORIZED, "Authentification refusée",
-                            "Sélection de contexte refusée.")))
+                    reponse -> reponse.bodyToMono(String.class).defaultIfEmpty("").flatMap(body -> {
+                        System.err.println("KERNEL select-context " + reponse.statusCode()
+                                + " body: " + body + " | selectionToken=" + selectionToken
+                                + " contextId=" + contextId + " organizationId=" + organizationId);
+                        return Mono.error(new ProblemException(
+                                HttpStatus.UNAUTHORIZED, "Authentification refusée",
+                                "Sélection de contexte refusée."));
+                    }))
             .bodyToMono(Map.class)
             .flatMap(this::versResultat);
 }

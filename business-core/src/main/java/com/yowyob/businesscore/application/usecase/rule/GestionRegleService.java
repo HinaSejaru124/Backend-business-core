@@ -4,6 +4,9 @@ import com.yowyob.businesscore.adapter.out.persistence.businesstype.VersionTypeR
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.enterprise.spi.LireEntreprise;
+import com.yowyob.businesscore.domain.port.out.JournaliserChangementSync;
+import com.yowyob.businesscore.domain.port.out.JournaliserChangementSync.OperationSync;
+import com.yowyob.businesscore.domain.port.out.JournaliserChangementSync.TypeEntiteSync;
 import com.yowyob.businesscore.domain.rule.RegleMetier;
 import com.yowyob.businesscore.domain.rule.spi.DepotRegle;
 import com.yowyob.businesscore.domain.shared.Declencheur;
@@ -17,7 +20,9 @@ import java.util.UUID;
 
 /**
  * CRUD des règles métier (Type ou locales). Le {@code tenantId} vient toujours du
- * {@link BusinessContext}.
+ * {@link BusinessContext}. Les règles locales (rattachées à une entreprise) sont journalisées pour la
+ * synchronisation pull des backends terminaux ; les règles de Type (partagées entre entreprises via une
+ * version) ne le sont pas — hors périmètre d'un journal par entreprise.
  */
 @Service
 public class GestionRegleService {
@@ -25,12 +30,20 @@ public class GestionRegleService {
     private final DepotRegle depot;
     private final VersionTypeRepository versionTypeRepo;
     private final LireEntreprise lireEntreprise;
+    private final JournaliserChangementSync journaliserSync;
 
     public GestionRegleService(DepotRegle depot, VersionTypeRepository versionTypeRepo,
-                               LireEntreprise lireEntreprise) {
+                               LireEntreprise lireEntreprise, JournaliserChangementSync journaliserSync) {
         this.depot = depot;
         this.versionTypeRepo = versionTypeRepo;
         this.lireEntreprise = lireEntreprise;
+        this.journaliserSync = journaliserSync;
+    }
+
+    private Mono<RegleMetier> journaliser(RegleMetier regle, OperationSync operation) {
+        return journaliserSync.journaliser(regle.getTenantId(), regle.getEntrepriseId(), TypeEntiteSync.RULE,
+                        regle.getId(), operation, regle)
+                .thenReturn(regle);
     }
 
     public Mono<RegleMetier> creerRegleDeType(
@@ -54,7 +67,8 @@ public class GestionRegleService {
                 .flatMap(entreprise -> depot.sauvegarder(new RegleMetier(
                         UUID.randomUUID(), ctx.tenantId(),
                         null, entrepriseId,
-                        declencheur, condition, effet, rolesAutorisesADeroger)));
+                        declencheur, condition, effet, rolesAutorisesADeroger)))
+                .flatMap(regle -> journaliser(regle, OperationSync.CREATE));
     }
 
     public Flux<RegleMetier> listerParVersion(UUID typeId, int numeroVersion) {
@@ -108,7 +122,8 @@ public class GestionRegleService {
                 .flatMap(existante -> depot.sauvegarder(new RegleMetier(
                         existante.getId(), existante.getTenantId(),
                         null, existante.getEntrepriseId(),
-                        declencheur, condition, effet, rolesAutorisesADeroger)));
+                        declencheur, condition, effet, rolesAutorisesADeroger)))
+                .flatMap(regle -> journaliser(regle, OperationSync.UPDATE));
     }
 
     public Mono<Void> supprimerDeType(UUID typeId, int numeroVersion, UUID ruleId) {
@@ -118,6 +133,8 @@ public class GestionRegleService {
 
     public Mono<Void> supprimerLocale(UUID entrepriseId, UUID ruleId) {
         return trouverLocale(entrepriseId, ruleId)
-                .flatMap(r -> depot.supprimer(r.getId()));
+                .flatMap(r -> depot.supprimer(r.getId()).thenReturn(r))
+                .flatMap(regle -> journaliser(regle, OperationSync.DELETE))
+                .then();
     }
 }

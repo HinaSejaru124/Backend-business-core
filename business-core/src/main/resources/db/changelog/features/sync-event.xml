@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : sync_event — journal de changements append-only, consommé en pull par les backends
+      terminaux via GET /v1/sync (auth par clé API scopée entreprise, cf. auth-api-key-entreprise.xml).
+      NE JAMAIS modifier _socle.xml/enterprise.xml. Table tenant-owned -> tenant_id + RLS.
+
+      La colonne `id` est un bigserial GLOBAL (toutes entreprises confondues) : monotone et sans
+      collision par construction, utilisé directement comme curseur `since` par le terminal. Pas de
+      séquence par-entreprise (évite une table de compteur + les races du MAX+1).
+    -->
+    <changeSet id="sync-001-sync-event" author="claude">
+        <createTable tableName="sync_event">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Isolation tenant (RLS) -->
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="entreprise_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="entity_type" type="varchar(32)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="entity_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="operation" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="payload" type="jsonb"/>
+
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="sync_event" baseColumnNames="entreprise_id"
+                referencedTableName="entreprise" referencedColumnNames="id"
+                constraintName="fk_sync_event_entreprise"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="sync_event" indexName="idx_sync_event_entreprise_id">
+            <column name="entreprise_id"/>
+            <column name="id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS sync_event;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="sync-002-rls-sync-event" author="claude">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE sync_event ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE sync_event FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON sync_event
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON sync_event;
+                ALTER TABLE sync_event NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE sync_event DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+      sync-003 : payload en text plutôt que jsonb.
+
+      Convention du repo pour les colonnes JSON (cf. trace_operation.resultat_regles) : stockage en
+      texte brut, sérialisé/désérialisé côté application (Jackson). jsonb exigerait que le driver
+      R2DBC lie le paramètre via le codec io.r2dbc.postgresql.codec.Json — sinon Postgres rejette le
+      bind varchar->jsonb (42804, "column payload is of type jsonb but expression is of type character
+      varying"). text évite cette dépendance au driver et reste cohérent avec le reste du schéma.
+    -->
+    <changeSet id="sync-003-payload-text" author="claude">
+        <sql>ALTER TABLE sync_event ALTER COLUMN payload TYPE text USING payload::text;</sql>
+        <rollback>
+            <sql>ALTER TABLE sync_event ALTER COLUMN payload TYPE jsonb USING payload::jsonb;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : clé API scopée à une entreprise (business) — modèle final (akbe-002/003) : exactement
+      une clé ACTIVE par entreprise, pas de "prefix" par clé. Le développeur s'identifie par son
+      developerId stable (X-BC-Client-Id, cf. GET /v1/auth/me) ; X-BC-Api-Key est le secret de
+      l'entreprise, résolu en confrontant le secret aux hachés des clés actives du développeur
+      (cf. ApiKeyReactiveAuthenticationManager). NE JAMAIS modifier _socle.xml : altérations séparées.
+    -->
+    <changeSet id="akbe-001-api-key-entreprise-id" author="claude">
+        <addColumn tableName="api_key">
+            <column name="entreprise_id" type="uuid"/>
+        </addColumn>
+        <addForeignKeyConstraint
+                baseTableName="api_key" baseColumnNames="entreprise_id"
+                referencedTableName="entreprise" referencedColumnNames="id"
+                constraintName="fk_api_key_entreprise"
+                onDelete="CASCADE"/>
+        <createIndex tableName="api_key" indexName="idx_api_key_entreprise_status">
+            <column name="entreprise_id"/>
+            <column name="status"/>
+        </createIndex>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="api_key" constraintName="fk_api_key_entreprise"/>
+            <dropColumn tableName="api_key" columnName="entreprise_id"/>
+        </rollback>
+    </changeSet>
+
+    <!--
+      akbe-002 : nettoie les clés "niveau développeur" du modèle transitoire (entreprise_id NULL,
+      concept abandonné) avant de rendre la colonne obligatoire — sans ce ménage, l'ALTER ci-dessous
+      échoue sur toute base ayant traversé l'itération précédente (y compris la nôtre en dev).
+    -->
+    <changeSet id="akbe-002-purge-cles-sans-entreprise" author="claude">
+        <sql>DELETE FROM api_key WHERE entreprise_id IS NULL;</sql>
+        <rollback/>
+    </changeSet>
+
+    <!--
+      akbe-003 : suppression du prefix (obsolète — X-BC-Client-Id est désormais le developerId, pas un
+      identifiant par clé). entreprise_id devient obligatoire : il n'existe plus de clé "niveau
+      développeur" (la gestion du compte/des entreprises se fait exclusivement en JWT).
+    -->
+    <changeSet id="akbe-003-drop-prefix-entreprise-not-null" author="claude">
+        <dropUniqueConstraint tableName="api_key" constraintName="api_key_prefix_key"/>
+        <dropColumn tableName="api_key" columnName="prefix"/>
+        <addNotNullConstraint tableName="api_key" columnName="entreprise_id" columnDataType="uuid"/>
+        <rollback>
+            <dropNotNullConstraint tableName="api_key" columnName="entreprise_id" columnDataType="uuid"/>
+            <addColumn tableName="api_key">
+                <column name="prefix" type="varchar(64)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!--
+      akbe-004 : ne garde que la clé ACTIVE la plus récente par entreprise (révoque les autres) avant
+      de poser la contrainte d'unicité — même logique que akbe-002 : ménage des données du modèle
+      transitoire (plusieurs clés actives par business), sans quoi l'index unique ci-dessous échoue.
+    -->
+    <changeSet id="akbe-004-revoque-doublons-cles-actives" author="claude">
+        <sql>
+            UPDATE api_key SET status = 'REVOKED'
+            WHERE status = 'ACTIVE' AND id NOT IN (
+                SELECT DISTINCT ON (entreprise_id) id FROM api_key
+                WHERE status = 'ACTIVE'
+                ORDER BY entreprise_id, created_at DESC
+            );
+        </sql>
+        <rollback/>
+    </changeSet>
+
+    <!--
+      akbe-005 : au plus une clé ACTIVE par entreprise (défense en profondeur au niveau base — la
+      vérification applicative vit dans ApiKeyService.creer). Index unique partiel : n'entre en
+      collision que sur les lignes status='ACTIVE', une entreprise peut réémettre une clé après
+      révocation sans jamais violer la contrainte.
+    -->
+    <changeSet id="akbe-005-unique-active-key-per-entreprise" author="claude">
+        <sql>
+            CREATE UNIQUE INDEX uq_api_key_entreprise_active
+                ON api_key (entreprise_id) WHERE status = 'ACTIVE';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_api_key_entreprise_active;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

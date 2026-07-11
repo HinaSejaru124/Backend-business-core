@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -29,9 +30,19 @@ import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 /**
  * Sécurité réactive du Business Core (Barrière 1 + en-têtes + CORS).
  *
- * <p>Authentification par clé Business Core via un {@link AuthenticationWebFilter} (converter +
- * manager) ; en succès, {@link BusinessContextWebFilter} propage le BusinessContext dans le Reactor
- * Context. Routes publiques : santé, inscription, documentation OpenAPI. Tout le reste exige une clé.
+ * <p>Deux voies d'authentification, pour deux acteurs différents :
+ * <ul>
+ *   <li>JWT (Bearer) — voie principale, couvre <b>toutes</b> les routes protégées : gestion de la
+ *       plateforme (types métier, entreprises, clés API, dashboard...). Consommée par le développeur
+ *       humain via le front Business Core.</li>
+ *   <li>Clé Business Core (en-têtes {@code X-BC-*}) — repli scopé aux routes d'usage <b>runtime</b>
+ *       d'une entreprise, consommées par le backend terminal qui la représente (ex. PharmAPI) :
+ *       synchronisation ({@code /v1/sync}), exécution/consultation d'opérations, traces, transactions.
+ *       Jamais la création/gestion d'entreprises, de clés ou de types métier — ça, c'est le développeur
+ *       qui le fait, via JWT.</li>
+ * </ul>
+ * En succès, {@link BusinessContextWebFilter} propage le BusinessContext dans le Reactor Context.
+ * Routes publiques : santé, inscription, documentation OpenAPI. Tout le reste exige une authentification.
  */
 @Configuration
 @EnableWebFluxSecurity
@@ -51,6 +62,20 @@ private static final String[] ROUTES_PUBLIQUES = {
         "/webjars/**"
 };
 
+    /**
+     * Surface consommée par un backend terminal (usage runtime d'une entreprise) : synchronisation,
+     * opérations, traces, transactions. Tenue en phase avec {@link com.yowyob.businesscore.infrastructure.config.AuthRouteClassifier}
+     * (qui documente cette même surface dans Swagger).
+     */
+    private static final String[] ROUTES_INTEGRATION_TERMINAL = {
+            "/v1/sync", "/v1/sync/**",
+            "/v1/businesses/me",
+            "/v1/businesses/*/operations", "/v1/businesses/*/operations/**",
+            "/v1/businesses/*/traces", "/v1/businesses/*/traces/**",
+            "/v1/businesses/*/transactions", "/v1/businesses/*/transactions/**",
+            "/v1/businesses/*/orders/**"
+    };
+
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(
             ServerHttpSecurity http,
@@ -63,9 +88,14 @@ private static final String[] ROUTES_PUBLIQUES = {
             ProblemAccessDeniedHandler accessDeniedHandler,
             com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur usageCompteur) {
 
-        // Authentification par clé Business Core (X-BC-*). Conservée (provisioning / transitoire).
+        // Authentification par clé Business Core (X-BC-*) — réservée aux routes d'usage runtime d'une
+        // entreprise (cf. ROUTES_INTEGRATION_TERMINAL). Tout le reste (gestion des types métier, des
+        // entreprises, des clés, du dashboard...) est exclusivement JWT : ces routes appellent le kernel
+        // au nom d'un utilisateur et sont consommées par le front Business Core, jamais par un terminal.
         AuthenticationWebFilter apiKeyFilter = new AuthenticationWebFilter(authenticationManager);
         apiKeyFilter.setServerAuthenticationConverter(converter);
+        apiKeyFilter.setRequiresAuthenticationMatcher(
+                ServerWebExchangeMatchers.pathMatchers(ROUTES_INTEGRATION_TERMINAL));
 
         return http
                 .csrf(csrf -> csrf.disable())

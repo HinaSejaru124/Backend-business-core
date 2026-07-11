@@ -1,6 +1,7 @@
 package com.yowyob.businesscore.adapter.out.persistence.enterprise;
 
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
@@ -10,4 +11,6 @@ import java.util.UUID;
  */
 public interface EntrepriseRepository
         extends ReactiveCrudRepository<EntrepriseEntity, UUID> {
+
+    Mono<Long> countByTenantId(UUID tenantId);
 }

@@ -10,9 +10,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Clé API d'un développeur. Un développeur peut en détenir plusieurs (« Prod », « Dev »…). Le secret
- * n'est stocké que haché ({@code key_hash}) ; seul le {@code prefix} (l'identifiant public, porté par
- * l'en-tête {@code X-BC-Client-Id}) reste lisible. La révocation est immédiate ({@code status=REVOKED}).
+ * Clé API d'une entreprise. Une entreprise n'a jamais plus d'une clé {@code ACTIVE} à la fois (imposé
+ * à la création). Le secret n'est stocké que haché ({@code key_hash}) — pas de {@code prefix} : le
+ * développeur s'identifie par son {@code developerId} stable ({@code X-BC-Client-Id}, cf.
+ * {@code GET /v1/auth/me}), l'entreprise est résolue en confrontant le secret aux hachés des clés
+ * actives de ce développeur. La révocation est immédiate ({@code status=REVOKED}).
  *
  * <p>Table sans RLS : elle sert à résoudre le tenant avant qu'il soit connu.
  */
@@ -28,7 +30,8 @@ public class ApiKeyEntity implements Persistable<UUID> {
     @Column("developer_id")
     private UUID developerId;
 
-    private String prefix;
+    @Column("entreprise_id")
+    private UUID entrepriseId;
 
     @Column("key_hash")
     private String keyHash;
@@ -49,12 +52,11 @@ public class ApiKeyEntity implements Persistable<UUID> {
     public ApiKeyEntity() {
     }
 
-    public static ApiKeyEntity nouveau(UUID id, UUID developerId, String prefix, String keyHash,
-                                       String name) {
+    public static ApiKeyEntity nouveau(UUID id, UUID developerId, UUID entrepriseId, String keyHash, String name) {
         ApiKeyEntity e = new ApiKeyEntity();
         e.id = id;
         e.developerId = developerId;
-        e.prefix = prefix;
+        e.entrepriseId = entrepriseId;
         e.keyHash = keyHash;
         e.name = (name == null || name.isBlank()) ? "Default" : name;
         e.status = STATUT_ACTIVE;
@@ -77,8 +79,8 @@ public class ApiKeyEntity implements Persistable<UUID> {
         return developerId;
     }
 
-    public String getPrefix() {
-        return prefix;
+    public UUID getEntrepriseId() {
+        return entrepriseId;
     }
 
     public String getKeyHash() {
@@ -113,8 +115,8 @@ public class ApiKeyEntity implements Persistable<UUID> {
         this.developerId = developerId;
     }
 
-    public void setPrefix(String prefix) {
-        this.prefix = prefix;
+    public void setEntrepriseId(UUID entrepriseId) {
+        this.entrepriseId = entrepriseId;
     }
 
     public void setKeyHash(String keyHash) {

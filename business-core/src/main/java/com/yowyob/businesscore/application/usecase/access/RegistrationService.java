@@ -14,25 +14,23 @@ import java.util.UUID;
  * Inscription d'un développeur :
  * <ol>
  *   <li>crée le compte sur le kernel (sign-up) — le kernel fait autorité sur l'identité et le tenant ;</li>
- *   <li>crée le compte BC local en mémorisant le {@code kernel_tenant_id} (le tenant métier) et l'email ;</li>
- *   <li>émet une première clé API (dans la table {@code api_key}).</li>
+ *   <li>crée le compte BC local en mémorisant le {@code kernel_tenant_id} (le tenant métier) et l'email.</li>
  * </ol>
- * Le tenant BC est donc le tenant kernel dès l'inscription : la clé API et le JWT résolvent le même
- * espace. Le dev vérifie son email, puis se connecte via {@code POST /v1/auth/login}.
+ * Aucune clé API n'est émise ici : les clés sont désormais scopées à une entreprise, qui n'existe pas
+ * encore au moment de l'inscription. Le dev vérifie son email, se connecte via {@code POST /v1/auth/login}
+ * (JWT — son identifiant stable est exposé par {@code GET /v1/auth/me}), crée une entreprise via
+ * {@code POST /v1/businesses}, puis émet une clé API pour cette entreprise via {@code POST /v1/api-keys}.
  */
 @Service
 public class RegistrationService implements RegistrationUseCase {
 
     private final DeveloperAccountRepository repository;
     private final AuthentifierUtilisateur authentifier;
-    private final ApiKeyService apiKeyService;
 
     public RegistrationService(DeveloperAccountRepository repository,
-                               AuthentifierUtilisateur authentifier,
-                               ApiKeyService apiKeyService) {
+                               AuthentifierUtilisateur authentifier) {
         this.repository = repository;
         this.authentifier = authentifier;
-        this.apiKeyService = apiKeyService;
     }
 
     @Override
@@ -53,8 +51,9 @@ public class RegistrationService implements RegistrationUseCase {
                             plan);
                     return repository.save(entity);
                 })
-                .flatMap(account -> apiKeyService.creer(account.getId(), "Default")
-                        .map(cle -> new ApiKeyEmise(cle.prefix(), cle.secret(), plan)));
+                .map(account -> new ApiKeyEmise(plan,
+                        "Compte créé. Vérifiez votre email, connectez-vous via POST /v1/auth/login, "
+                                + "créez une entreprise puis une clé API pour cette entreprise."));
     }
 
     private static UUID parseUuid(String valeur) {

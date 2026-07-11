@@ -14,8 +14,6 @@ public record CreerEntrepriseRequest(
         @Schema(description = "Numéro de version épinglée", example = "1")
         @NotNull @Positive Integer versionNumber,
         @Schema(description = "Nom affiché de l'entreprise", example = "Boutique Alpha")
-        @NotBlank String nom,
-        @Schema(description = "Organisation kernel existante (optionnel)", example = "00000000-0000-0000-0000-000000000000")
-        UUID organizationId
+        @NotBlank String nom
 ) {
 }

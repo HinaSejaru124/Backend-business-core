@@ -28,23 +28,25 @@ public class RegistrationController {
     @Operation(
             summary = "Inscrire un développeur",
             description = """
-                    Crée un compte développeur et provisionne en coulisse une Actor kernel.
-                    Renvoie la clé Business Core (`clientId` + `apiKey`) — le secret n'est affiché qu'une fois.
+                    Crée un compte développeur et provisionne en coulisse une Actor kernel. N'émet aucune
+                    clé API (elles sont scopées à une entreprise, créée après connexion) : connectez-vous via
+                    POST /v1/auth/login, consultez GET /v1/auth/me pour votre identifiant développeur stable,
+                    créez une entreprise puis une clé API pour cette entreprise.
                     """,
             security = {})
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Développeur inscrit, clé émise"),
+            @ApiResponse(responseCode = "201", description = "Développeur inscrit"),
             @ApiResponse(responseCode = "422", description = "Données invalides")
     })
     @PostMapping("/registration")
     @ResponseStatus(HttpStatus.CREATED)
-    public Mono<ApiKeyResponse> register(@Valid @RequestBody RegistrationRequest request) {
+    public Mono<InscriptionResponse> register(@Valid @RequestBody RegistrationRequest request) {
         return registrationUseCase.inscrire(
                 request.firstName(),
                 request.lastName(),
                 request.email(),
                 request.password(),
                 request.planCode()
-        ).map(emise -> new ApiKeyResponse(emise.clientId(), emise.apiKey(), emise.plan()));
+        ).map(InscriptionResponse::depuis);
     }
 }

@@ -1,6 +1,7 @@
 package com.yowyob.businesscore.adapter.in.rest.enterprise;
 
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
+import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.usecase.enterprise.EntrepriseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,6 +25,12 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+/**
+ * Gestion des entreprises — JWT uniquement (cf. {@code SecurityConfig}), à l'exception de
+ * {@code GET /me} qui est le point d'entrée réservé aux backends terminaux (clé Business Core) : ces
+ * routes de gestion appellent le kernel au nom d'un développeur et sont destinées au front Business
+ * Core, jamais consommées directement par un backend métier tiers.
+ */
 @Tag(name = "Entreprises", description = "Instances de métier épinglées à une version de Type")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
@@ -38,8 +45,8 @@ public class EntrepriseController {
 
     @Operation(summary = "Créer une entreprise",
             description = """
-                    Instancie un Type Métier à une version donnée. Provisionne l'organisation kernel si absente
-                    (actor → org → approve → services → agence principale).""")
+                    Instancie un Type Métier à une version donnée. Provisionne automatiquement l'organisation
+                    kernel (actor → org → approve → services → agence principale).""")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Entreprise créée"),
             @ApiResponse(responseCode = "404", description = "Version de type introuvable"),
@@ -50,8 +57,7 @@ public class EntrepriseController {
     public Mono<EntrepriseResponse> creer(@Valid @RequestBody CreerEntrepriseRequest requete) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> entrepriseService.creer(
-                        requete.typeId(), requete.versionNumber(), requete.nom(),
-                        requete.organizationId(), ctx))
+                        requete.typeId(), requete.versionNumber(), requete.nom(), ctx))
                 .map(EntrepriseResponse::depuis);
     }
 
@@ -61,6 +67,28 @@ public class EntrepriseController {
     public Flux<EntrepriseResponse> lister() {
         return BusinessContextHolder.currentContext()
                 .flatMapMany(entrepriseService::lister)
+                .map(EntrepriseResponse::depuis);
+    }
+
+    @Operation(summary = "Résoudre l'entreprise de la clé courante",
+            description = """
+                    Réservé aux backends terminaux (clé Business Core scopée) : renvoie l'entreprise
+                    représentée par la clé, sans que le terminal ait besoin de connaître ni transmettre
+                    son businessId. Premier appel typique après réception des identifiants.""")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "L'entreprise de la clé"),
+            @ApiResponse(responseCode = "403", description = "Clé non scopée à une entreprise")
+    })
+    @GetMapping("/me")
+    public Mono<EntrepriseResponse> moi() {
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> {
+                    if (ctx.businessId() == null) {
+                        return Mono.error(ProblemException.forbidden(
+                                "Cette route nécessite une clé API scopée à une entreprise."));
+                    }
+                    return entrepriseService.trouver(ctx.businessId(), ctx);
+                })
                 .map(EntrepriseResponse::depuis);
     }
 

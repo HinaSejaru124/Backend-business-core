@@ -46,10 +46,11 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
     private io.swagger.v3.oas.models.Operation documenterIntegration(io.swagger.v3.oas.models.Operation operation) {
         assurerBearerSecurity(operation);
         addHeaderIfAbsent(operation, CLIENT_ID_HEADER,
-                "Identifiant public de la clé BC (préfixe). Recommandé pour identifier votre application développeur.",
-                "bck_live_abc123", false);
+                "Identifiant développeur stable (voir GET /v1/auth/me) — ne change jamais, quelle que "
+                        + "soit l'entreprise ciblée.",
+                "00000000-0000-0000-0000-000000000000", false);
         addHeaderIfAbsent(operation, API_KEY_HEADER,
-                "Secret de la clé BC. À utiliser avec X-BC-Client-Id. Complète le Bearer pour le suivi d'usage.",
+                "Secret de la clé de l'entreprise ciblée. À utiliser avec X-BC-Client-Id.",
                 null, false);
         addHeaderIfAbsent(operation, ON_BEHALF_HEADER,
                 "Acteur métier asserté par le backend du développeur (UUID, optionnel).",

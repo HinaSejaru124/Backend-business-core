@@ -81,6 +81,7 @@ public class OperationController {
     @GetMapping("/businesses/{businessId}/operations")
     public Flux<OperationResponse> lister(@PathVariable UUID businessId) {
         return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> ctx.verifierAcces(businessId))
                 .flatMapMany(ctx -> consulterOperation.listerParEntreprise(businessId, ctx))
                 .map(OperationResponse::depuis);
     }
@@ -94,6 +95,7 @@ public class OperationController {
     public Mono<OperationResponse> trouver(@PathVariable UUID businessId,
                                              @Parameter(example = "vente") @PathVariable String name) {
         return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> ctx.verifierAcces(businessId))
                 .flatMap(ctx -> consulterOperation.trouverParNom(businessId, name, ctx))
                 .map(OperationResponse::depuis);
     }
@@ -119,6 +121,7 @@ public class OperationController {
                                                  @RequestBody(required = false) ExecuterOperationRequest requete) {
         Map<String, Object> parametres = requete == null ? Map.of() : requete.parametresOuVide();
         return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> ctx.verifierAcces(businessId))
                 .flatMap(ctx -> executerOperation.executer(businessId, name, idempotencyKey, parametres, ctx))
                 .map(resultat -> versReponse(businessId, resultat));
     }

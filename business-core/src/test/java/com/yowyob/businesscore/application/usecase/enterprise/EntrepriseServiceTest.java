@@ -4,6 +4,7 @@ import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.domain.businesstype.VersionType;
 import com.yowyob.businesscore.domain.enterprise.Entreprise;
 import com.yowyob.businesscore.domain.enterprise.spi.DepotEntreprise;
+import com.yowyob.businesscore.domain.port.out.JournaliserChangementSync;
 import com.yowyob.businesscore.domain.port.out.OrganisationProvisionnee;
 import com.yowyob.businesscore.domain.port.out.PersisterEntreprise;
 import com.yowyob.businesscore.domain.port.out.PersisterVersionType;
@@ -34,6 +35,7 @@ class EntrepriseServiceTest {
     @Mock PersisterVersionType persisterVersionType;
     @Mock PersisterEntreprise persisterEntreprise;
     @Mock DepotEntreprise depotEntreprise;
+    @Mock JournaliserChangementSync journaliserSync;
 
     EntrepriseService service;
 
@@ -48,7 +50,8 @@ class EntrepriseServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EntrepriseService(depotEntreprise, persisterVersionType, persisterEntreprise);
+        service = new EntrepriseService(depotEntreprise, persisterVersionType, persisterEntreprise, journaliserSync);
+        when(journaliserSync.journaliser(any(), any(), any(), any(), any(), any())).thenReturn(Mono.empty());
     }
 
     @Test
@@ -65,7 +68,7 @@ class EntrepriseServiceTest {
                 .thenReturn(Mono.just(AGENCY_ID));
         when(depotEntreprise.sauvegarder(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
-        StepVerifier.create(service.creer(TYPE_ID, 1, "Pharma Test", null, ctx))
+        StepVerifier.create(service.creer(TYPE_ID, 1, "Pharma Test", ctx))
                 .assertNext(ent -> {
                     assertThat(ent.organizationId()).isEqualTo(ORG_ID);
                     assertThat(ent.businessActorId()).isEqualTo(ACTOR_ID);
@@ -78,21 +81,6 @@ class EntrepriseServiceTest {
         ordre.verify(persisterEntreprise).approuverOrganisation(ORG_ID, "Approbation initiale");
         ordre.verify(persisterEntreprise).souscrireServices(ORG_ID);
         ordre.verify(persisterEntreprise).creerAgence(eq(ORG_ID), eq("Pharma Test — agence principale"));
-        verifyNoMoreInteractions(persisterEntreprise);
-    }
-
-    @Test
-    @DisplayName("organizationId fourni : pas de provisionnement kernel")
-    void reutilise_organization_id_existant() {
-        VersionType version = VersionType.creer(TYPE_ID, TENANT_ID, 1);
-        UUID orgExistante = UUID.randomUUID();
-        when(persisterVersionType.trouverParTypeEtNumero(TYPE_ID, 1)).thenReturn(Mono.just(version));
-        when(depotEntreprise.sauvegarder(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
-
-        StepVerifier.create(service.creer(TYPE_ID, 1, "Pharma Test", orgExistante, ctx))
-                .assertNext(ent -> assertThat(ent.organizationId()).isEqualTo(orgExistante))
-                .verifyComplete();
-
         verifyNoMoreInteractions(persisterEntreprise);
     }
 }

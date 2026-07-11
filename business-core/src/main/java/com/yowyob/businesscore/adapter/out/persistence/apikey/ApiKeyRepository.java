@@ -12,11 +12,12 @@ import java.util.UUID;
  */
 public interface ApiKeyRepository extends ReactiveCrudRepository<ApiKeyEntity, UUID> {
 
-    Mono<ApiKeyEntity> findByPrefix(String prefix);
-
-    Flux<ApiKeyEntity> findByDeveloperId(UUID developerId);
-
+    /** Candidates pour la résolution d'auth : confrontation du secret aux hachés (cf. auth manager). */
     Flux<ApiKeyEntity> findByDeveloperIdAndStatus(UUID developerId, String status);
 
+    Flux<ApiKeyEntity> findByEntrepriseIdAndStatus(UUID entrepriseId, String status);
+
     Mono<Long> countByDeveloperIdAndStatus(UUID developerId, String status);
+
+    Mono<Long> countByEntrepriseIdAndStatus(UUID entrepriseId, String status);
 }

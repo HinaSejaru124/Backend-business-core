@@ -1,6 +1,9 @@
 package com.yowyob.businesscore.adapter.in.rest.auth;
 
+import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
+import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
+import com.yowyob.businesscore.application.usecase.access.ResoudreDeveloppeurCourant;
 import com.yowyob.businesscore.application.usecase.auth.AuthentificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -26,9 +29,15 @@ import reactor.core.publisher.Mono;
 public class AuthController {
 
     private final AuthentificationService authentification;
+    private final ResoudreDeveloppeurCourant developpeurCourant;
+    private final DeveloperAccountRepository developerRepository;
 
-    public AuthController(AuthentificationService authentification) {
+    public AuthController(AuthentificationService authentification,
+                          ResoudreDeveloppeurCourant developpeurCourant,
+                          DeveloperAccountRepository developerRepository) {
         this.authentification = authentification;
+        this.developpeurCourant = developpeurCourant;
+        this.developerRepository = developerRepository;
     }
 
     @Operation(
@@ -48,12 +57,24 @@ public class AuthController {
 
     @Operation(
             summary = "Profil courant",
-            description = "Identité dérivée du JWT ou de la clé BC courante (dont le rôle owner).",
+            description = """
+                    Identité dérivée du JWT ou de la clé BC courante (dont le rôle owner), enrichie de
+                    l'identifiant développeur stable (`developerId`) — à conserver côté client, ne change
+                    jamais, sert à référencer ce développeur (ex. dans les intégrations tierces).
+                    """,
             security = {@SecurityRequirement(name = "bearerAuth")}
     )
     @ApiResponse(responseCode = "200", description = "Profil utilisateur")
     @GetMapping("/me")
     public Mono<MeResponse> me() {
-        return BusinessContextHolder.currentContext().map(MeResponse::depuis);
+        return BusinessContextHolder.currentContext()
+                .flatMap(this::avecIdentiteDeveloppeur);
+    }
+
+    private Mono<MeResponse> avecIdentiteDeveloppeur(BusinessContext ctx) {
+        return developpeurCourant.id()
+                .flatMap(developerRepository::findById)
+                .map(compte -> MeResponse.depuis(ctx, compte.getId(), compte.getEmail(), compte.getPlan()))
+                .defaultIfEmpty(MeResponse.depuis(ctx, null, null, null));
     }
 }

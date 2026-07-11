@@ -1,5 +1,6 @@
 package com.yowyob.businesscore.adapter.in.rest.access;
 
+import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.usecase.access.DashboardService;
 import com.yowyob.businesscore.application.usecase.access.ResoudreDeveloppeurCourant;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,7 +13,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
-@Tag(name = "Accès", description = "Inscription et gestion des clés d'API")
+/**
+ * Tableau de bord développeur — exclusivement JWT (cf. {@code SecurityConfig}). Statistiques agrégées
+ * et publiques uniquement (nombre d'entreprises, de clés actives, usage) : jamais de secret ni de
+ * détail de clé individuelle, voir {@code /v1/businesses/{id}/api-keys} pour la gestion d'une clé.
+ */
+@Tag(name = "Accès", description = "Tableau de bord développeur")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/v1/dashboard")
@@ -28,16 +34,16 @@ public class DashboardController {
     }
 
     @Operation(summary = "Tableau de bord développeur",
-            description = "Synthèse d'usage sur 30 jours et état des clés API du développeur courant.")
+            description = "Synthèse d'usage sur 30 jours et compteurs publics (entreprises, clés actives).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Données du tableau de bord"),
-            @ApiResponse(responseCode = "403", description = "Contexte développeur absent"),
             @ApiResponse(responseCode = "404", description = "Compte développeur introuvable")
     })
     @GetMapping
     public Mono<DashboardResponse> tableau() {
-        return developpeurCourant.id()
-                .flatMap(dashboardService::pour)
+        return BusinessContextHolder.currentContext()
+                .flatMap(ctx -> developpeurCourant.id()
+                        .flatMap(developerId -> dashboardService.pour(developerId, ctx.tenantId())))
                 .map(DashboardResponse::depuis);
     }
 }

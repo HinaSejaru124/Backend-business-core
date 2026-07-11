@@ -41,6 +41,7 @@ public class TransactionController {
             @Parameter(description = "Taille de page", example = "20")
             @RequestParam(defaultValue = "20") int size) {
         return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> ctx.verifierAcces(businessId))
                 .flatMapMany(ctx -> consulterTransaction.lister(businessId, page, size, ctx))
                 .map(TransactionResponse::depuis)
                 .collectList()
@@ -56,6 +57,7 @@ public class TransactionController {
     @GetMapping("/businesses/{businessId}/transactions/{billId}")
     public Mono<TransactionResponse> trouver(@PathVariable UUID businessId, @PathVariable UUID billId) {
         return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> ctx.verifierAcces(businessId))
                 .flatMap(ctx -> consulterTransaction.trouver(businessId, billId, ctx))
                 .map(TransactionResponse::depuis);
     }
@@ -70,6 +72,7 @@ public class TransactionController {
     public Mono<TransactionResponse> trouverCommande(@PathVariable UUID businessId,
                                                      @PathVariable UUID orderId) {
         return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> ctx.verifierAcces(businessId))
                 .flatMap(ctx -> consulterTransaction.trouverCommande(businessId, orderId, ctx))
                 .map(TransactionResponse::depuis);
     }

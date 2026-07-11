@@ -1,13 +1,12 @@
 package com.yowyob.businesscore.infrastructure.config;
 
-import com.yowyob.businesscore.adapter.in.rest.access.ApiKeyController;
-import com.yowyob.businesscore.adapter.in.rest.access.CreerCleRequest;
 import com.yowyob.businesscore.adapter.in.rest.access.DashboardController;
 import com.yowyob.businesscore.adapter.in.rest.auth.AuthController;
 import com.yowyob.businesscore.adapter.in.rest.auth.LoginRequest;
 import com.yowyob.businesscore.adapter.in.rest.businesstype.BusinessTypeController;
 import com.yowyob.businesscore.adapter.in.rest.enterprise.CreerEntrepriseRequest;
 import com.yowyob.businesscore.adapter.in.rest.enterprise.EntrepriseController;
+import com.yowyob.businesscore.adapter.in.rest.sync.SyncController;
 import com.yowyob.businesscore.adapter.in.security.ApiKeyAuthenticationConverter;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.parameters.Parameter;
@@ -31,18 +30,6 @@ class BcClientIdHeaderOperationCustomizerTest {
     }
 
     @Test
-    @DisplayName("POST /v1/api-keys : pas de headers BC (console dev JWT)")
-    void apiKeys_sansHeadersBc() throws Exception {
-        Operation operation = customize(
-                new ApiKeyController(null, null),
-                ApiKeyController.class.getDeclaredMethod("creer", CreerCleRequest.class));
-
-        assertThat(headerNames(operation)).doesNotContain(
-                ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
-                ApiKeyAuthenticationConverter.HEADER_API_KEY);
-    }
-
-    @Test
     @DisplayName("GET /v1/dashboard : pas de headers BC (console dev JWT)")
     void dashboard_sansHeadersBc() throws Exception {
         Operation operation = customize(
@@ -55,11 +42,35 @@ class BcClientIdHeaderOperationCustomizerTest {
     }
 
     @Test
-    @DisplayName("GET /v1/business-types : Bearer + headers BC documentés")
-    void businessTypes_integration() throws Exception {
+    @DisplayName("POST /v1/businesses : pas de headers BC (gestion réservée au JWT)")
+    void businesses_sansHeadersBc() throws Exception {
+        Operation operation = customize(
+                new EntrepriseController(null),
+                EntrepriseController.class.getDeclaredMethod("creer", CreerEntrepriseRequest.class));
+
+        assertThat(headerNames(operation)).doesNotContain(
+                ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
+                ApiKeyAuthenticationConverter.HEADER_API_KEY);
+    }
+
+    @Test
+    @DisplayName("GET /v1/business-types : pas de headers BC (gestion réservée au JWT)")
+    void businessTypes_sansHeadersBc() throws Exception {
         Operation operation = customize(
                 new BusinessTypeController(null, null, null),
                 BusinessTypeController.class.getDeclaredMethod("lister"));
+
+        assertThat(headerNames(operation)).doesNotContain(
+                ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
+                ApiKeyAuthenticationConverter.HEADER_API_KEY);
+    }
+
+    @Test
+    @DisplayName("GET /v1/sync : Bearer + headers BC documentés (seule route consommée par un terminal)")
+    void sync_integration() throws Exception {
+        Operation operation = customize(
+                new SyncController(null),
+                SyncController.class.getDeclaredMethod("consulter", long.class, Integer.class));
 
         assertThat(headerNames(operation)).contains(
                 ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
@@ -69,23 +80,10 @@ class BcClientIdHeaderOperationCustomizerTest {
     }
 
     @Test
-    @DisplayName("POST /v1/businesses : Bearer + headers BC documentés")
-    void businesses_integration() throws Exception {
-        Operation operation = customize(
-                new EntrepriseController(null),
-                EntrepriseController.class.getDeclaredMethod("creer", CreerEntrepriseRequest.class));
-
-        assertThat(headerNames(operation)).contains(
-                ApiKeyAuthenticationConverter.HEADER_CLIENT_ID,
-                ApiKeyAuthenticationConverter.HEADER_API_KEY);
-        assertThat(operation.getSecurity()).anyMatch(req -> req.containsKey("bearerAuth"));
-    }
-
-    @Test
     @DisplayName("POST /v1/auth/login : pas de headers BC (route publique)")
     void login_sansHeadersBc() throws Exception {
         Operation operation = customize(
-                new AuthController(null),
+                new AuthController(null, null, null),
                 AuthController.class.getDeclaredMethod("login", LoginRequest.class));
 
         assertThat(headerNames(operation)).isEmpty();
