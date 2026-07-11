@@ -7,6 +7,7 @@ import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccoun
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseEntity;
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseRepository;
 import com.yowyob.businesscore.application.context.BusinessContext;
+import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.usecase.access.ApiKeyService;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
@@ -94,13 +95,22 @@ public class ApiKeyReactiveAuthenticationManager implements ReactiveAuthenticati
      * Défense en profondeur : l'entreprise résolue doit réellement appartenir au tenant de ce
      * développeur et ne pas être fermée — ne devrait jamais échouer en usage normal (une entreprise ne
      * change pas de tenant après coup), mais protège contre toute anomalie de données.
+     *
+     * <p>À ce stade, l'authentification n'a pas encore abouti : {@link BusinessContextWebFilter} (qui
+     * peuple normalement le Reactor Context lu par le pool R2DBC pour positionner
+     * {@code app.current_tenant}) ne s'exécute qu'après. Sans ça, la RLS (FORCE) de {@code entreprise}
+     * masquerait la ligne même pour une clé valide. Le tenant étant déjà connu (compte développeur,
+     * table sans RLS), on l'injecte nous-mêmes dans le Reactor Context, le temps de cette requête.
      */
     private Mono<UUID> resoudreEntreprise(ApiKeyEntity cle, DeveloperAccountEntity account) {
+        BusinessContext contextePreliminaire = new BusinessContext(
+                account.getKernelTenantId(), null, Set.of(), null, UUID.randomUUID().toString(), Locale.getDefault());
         return entrepriseRepository.findById(cle.getEntrepriseId())
                 .filter(entreprise -> account.getKernelTenantId().equals(entreprise.getTenantId()))
                 .filter(entreprise -> !"FERMEE".equals(entreprise.getCycleVie()))
                 .map(EntrepriseEntity::getId)
-                .switchIfEmpty(Mono.error(new BadCredentialsException("Clé Business Core invalide")));
+                .switchIfEmpty(Mono.error(new BadCredentialsException("Clé Business Core invalide")))
+                .contextWrite(ctx -> BusinessContextHolder.withContext(ctx, contextePreliminaire));
     }
 
     private Authentication authentifie(DeveloperAccountEntity account, String onBehalfOf, UUID apiKeyId,
