@@ -44,7 +44,7 @@ final class OrganizationServiceOrder {
         if (!(raw instanceof List<?> list)) {
             return List.of();
         }
-        return list.stream().map(Object::toString).toList();
+        return list.stream().map(o -> o.toString()).toList();
     }
 
     /**
@@ -70,7 +70,7 @@ final class OrganizationServiceOrder {
                     continue;
                 }
                 dependants.get(dep).add(entry.code());
-                indegree.merge(entry.code(), 1, Integer::sum);
+                indegree.merge(entry.code(), 1, (a, b) -> a + b);
             }
         }
 
@@ -95,7 +95,7 @@ final class OrganizationServiceOrder {
             ordre.add(suivant);
             restants.remove(suivant);
             for (String dependant : dependants.get(suivant)) {
-                indegree.merge(dependant, -1, Integer::sum);
+                indegree.merge(dependant, -1, (a, b) -> a + b);
             }
         }
         return ordre;

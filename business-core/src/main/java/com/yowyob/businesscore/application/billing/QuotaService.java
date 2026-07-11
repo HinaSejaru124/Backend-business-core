@@ -4,7 +4,6 @@ import com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur;
 import com.yowyob.businesscore.adapter.out.cache.QuotaMensuelCompteur;
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyEntity;
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyRepository;
-import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyUsageDailyEntity;
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyUsageDailyRepository;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -91,7 +90,7 @@ public class QuotaService {
         LocalDate premierJour = mois.atDay(1);
         LocalDate today = LocalDate.now();
         return apiKeyRepository.findByDeveloperIdAndStatus(developerId, ApiKeyEntity.STATUT_ACTIVE)
-                .map(ApiKeyEntity::getId)
+                .map(cle -> cle.getId())
                 .collectList()
                 .flatMap(ids -> {
                     if (ids.isEmpty()) {
@@ -100,12 +99,12 @@ public class QuotaService {
                     Mono<Long> histo = usageRepository
                             .findByApiKeyIdInAndJourGreaterThanEqual(ids, premierJour)
                             .filter(r -> r.getJour().isBefore(today))
-                            .map(ApiKeyUsageDailyEntity::getTotal)
-                            .reduce(0L, Long::sum);
+                            .map(r -> r.getTotal())
+                            .reduce(0L, (a, b) -> a + b);
                     Mono<Long> live = Flux.fromIterable(ids)
                             .flatMap(id -> liveCompteur.lireJour(id, today))
-                            .map(ApiKeyUsageCompteur.UsageJournalier::total)
-                            .reduce(0L, Long::sum);
+                            .map(u -> u.total())
+                            .reduce(0L, (a, b) -> a + b);
                     return Mono.zip(histo, live).map(t -> t.getT1() + t.getT2());
                 });
     }

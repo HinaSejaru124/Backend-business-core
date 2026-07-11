@@ -12,7 +12,6 @@ import com.yowyob.businesscore.adapter.in.rest.sync.SyncController;
 import com.yowyob.businesscore.adapter.in.security.ApiKeyAuthenticationConverter;
 import java.util.UUID;
 import io.swagger.v3.oas.models.Operation;
-import io.swagger.v3.oas.models.parameters.Parameter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -138,7 +137,7 @@ class BcClientIdHeaderOperationCustomizerTest {
         }
         return operation.getParameters().stream()
                 .filter(p -> "header".equals(p.getIn()))
-                .map(Parameter::getName)
+                .map(p -> p.getName())
                 .toList();
     }
 }

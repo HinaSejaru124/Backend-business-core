@@ -39,7 +39,7 @@ public class ResoudreDeveloppeurCourant {
         return developerRepository.findByKernelTenantId(ctx.tenantId())
                 .switchIfEmpty(resoudreParJwt(ctx))
                 .switchIfEmpty(provisionnerDepuisJwt(ctx))
-                .map(DeveloperAccountEntity::getId)
+                .map(account -> account.getId())
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                         "Compte développeur introuvable pour ce tenant. "
                                 + "Inscrivez-vous via POST /v1/registration puis reconnectez-vous via POST /v1/auth/login.")));

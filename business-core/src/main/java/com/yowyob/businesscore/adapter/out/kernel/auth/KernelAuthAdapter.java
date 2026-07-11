@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.yowyob.businesscore.application.error.ProblemException;
@@ -63,18 +64,28 @@ public Mono<ResultatLogin> login(String principal, String motDePasse) {
             .bodyValue(discoverBody)
             .retrieve()
             .onStatus(status -> status.value() == 401 || status.value() == 403,
-                    reponse -> reponse.bodyToMono(Map.class).defaultIfEmpty(Map.of()).flatMap(corps -> {
-                        String message = corps.get("message") instanceof String s
-                                ? s : "Identifiant ou mot de passe invalide.";
-                        return Mono.error(new ProblemException(
-                                HttpStatus.UNAUTHORIZED, "Authentification refusée", message));
-                    }))
+                    this::erreurDiscoverContexte)
             .bodyToMono(Map.class)
             .timeout(Duration.ofMillis(kernelProperties.timeoutMs()))
             .flatMap(discoverReponse -> selectPremierContexte(discoverReponse, principal, motDePasse))
             .onErrorMap(ex -> !(ex instanceof ProblemException), ex -> new ProblemException(
                     HttpStatus.SERVICE_UNAVAILABLE, "Service indisponible",
                     "Le service d'authentification est momentanément indisponible. Réessayez dans quelques instants."));
+}
+
+    private Mono<Throwable> erreurDiscoverContexte(ClientResponse reponse) {
+        return reponse.bodyToMono(Map.class)
+                .defaultIfEmpty(Map.of())
+                .flatMap(corps -> {
+                    String message = corps.get("message") instanceof String s
+                            ? s : "Identifiant ou mot de passe invalide.";
+                    return Mono.<Throwable>error(new ProblemException(
+                            HttpStatus.UNAUTHORIZED, "Authentification refusée", message));
+                })
+                .onErrorResume(ProblemException.class, Mono::error)
+                .onErrorResume(ex -> Mono.error(new ProblemException(
+                        HttpStatus.UNAUTHORIZED, "Authentification refusée",
+                        "Identifiant ou mot de passe invalide.")));
 }
 
 private Mono<ResultatLogin> selectPremierContexte(Map<?, ?> discoverReponse,
