@@ -90,6 +90,7 @@ private static final String[] ROUTES_PUBLIQUES = {
             ProblemAccessDeniedHandler accessDeniedHandler,
             com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur usageCompteur,
             com.yowyob.businesscore.application.billing.QuotaService quotaService,
+            com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogWriter requeteLogWriter,
             com.yowyob.businesscore.adapter.in.rest.error.ProblemResponseWriter problemResponseWriter) {
 
         // Authentification par clé Business Core (X-BC-*) — réservée aux routes d'usage runtime d'une
@@ -127,7 +128,11 @@ private static final String[] ROUTES_PUBLIQUES = {
                 .addFilterAfter(new QuotaEnforcementWebFilter(quotaService, problemResponseWriter),
                         SecurityWebFiltersOrder.AUTHENTICATION)
                 // Comptabilise l'usage par clé API (dashboard développeur + compteur mensuel de quota).
-                .addFilterAfter(new UsageTrackingWebFilter(usageCompteur, quotaService),
+                .addFilterAfter(new UsageTrackingWebFilter(usageCompteur, quotaService, requeteLogWriter),
+                        SecurityWebFiltersOrder.AUTHENTICATION)
+                // Journalise le flux JWT (design-time) dans le même onglet Audit / Requêtes, marqué
+                // non-facturable — cf. DesignTimeAuditWebFilter.
+                .addFilterAfter(new DesignTimeAuditWebFilter(requeteLogWriter),
                         SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }

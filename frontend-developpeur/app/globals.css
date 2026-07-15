@@ -13,7 +13,7 @@ html {
 body {
   /* Blanc cassé légèrement bleu (moins agressif que le blanc pur) */
   background-color: #f3f6fd;
-  color: #101828;
+  color: #0f1b33;
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: 16.5px;
   -webkit-font-smoothing: antialiased;
@@ -32,9 +32,10 @@ body {
   h2,
   h3,
   h4 {
-    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-    color: #0b1b3a;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    color: #0a1730;
     letter-spacing: -0.02em;
+    font-weight: 700;
   }
   :focus-visible {
     outline: 2px solid #1b4df5;
@@ -64,6 +65,21 @@ body {
     background-position: center;
   }
 
+  /* Halo lumineux radial (bleu marque) — utilisé derrière les panneaux de code du hero. */
+  .glow-orb {
+    background: radial-gradient(closest-side, rgba(27, 77, 245, 0.28), transparent 70%);
+    filter: blur(20px);
+  }
+
+  /* Légère inclinaison 3D façon vitrine produit — s'aplatit au survol pour un effet vivant. */
+  .tilt-code {
+    transform: perspective(1400px) rotateY(-7deg) rotateX(3deg);
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .tilt-code:hover {
+    transform: perspective(1400px) rotateY(-2deg) rotateX(1deg) translateY(-4px);
+  }
+
   /* Apparition au scroll (piloté par le composant Reveal) */
   .reveal {
     opacity: 0;
@@ -74,6 +90,17 @@ body {
   .reveal.is-visible {
     opacity: 1;
     transform: none;
+  }
+
+  /* Cartes du dashboard — élévation + ombre douce + halo bleu au survol. */
+  .card-hover {
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.22s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-3px);
+    border-color: rgba(27, 77, 245, 0.28);
+    box-shadow: 0 20px 45px -18px rgba(27, 77, 245, 0.35), 0 8px 20px -8px rgba(11, 27, 58, 0.12);
   }
 
   /* Soulignement animé des liens de navigation */

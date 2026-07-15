@@ -163,3 +163,10 @@ export function IconLogout(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function IconCrown(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3 8l4 4 5-7 5 7 4-4-2 11H5L3 8zM6 21h12" />
+    </svg>
+  );
+}

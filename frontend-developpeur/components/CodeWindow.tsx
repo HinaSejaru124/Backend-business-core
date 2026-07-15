@@ -70,16 +70,16 @@ export default function CodeWindow({
     <div
       ref={ref}
       className={cn(
-        "group border border-ink/20 bg-ink text-slate-200 shadow-pop transition-all duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-[0_18px_44px_rgba(11,27,58,0.24)]",
+        "group overflow-hidden rounded-2xl border border-ink/20 bg-ink text-slate-200 shadow-glow transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-brand/50 hover:shadow-[0_40px_80px_-20px_rgba(27,77,245,.45)]",
         className
       )}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
         <div className="flex items-center gap-3 font-mono text-[12px] text-slate-400">
           <span className="flex gap-1.5" aria-hidden>
-            <span className="h-2.5 w-2.5 bg-white/15 transition-colors group-hover:bg-white/30" />
-            <span className="h-2.5 w-2.5 bg-white/15 transition-colors group-hover:bg-white/30" />
-            <span className="h-2.5 w-2.5 bg-brand/70 transition-colors group-hover:bg-brand" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]/70 transition-colors group-hover:bg-[#FF5F57]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]/70 transition-colors group-hover:bg-[#FEBC2E]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]/70 transition-colors group-hover:bg-[#28C840]" />
           </span>
           {filename && <span>{filename}</span>}
         </div>

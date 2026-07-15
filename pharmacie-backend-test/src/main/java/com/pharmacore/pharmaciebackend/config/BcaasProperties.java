@@ -12,6 +12,13 @@ public record BcaasProperties(
         String clientId,
         String apiKey,
         String typeId,
-        int versionNumber
+        int versionNumber,
+        /**
+         * Identifiant de l'entreprise Business Core que PharmaCore représente. La caisse (clé API) le
+         * résout dynamiquement via {@code GET /v1/businesses/me} ; l'espace admin (JWT), lui, n'a pas de
+         * « me » (un développeur gère plusieurs entreprises), d'où cette valeur explicite pour cibler
+         * la bonne entreprise lors de la modélisation.
+         */
+        String businessId
 ) {
 }

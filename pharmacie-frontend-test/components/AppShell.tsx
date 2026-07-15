@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useSession } from "@/lib/useSession";
+import { estAutorise, homePour, LIBELLE_ROLE } from "@/lib/roles";
+import { logout } from "@/lib/api";
+import type { Role } from "@/lib/types";
 import {
   IconLayers,
   IconCart,
@@ -16,52 +20,107 @@ import {
   IconAlertTriangle,
   IconMenu,
   IconClose,
+  IconShield,
+  IconLogout,
 } from "./icons";
 
 type NavItem = { href: string; label: string; icon: typeof IconLayers; exact?: boolean };
+type NavGroup = { label: string; items: NavItem[] };
 
-/** Sections groupées (adapté du modèle fourni — pas copié, palette et radius restent les nôtres). */
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Principal",
-    items: [
-      { href: "/", label: "Tableau de bord", icon: IconLayers, exact: true },
-      // "exact" sur /vente : sinon "/ventes".startsWith("/vente") === true et les deux
-      // items s'activaient ensemble (bug signalé — collision de préfixe entre les deux routes).
-      { href: "/vente", label: "Vente", icon: IconCart, exact: true },
-    ],
-  },
-  {
-    label: "Catalogue & stock",
-    items: [
-      { href: "/medicaments", label: "Médicaments", icon: IconPill },
-      { href: "/alertes", label: "Alertes stock", icon: IconAlertTriangle },
-      { href: "/fournisseurs", label: "Fournisseurs", icon: IconTruck },
-    ],
-  },
-  {
-    label: "Patients & ventes",
-    items: [
+/** Chaque rôle ne voit que sa propre navigation — c'est ici que « chacun a son espace » se concrétise. */
+function navGroupsPour(role: Role | null): NavGroup[] {
+  if (role === "TITULAIRE") {
+    return [
+      {
+        label: "Principal",
+        items: [{ href: "/", label: "Tableau de bord", icon: IconLayers, exact: true }],
+      },
+      {
+        label: "Catalogue & stock",
+        items: [
+          { href: "/medicaments", label: "Médicaments", icon: IconPill },
+          { href: "/alertes", label: "Alertes stock", icon: IconAlertTriangle },
+          { href: "/fournisseurs", label: "Fournisseurs", icon: IconTruck },
+          { href: "/commandes", label: "Commandes fournisseurs", icon: IconCart },
+        ],
+      },
+      {
+        label: "Patients & ventes",
+        items: [
+          { href: "/clients", label: "Clients", icon: IconUsers },
+          { href: "/ordonnances", label: "Ordonnances", icon: IconFileText },
+          { href: "/ventes", label: "Historique des ventes", icon: IconHistory },
+        ],
+      },
+      {
+        label: "Équipe",
+        items: [{ href: "/admin", label: "Personnel", icon: IconShield }],
+      },
+    ];
+  }
+  if (role === "PHARMACIEN_RESPONSABLE" || role === "CAISSIER") {
+    const items: NavItem[] = [
+      { href: "/vente", label: "Poste de vente", icon: IconCart, exact: true },
       { href: "/clients", label: "Clients", icon: IconUsers },
-      { href: "/ordonnances", label: "Ordonnances", icon: IconFileText },
-      { href: "/ventes", label: "Historique des ventes", icon: IconHistory },
-    ],
-  },
-];
-const NAV = NAV_GROUPS.flatMap((g) => g.items);
+    ];
+    if (role === "PHARMACIEN_RESPONSABLE") {
+      items.push({ href: "/ordonnances", label: "Ordonnances", icon: IconFileText });
+    }
+    return [{ label: "Principal", items }];
+  }
+  return [];
+}
 
 /**
- * Shell plein écran unique de PharmaCore — sidebar plein-vert foncé (pas de distinction
- * site vitrine / espace connecté, contrairement à frontend-developpeur) : cette application
- * EST la console, du début à la fin. Pas d'authentification en v1 (cf. frontend-test.md §1).
+ * Shell plein écran de PharmaCore — sidebar plein-vert foncé, navigation propre à chaque rôle. La page
+ * de connexion ({@code /connexion}) n'a pas de shell (écran de bienvenue à part) ; toutes les autres
+ * routes sont gardées : session absente → redirection vers la connexion, rôle non autorisé pour la
+ * route courante → redirection vers l'espace naturel du rôle (cf. lib/roles.ts).
  */
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const { session, rafraichir } = useSession();
+
+  const estConnexion = pathname === "/connexion";
+
+  useEffect(() => {
+    if (estConnexion || session.state !== "ok") return;
+    if (!session.data?.connecte) {
+      router.replace("/connexion");
+      return;
+    }
+    if (!estAutorise(pathname, session.data.role)) {
+      router.replace(homePour(session.data.role));
+    }
+  }, [estConnexion, session, pathname, router]);
+
+  if (estConnexion) {
+    return <>{children}</>;
+  }
+
+  if (session.state === "loading") {
+    return <div className="grid min-h-screen place-items-center text-sm text-muted">Chargement…</div>;
+  }
+
+  if (!session.data?.connecte || !estAutorise(pathname, session.data.role)) {
+    return null; // redirection en cours (useEffect ci-dessus)
+  }
+
+  const role = session.data.role;
+  const NAV_GROUPS = navGroupsPour(role);
+  const NAV = NAV_GROUPS.flatMap((g) => g.items);
 
   const isActive = (item: NavItem) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
   const current = NAV.find(isActive)?.label ?? "PharmaCore";
+
+  async function onDeconnexion() {
+    await logout().catch(() => {});
+    rafraichir();
+    router.replace("/connexion");
+  }
 
   return (
     <div className="flex min-h-screen bg-subtle">
@@ -108,12 +167,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="flex-none border-t border-white/10 px-6 py-5">
-          <p className="font-mono text-[10.5px] leading-relaxed text-white/50">
-            Bâtie avec la clé API Business Core.
-            <br />
-            Application de test — GUIDE-PROJET-PHARMACORE.md
-          </p>
+        <div className="flex-none border-t border-white/10 px-5 py-5">
+          <div className="mb-3 px-1">
+            <div className="truncate text-[13px] font-medium text-white">{session.data.nomAffichage}</div>
+            <div className="font-mono text-[10.5px] uppercase tracking-wider text-brand">
+              {role ? LIBELLE_ROLE[role] : ""}
+            </div>
+          </div>
+          <button
+            onClick={onDeconnexion}
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-[13.5px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <IconLogout className="h-4 w-4 text-brand" />
+            Déconnexion
+          </button>
         </div>
       </aside>
 
@@ -136,7 +203,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         {open && (
-          <div className="flex gap-1 overflow-x-auto border-b border-line bg-ink px-3 py-2 md:hidden">
+          <div className="flex flex-col gap-1 overflow-x-auto border-b border-line bg-ink px-3 py-2 md:hidden">
             {NAV.map((item) => (
               <Link
                 key={item.href}
@@ -150,6 +217,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 {item.label}
               </Link>
             ))}
+            <button
+              onClick={onDeconnexion}
+              className="flex-none whitespace-nowrap px-3 py-2 text-left text-[13px] font-medium text-white/70 hover:text-white"
+            >
+              Déconnexion
+            </button>
           </div>
         )}
 

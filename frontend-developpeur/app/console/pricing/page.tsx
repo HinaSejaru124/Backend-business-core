@@ -10,6 +10,8 @@ import {
   type Plan,
 } from "@/lib/api";
 import { Button } from "@/components/Button";
+import DonutChart from "@/components/DonutChart";
+import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/cn";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
@@ -29,7 +31,7 @@ function Sparkline({ points }: { points: { jour: string; total: number }[] }) {
       {points.map((p) => (
         <div
           key={p.jour}
-          className={cn("flex-1", p.total > 0 ? "bg-brand" : "bg-line")}
+          className={cn("flex-1 rounded-sm", p.total > 0 ? "bg-ok" : "bg-line")}
           style={{ height: p.total > 0 ? `${Math.max(6, (p.total / max) * 100)}%` : "4px" }}
           title={`${p.jour} · ${p.total} requête${p.total > 1 ? "s" : ""}`}
         />
@@ -43,6 +45,7 @@ function fmt(n: number): string {
 }
 
 export default function ConsolePricingPage() {
+  const { refresh } = useAuth();
   const [usage, setUsage] = useState<Charge<Dashboard | null>>({ state: "loading", data: null });
   const [plans, setPlans] = useState<Plan[]>([]);
   const [enCours, setEnCours] = useState<string | null>(null); // code plan en cours d'upgrade
@@ -73,6 +76,7 @@ export default function ConsolePricingPage() {
       if (res.statut === "CONFIRME") {
         setMessage({ type: "ok", texte: `Plan changé : vous êtes maintenant en ${res.plan}.` });
         charger(); // recharge plan + quota réels
+        void refresh(); // resynchronise profil.plan (auth-context) — alimente le badge de la navbar
       } else {
         setMessage({
           type: "ok",
@@ -92,7 +96,7 @@ export default function ConsolePricingPage() {
   return (
     <div className="animate-fade-up space-y-10 py-4">
       <div className="border-b border-line pb-6">
-        <div className="font-mono text-[12px] uppercase tracking-wider text-brand">Facturation</div>
+        <div className="text-[12px] font-semibold uppercase tracking-wider text-brand">Facturation</div>
         <h1 className="mt-2 font-display text-3xl font-bold text-ink">Tarifs &amp; Consommation</h1>
         <p className="mt-1 text-sm text-muted">
           Modèle à l&apos;usage : chaque requête de vos applications est comptée. Choisissez le plan
@@ -128,7 +132,7 @@ export default function ConsolePricingPage() {
           <>
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
-                <div className="font-mono text-xs uppercase tracking-wider text-muted">Plan actuel</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted">Plan actuel</div>
                 <div className="mt-1.5 font-display text-2xl font-bold text-ink">{d.plan}</div>
               </div>
               <div className="text-right">
@@ -148,9 +152,9 @@ export default function ConsolePricingPage() {
             </div>
 
             {d.quotaMensuel > 0 && (
-              <div className="mt-4 h-2.5 w-full overflow-hidden bg-subtle">
+              <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-subtle">
                 <div
-                  className={cn("h-full", d.bloque ? "bg-danger" : "bg-brand")}
+                  className={cn("h-full rounded-full", d.bloque ? "bg-danger" : "bg-ok")}
                   style={{ width: `${Math.min(100, (d.requetesCeMois / d.quotaMensuel) * 100)}%` }}
                 />
               </div>
@@ -174,17 +178,17 @@ export default function ConsolePricingPage() {
           <h2 className="font-display text-lg font-semibold text-ink">Votre consommation</h2>
           <div className="mt-5 grid gap-6 sm:grid-cols-3">
             <div className="border border-line bg-subtle p-5">
-              <div className="font-mono text-xs font-semibold text-muted">Ce mois</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted">Ce mois</div>
               <div className="mt-2 font-display text-3xl font-bold text-ink">{fmt(d.requetesCeMois)}</div>
             </div>
             <div className="border border-line bg-subtle p-5">
-              <div className="font-mono text-xs font-semibold text-muted">Aujourd&apos;hui</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted">Aujourd&apos;hui</div>
               <div className="mt-2 font-display text-3xl font-bold text-ink">
                 {fmt(d.requetesAujourdhui)}
               </div>
             </div>
             <div className="border border-line bg-subtle p-5">
-              <div className="font-mono text-xs font-semibold text-muted">Taux d&apos;erreur</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted">Taux d&apos;erreur</div>
               <div className="mt-2 font-display text-3xl font-bold text-ink">
                 {(d.tauxErreur * 100).toFixed(1)}
                 <span className="text-lg text-muted">%</span>
@@ -192,7 +196,7 @@ export default function ConsolePricingPage() {
             </div>
           </div>
           <div className="mt-6">
-            <div className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
               30 derniers jours
             </div>
             {d.sparkline.length > 0 ? (
@@ -204,7 +208,49 @@ export default function ConsolePricingPage() {
         </div>
       )}
 
-      {/* Catalogue des plans */}
+      {/* Répartition par entreprise / clé API (donut réel) + aperçu de la liste des requêtes */}
+      {d && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="border border-line bg-white p-6">
+            <h2 className="font-display text-lg font-semibold text-ink">Requêtes par entreprise / clé</h2>
+            <p className="mt-1 text-sm text-muted">Sur les 30 derniers jours — une clé active par entreprise.</p>
+            <div className="mt-5">
+              <DonutChart slices={d.topEntreprises.map((e) => ({ label: e.nom, value: e.total }))} />
+            </div>
+          </div>
+
+          <div className="flex flex-col border border-line bg-white p-6">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-display text-lg font-semibold text-ink">Liste des requêtes</h2>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">par jour</span>
+            </div>
+            <p className="mt-1 text-sm text-muted">Nombre réel de requêtes comptabilisées, jour par jour.</p>
+            <div className="mt-4 max-h-64 overflow-y-auto">
+              {[...d.sparkline].filter((p) => p.total > 0).reverse().length === 0 ? (
+                <div className="py-6 text-sm text-muted">Aucune requête sur la période.</div>
+              ) : (
+                <table className="w-full border-collapse text-sm">
+                  <tbody>
+                    {[...d.sparkline]
+                      .filter((p) => p.total > 0)
+                      .reverse()
+                      .map((p) => (
+                        <tr key={p.jour} className="border-b border-line last:border-0">
+                          <td className="py-2.5 text-body">{p.jour}</td>
+                          <td className="py-2.5 text-right font-semibold text-ink">
+                            {fmt(p.total)} <span className="text-xs font-normal text-muted">req</span>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Catalogue des plans — « Changer le plan », tout en bas */}
       <div>
         <h2 className="font-display text-lg font-semibold text-ink">Changer de plan</h2>
         <p className="mt-1 text-sm text-muted">

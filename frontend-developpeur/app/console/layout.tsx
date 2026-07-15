@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import Logo from "@/components/Logo";
 import { ButtonLink } from "@/components/Button";
-import { Banner } from "@/components/Feedback";
 import {
   IconLayers,
   IconKey,
@@ -72,9 +71,13 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
       <div className="grid min-h-screen place-items-center bg-subtle px-6">
         <div className="w-full max-w-md border border-line bg-white p-8 text-center">
           <IconShield className="mx-auto h-6 w-6 text-brand" />
-          <h1 className="mt-4 font-display text-xl font-bold text-ink">Connexion requise</h1>
+          <h1 className="mt-4 font-display text-xl font-bold text-ink">
+            {sessionExpired ? "Session expirée" : "Connexion requise"}
+          </h1>
           <p className="mt-2 text-sm text-muted">
-            Votre session n&apos;est pas active. Connectez-vous pour accéder à votre espace.
+            {sessionExpired
+              ? "Votre session a expiré. Reconnectez-vous pour continuer."
+              : "Votre session n'est pas active. Connectez-vous pour accéder à votre espace."}
           </p>
           <ButtonLink href="/login?tab=login" className="mt-6 w-full">
             Se connecter
@@ -98,31 +101,18 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-subtle">
-      {/* ── Sidebar ── */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-line bg-white md:flex">
+      {/* ── Sidebar — fond clair, l'item actif se teinte légèrement en bleu.
+           La bordure droite ne s'applique PAS au bandeau du haut (logo) : ainsi la barre
+           supérieure est lisse et continue, avec un seul trait horizontal. ── */}
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-white md:flex">
         <div className="flex h-16 flex-none items-center border-b border-line px-6">
           <Link href="/console" aria-label="Business Core">
             <Logo plain />
           </Link>
         </div>
 
-        {/* Compte réel */}
-        <div className="border-b border-line px-4 py-4">
-          <div className="flex items-center gap-3">
-            <span className="grid h-9 w-9 flex-none place-items-center bg-ink font-mono text-sm font-semibold text-white">
-              {(principal || "?").charAt(0).toUpperCase()}
-            </span>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-ink">{principal || "Mon compte"}</div>
-              <div className="mt-0.5 font-mono text-[11px] uppercase tracking-wider text-muted">
-                {profil?.owner ? <span className="text-brand">Owner</span> : "Développeur"}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {/* Navigation — hover progressif, actif = fond bleu clair + barre bleu foncé */}
+        <nav className="flex-1 overflow-y-auto border-r border-line px-3 py-4">
           {NAV.map((item) => {
             const Icon = item.icon;
             const activeItem = isActive(item);
@@ -131,13 +121,25 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 border-l-2 px-3 py-2.5 text-sm transition-colors",
+                  "group relative flex items-center gap-3 overflow-hidden px-3 py-2.5 text-sm transition-all duration-200 ease-out",
                   activeItem
-                    ? "border-brand bg-tint font-medium text-ink"
-                    : "border-transparent text-muted hover:bg-subtle hover:text-ink"
+                    ? "bg-tint font-medium text-ink"
+                    : "text-muted hover:translate-x-0.5 hover:bg-subtle hover:text-ink"
                 )}
               >
-                <Icon className={cn("h-4 w-4", activeItem ? "text-brand" : "text-muted")} />
+                <span
+                  className={cn(
+                    "absolute inset-y-1 left-0 w-[3px] bg-brand transition-transform duration-200 ease-out",
+                    activeItem ? "scale-y-100" : "scale-y-0 group-hover:scale-y-100"
+                  )}
+                  aria-hidden
+                />
+                <Icon
+                  className={cn(
+                    "h-4 w-4 transition-colors",
+                    activeItem ? "text-brand" : "text-muted group-hover:text-brand"
+                  )}
+                />
                 {item.label}
               </Link>
             );
@@ -151,15 +153,15 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
               href={`${API_BASE}/swagger-ui.html`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted transition-colors hover:bg-subtle hover:text-ink"
+              className="group flex items-center gap-3 px-3 py-2.5 text-sm text-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-subtle hover:text-ink"
             >
-              <IconExternal className="h-4 w-4" /> Swagger UI
+              <IconExternal className="h-4 w-4 transition-colors group-hover:text-brand" /> Swagger UI
             </a>
           </div>
         </nav>
 
         {/* Déconnexion */}
-        <div className="flex-none border-t border-line p-3">
+        <div className="flex-none border-r border-t border-line p-3">
           <button
             onClick={onLogout}
             className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-danger transition-colors hover:bg-danger/5"
@@ -171,20 +173,23 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
 
       {/* ── Zone principale (décalée de la sidebar) ── */}
       <div className="flex min-w-0 flex-1 flex-col md:pl-64">
-        {/* Barre supérieure */}
-        <header className="sticky top-0 z-30 flex h-16 flex-none items-center justify-between gap-4 border-b border-line bg-white/85 px-6 backdrop-blur-md md:px-10">
+        {/* Barre supérieure — identité connectée en haut à droite (seul endroit où elle apparaît) */}
+        <header className="sticky top-0 z-30 flex h-16 flex-none items-center justify-between gap-4 border-b border-line bg-tint/80 px-6 backdrop-blur-md md:px-10">
           <div className="min-w-0">
-            <div className="font-mono text-[11px] uppercase tracking-wider text-muted">Console</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">Console</div>
             <div className="truncate font-display text-[15px] font-semibold text-ink">{current}</div>
           </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="hidden items-center gap-1.5 text-sm text-muted transition-colors hover:text-ink sm:flex"
-            >
-              <IconExternal className="h-4 w-4" /> Voir le site
-            </Link>
-            <span className="grid h-9 w-9 place-items-center bg-ink font-mono text-sm font-semibold text-white">
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <div className="truncate text-[13.5px] font-semibold leading-tight text-ink">
+                {principal || "Mon compte"}
+              </div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                {profil?.owner ? <span className="text-brand">Owner</span> : "Développeur"}
+                {profil?.plan && <span> · {profil.plan}</span>}
+              </div>
+            </div>
+            <span className="grid h-9 w-9 flex-none place-items-center bg-gradient-to-br from-ink to-[#132a5c] font-mono text-sm font-semibold text-white shadow-glow-sm">
               {(principal || "?").charAt(0).toUpperCase()}
             </span>
           </div>
@@ -213,16 +218,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Contenu — pleine largeur */}
-        <div className="flex-1 px-6 py-8 md:px-10">
-          {sessionExpired && status === "anon" && (
-            <div className="mb-6">
-              <Banner variant="warning">
-                Session expirée — reconnectez-vous pour continuer.
-              </Banner>
-            </div>
-          )}
-          {children}
-        </div>
+        <div className="flex-1 px-6 py-8 md:px-10">{children}</div>
       </div>
     </div>
   );

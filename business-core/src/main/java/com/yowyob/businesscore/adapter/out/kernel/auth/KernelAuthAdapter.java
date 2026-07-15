@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,6 +21,7 @@ import com.yowyob.businesscore.domain.port.out.SignUpResult;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Adapter d'authentification : implémente {@link AuthentifierUtilisateur} via
@@ -34,6 +37,8 @@ import reactor.core.publisher.Mono;
  */
 @Component
 public class KernelAuthAdapter implements AuthentifierUtilisateur {
+
+    private static final Logger log = LoggerFactory.getLogger(KernelAuthAdapter.class);
 
     private static final String HEADER_CLIENT_ID = "X-Client-Id";
     private static final String HEADER_API_KEY = "X-Api-Key";
@@ -66,11 +71,32 @@ public Mono<ResultatLogin> login(String principal, String motDePasse) {
             .onStatus(status -> status.value() == 401 || status.value() == 403,
                     this::erreurDiscoverContexte)
             .bodyToMono(Map.class)
-            .timeout(Duration.ofMillis(kernelProperties.timeoutMs()))
+            .transform(this::resilience)
             .flatMap(discoverReponse -> selectPremierContexte(discoverReponse, principal, motDePasse))
-            .onErrorMap(ex -> !(ex instanceof ProblemException), ex -> new ProblemException(
-                    HttpStatus.SERVICE_UNAVAILABLE, "Service indisponible",
-                    "Le service d'authentification est momentanément indisponible. Réessayez dans quelques instants."));
+            .onErrorMap(ex -> !(ex instanceof ProblemException), ex -> {
+                log.warn("Échec discover-contexts/select-context (kernel) pour '{}' : {}",
+                        principal, ex.toString());
+                return new ProblemException(
+                        HttpStatus.SERVICE_UNAVAILABLE, "Service indisponible",
+                        "Le service d'authentification est momentanément indisponible. Réessayez dans quelques instants.");
+            });
+}
+
+/**
+ * Résilience des appels d'authentification (kernel). Le kernel RT-Comops a une latence très variable
+ * (observé : de 1s à plus de 9s sur le même appel selon la charge) ; un timeout de 5s et une absence
+ * totale de retry — l'ancien comportement — faisaient donc échouer la connexion de façon intermittente
+ * sur des comptes pourtant valides. On aligne sur le même pattern que {@code KernelClient.resilience}
+ * (timeout généreux + retry avec backoff), la seule différence tolérable en cas d'échec persistant
+ * étant l'endroit où l'échec est loggé (ici, avec le principal concerné pour le diagnostic).
+ */
+private <T> Mono<T> resilience(Mono<T> source) {
+    Mono<T> avecTimeout = source.timeout(Duration.ofMillis(kernelProperties.timeoutMs()));
+    int maxRetries = kernelProperties.maxRetries();
+    return maxRetries > 0
+            ? avecTimeout.retryWhen(Retry.backoff(maxRetries, Duration.ofMillis(300))
+                    .filter(ex -> !(ex instanceof ProblemException)))
+            : avecTimeout;
 }
 
     private Mono<Throwable> erreurDiscoverContexte(ClientResponse reponse) {
@@ -102,7 +128,24 @@ private Mono<ResultatLogin> selectPremierContexte(Map<?, ?> discoverReponse,
                 "Aucun contexte disponible pour cet utilisateur."));
     }
 
-    return essayerContexte(contexts, 0, selectionToken, null);
+    return essayerContexte(trierParUtilite(contexts), 0, selectionToken, null);
+}
+
+/**
+ * Priorise les contextes qui portent au moins une organisation. Un compte avec plusieurs contextes
+ * kernel (cf. BUG #3 ci-dessous) peut avoir un contexte "coquille vide" (0 organisation — résidu d'un
+ * compte dupliqué) qui répond pourtant à select-context sans erreur : sans ce tri, {@link #essayerContexte}
+ * s'arrête dessus (premier succès) et le développeur atterrit dans un tenant vide, alors qu'un autre
+ * contexte du même compte a ses vraies entreprises. Tri stable : à nombre d'organisations égal, l'ordre
+ * du kernel est conservé.
+ */
+private static List<?> trierParUtilite(List<?> contexts) {
+    return contexts.stream()
+            .sorted(java.util.Comparator.comparingInt((Object c) -> {
+                Object orgs = ((Map<?, ?>) c).get("organizations");
+                return orgs instanceof List<?> l ? -l.size() : 0;
+            }))
+            .toList();
 }
 
 /**
@@ -160,7 +203,7 @@ private Mono<ResultatLogin> essayerContexte(List<?> contexts, int index, String 
                     reponse -> reponse.bodyToMono(Map.class).defaultIfEmpty(Map.of()).flatMap(corps ->
                             Mono.error(erreurSelectContexte(corps))))
             .bodyToMono(Map.class)
-            .timeout(Duration.ofMillis(kernelProperties.timeoutMs()))
+            .transform(this::resilience)
             .flatMap(this::versResultat)
             .onErrorResume(ProblemException.class, ex -> essayerContexte(
                     contexts, index + 1, selectionToken, premiereErreur != null ? premiereErreur : ex));
@@ -272,11 +315,14 @@ private Mono<ResultatLogin> versResultat(Map<?, ?> corps) {
                                     HttpStatus.BAD_REQUEST, "Inscription refusée", message));
                         }))
                 .bodyToMono(Map.class)
-                .timeout(Duration.ofMillis(kernelProperties.timeoutMs()))
+                .transform(this::resilience)
                 .map(this::versSignUpResult)
-                .onErrorMap(ex -> !(ex instanceof ProblemException), ex -> new ProblemException(
-                        HttpStatus.SERVICE_UNAVAILABLE, "Service indisponible",
-                        "Le service d'inscription est momentanément indisponible. Réessayez dans quelques instants."));
+                .onErrorMap(ex -> !(ex instanceof ProblemException), ex -> {
+                    log.warn("Échec sign-up (kernel) pour '{}' : {}", principal, ex.toString());
+                    return new ProblemException(
+                            HttpStatus.SERVICE_UNAVAILABLE, "Service indisponible",
+                            "Le service d'inscription est momentanément indisponible. Réessayez dans quelques instants.");
+                });
     }
 
     

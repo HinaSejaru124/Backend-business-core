@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import Link from "next/link";
 import Field from "@/components/Field";
 import { Button, ButtonLink } from "@/components/Button";
 import { Banner, EmptyState, LoadingBlock } from "@/components/Feedback";
@@ -19,14 +18,17 @@ import {
 import { cn } from "@/lib/cn";
 
 function StatutBadge({ value }: { value: string }) {
-  const style =
-    value === "PUBLIE" || value === "ACTIVE"
-      ? "text-ok border-ok/30 bg-ok/5"
-      : value === "ARCHIVE" || value === "FERMEE"
-        ? "text-muted border-line bg-subtle"
-        : "text-brand border-brand/30 bg-brand/5";
+  const actif = value === "PUBLIE" || value === "ACTIVE";
+  const style = actif
+    ? "text-ok-strong border-ok/60 bg-ok-tint"
+    : value === "ARCHIVE" || value === "FERMEE"
+      ? "text-muted border-line bg-subtle"
+      : "text-brand border-brand/40 bg-brand/5";
   return (
-    <span className={cn("inline-block border px-2 py-0.5 font-mono text-[11px]", style)}>{value}</span>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", style)}>
+      {actif && <span className="h-1.5 w-1.5 rounded-full bg-ok" />}
+      {value}
+    </span>
   );
 }
 
@@ -110,7 +112,7 @@ export default function BusinessesPage() {
   return (
     <div className="animate-fade-up">
       <div className="border-b border-line pb-6">
-        <div className="font-mono text-[12px] uppercase tracking-wider text-brand">Ressources</div>
+        <div className="text-[12px] font-semibold uppercase tracking-wider text-brand">Ressources</div>
         <h1 className="mt-2 font-display text-3xl font-bold text-ink">Entreprises</h1>
         <p className="mt-1 text-sm text-muted">
           Instanciez vos types métier en entreprises opérationnelles. Chaque entreprise dispose
@@ -150,12 +152,9 @@ export default function BusinessesPage() {
                   </div>
                 </div>
                 <StatutBadge value={b.cycleVie} />
-                <Link
-                  href="/console/api-key"
-                  className="text-xs font-medium text-brand hover:underline"
-                >
+                <ButtonLink href="/console/api-key" size="sm">
                   Gérer la clé API →
-                </Link>
+                </ButtonLink>
               </div>
             ))}
         </div>
@@ -186,9 +185,19 @@ export default function BusinessesPage() {
         )}
 
         {profil?.owner && typesPublies.length > 0 && (
-          <form onSubmit={(e) => void onSubmit(e)} className="mt-4 space-y-4 border border-line bg-white p-5">
+          <form onSubmit={(e) => void onSubmit(e)} className="mt-4 space-y-5 border border-line bg-white p-5">
+            <p className="border-l-2 border-brand bg-tint px-3 py-2.5 text-[12.5px] leading-relaxed text-ink">
+              Une entreprise est l&apos;<strong>instance concrète</strong> d&apos;un type métier déjà
+              déclaré (offres, rôles, règles, opérations). Le <strong>type</strong> définit le modèle ;
+              la <strong>version</strong> le fige (une version publiée est immuable — c&apos;est ce qui
+              garantit que votre entreprise ne changera jamais de comportement sous vos pieds).
+            </p>
+
             <label className="block">
               <span className="mb-1.5 block text-[13px] font-medium text-ink">Type métier</span>
+              <span className="mb-1.5 block text-[12px] text-muted">
+                Le modèle (offres, rôles, règles) que cette entreprise va suivre.
+              </span>
               <select
                 value={typeId}
                 onChange={(e) => setTypeId(e.target.value)}
@@ -204,26 +213,42 @@ export default function BusinessesPage() {
               </select>
             </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-[13px] font-medium text-ink">Version</span>
-              <select
-                value={versionNumber}
-                onChange={(e) => setVersionNumber(e.target.value)}
-                required
-                disabled={!typeId || loadingVersions || versionsPubliees.length === 0}
-                className="h-11 w-full border border-line bg-white px-3 text-sm outline-none focus:border-brand disabled:bg-subtle"
-              >
-                {loadingVersions && <option value="">Chargement…</option>}
-                {!loadingVersions && versionsPubliees.length === 0 && typeId && (
-                  <option value="">Aucune version publiée</option>
-                )}
-                {versionsPubliees.map((v) => (
-                  <option key={v.id} value={v.numero}>
-                    v{v.numero}{v.libelle ? ` — ${v.libelle}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {typeId && versionsPubliees.length <= 1 && (
+              // Cas le plus courant (une seule version publiée) : le champ reste réel et connecté au
+              // backend, mais s'efface visuellement puisqu'il n'y a rien à choisir.
+              <input type="hidden" value={versionNumber} readOnly />
+            )}
+
+            {typeId && versionsPubliees.length > 1 && (
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-medium text-ink">Version</span>
+                <span className="mb-1.5 block text-[12px] text-muted">
+                  Plusieurs versions publiées existent pour ce type — chacune est figée (immuable),
+                  choisissez celle que cette entreprise doit suivre.
+                </span>
+                <select
+                  value={versionNumber}
+                  onChange={(e) => setVersionNumber(e.target.value)}
+                  required
+                  disabled={loadingVersions}
+                  className="h-11 w-full border border-line bg-white px-3 text-sm outline-none focus:border-brand disabled:bg-subtle"
+                >
+                  {loadingVersions && <option value="">Chargement…</option>}
+                  {versionsPubliees.map((v) => (
+                    <option key={v.id} value={v.numero}>
+                      v{v.numero}{v.libelle ? ` — ${v.libelle}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {typeId && !loadingVersions && versionsPubliees.length === 0 && (
+              <Banner variant="info">
+                Ce type métier n&apos;a aucune version <strong>publiée</strong> — publiez-en une (elle
+                devient alors immuable) avant de pouvoir créer une entreprise dessus.
+              </Banner>
+            )}
 
             <Field
               label="Nom de l'entreprise"

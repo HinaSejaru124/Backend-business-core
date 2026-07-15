@@ -100,6 +100,53 @@ public class DashboardService {
                 .flatMap(plan -> donnees(developerId, tenantId, plan));
     }
 
+    /**
+     * Sparkline seule, sur une fenêtre choisie par l'utilisateur (sélecteur de période du graphique).
+     * Volontairement <b>découplé</b> de {@link #pour} : le quota mensuel / requêtes restantes / blocage
+     * ({@code ceMois}) ne doivent JAMAIS dépendre de la fenêtre d'affichage du graphique — seule cette
+     * méthode varie, la facturation reste toujours calculée sur le mois calendaire réel.
+     *
+     * <p>Granularité réelle : journalière (nos compteurs n'ont pas de grain horaire). Une fenêtre de
+     * 1 jour renvoie donc un seul point réel, pas une fausse répartition par heure.
+     */
+    public Mono<List<PointJour>> sparklinePour(UUID developerId, int fenetreJours) {
+        LocalDate today = LocalDate.now();
+        LocalDate depuis = today.minusDays(Math.max(1, fenetreJours) - 1L);
+
+        return apiKeyRepository.findByDeveloperIdAndStatus(developerId, ApiKeyEntity.STATUT_ACTIVE)
+                .map(ApiKeyEntity::getId)
+                .collectList()
+                .flatMap(ids -> {
+                    if (ids.isEmpty()) {
+                        return Mono.just(pointsVides(depuis, today));
+                    }
+                    Mono<Map<LocalDate, Long>> histo = usageRepository
+                            .findByApiKeyIdInAndJourGreaterThanEqual(ids, depuis)
+                            .filter(r -> r.getJour().isBefore(today))
+                            .collect(HashMap::new, (m, r) ->
+                                    m.merge(r.getJour(), r.getTotal(), (a, b) -> Long.sum(a, b)));
+                    Mono<Long> aujourdhui = Flux.fromIterable(ids)
+                            .flatMap(id -> compteur.lireJour(id, today).onErrorResume(ex -> Mono.empty()))
+                            .reduce(0L, (acc, u) -> acc + u.total());
+                    return Mono.zip(histo, aujourdhui).map(t -> {
+                        List<PointJour> points = new ArrayList<>();
+                        for (LocalDate jour = depuis; !jour.isAfter(today); jour = jour.plusDays(1)) {
+                            long total = jour.isEqual(today) ? t.getT2() : t.getT1().getOrDefault(jour, 0L);
+                            points.add(new PointJour(jour, total));
+                        }
+                        return points;
+                    });
+                });
+    }
+
+    private List<PointJour> pointsVides(LocalDate depuis, LocalDate today) {
+        List<PointJour> points = new ArrayList<>();
+        for (LocalDate jour = depuis; !jour.isAfter(today); jour = jour.plusDays(1)) {
+            points.add(new PointJour(jour, 0L));
+        }
+        return points;
+    }
+
     private Mono<DashboardData> donnees(UUID developerId, UUID tenantId, String plan) {
         Instant depuisTrace = LocalDate.now().minusDays(FENETRE_JOURS - 1L).atStartOfDay(ZoneOffset.UTC).toInstant();
 

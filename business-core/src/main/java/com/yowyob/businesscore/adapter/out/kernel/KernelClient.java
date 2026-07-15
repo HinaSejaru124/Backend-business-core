@@ -59,6 +59,7 @@ public class KernelClient {
     private final KernelTokenService tokenService;
     private final KernelCredentialStore credentialStore;
     private final ObjectMapper objectMapper;
+    private final com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogWriter requeteLogWriter;
     private final String appClientId;
     private final String appApiKey;
     private final Duration timeout;
@@ -68,11 +69,13 @@ public class KernelClient {
                         KernelTokenService tokenService,
                         KernelCredentialStore credentialStore,
                         ObjectMapper objectMapper,
+                        com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogWriter requeteLogWriter,
                         KernelProperties properties) {
         this.kernelWebClient = kernelWebClient;
         this.tokenService = tokenService;
         this.credentialStore = credentialStore;
         this.objectMapper = objectMapper;
+        this.requeteLogWriter = requeteLogWriter;
         this.appClientId = properties.clientId();
         this.appApiKey = properties.clientSecret();
         this.timeout = Duration.ofMillis(properties.timeoutMs());
@@ -163,10 +166,24 @@ public class KernelClient {
             spec.header(HEADER_ORGANIZATION_ID, organizationId.toString());
         }
         WebClient.RequestHeadersSpec<?> finalSpec = (body != null) ? spec.bodyValue(body) : spec;
-        return finalSpec.retrieve()
-                .bodyToMono(Object.class)
-                .transform(this::resilience)
-                .flatMap(corps -> convertirReponse(corps, type));
+        long debut = System.currentTimeMillis();
+        return BusinessContextHolder.currentTenantId()
+                .flatMap(notreTenant -> finalSpec.retrieve()
+                        .bodyToMono(Object.class)
+                        .transform(this::resilience)
+                        .doOnSuccess(corps -> journaliser(notreTenant, method, path, 200, debut))
+                        .doOnError(WebClientResponseException.class,
+                                ex -> journaliser(notreTenant, method, path, ex.getStatusCode().value(), debut))
+                        .flatMap(corps -> convertirReponse(corps, type)));
+    }
+
+    /** Journal détaillé des appels sortants vers Kernel (catégorie KNL_CORE, onglet Audit / Requêtes). */
+    private void journaliser(java.util.Optional<UUID> notreTenant, HttpMethod method, String path,
+                             int statutHttp, long debut) {
+        // Kernel n'est jamais appelé en flux design-time (cf. DOCUMENTATION-REQUETES.md) : un appel
+        // KNL_CORE est toujours déclenché par une action runtime déjà facturée côté BUSINESS_CORE.
+        notreTenant.ifPresent(tenant -> requeteLogWriter.enregistrerAsync(
+                tenant, "KNL_CORE", method.name(), path, statutHttp, System.currentTimeMillis() - debut, true));
     }
 
     private <T> Mono<T> convertirReponse(Object corps, Class<T> type) {

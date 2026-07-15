@@ -1,21 +1,18 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import SiteChrome from "@/components/SiteChrome";
 import { AuthProvider } from "@/lib/auth-context";
 
-const display = Space_Grotesk({
+// Une SEULE famille pour toute l'UI (titres + texte) : Plus Jakarta Sans, ronde et lisible,
+// comme la maquette. La hiérarchie se fait au poids/à la couleur, pas en changeant de police.
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-display",
-  display: "swap",
-});
-const sans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-sans",
   display: "swap",
 });
+// Monospace RÉSERVÉE au code et aux identifiants techniques — jamais aux titres/labels d'UI.
 const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
@@ -31,7 +28,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="fr" className={`${jakarta.variable} ${mono.variable}`}>
       <body className="flex min-h-screen flex-col bg-white font-sans text-body antialiased">
         <AuthProvider>
           <SiteChrome>{children}</SiteChrome>

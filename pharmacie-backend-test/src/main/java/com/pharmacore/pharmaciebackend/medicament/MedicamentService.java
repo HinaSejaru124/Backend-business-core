@@ -1,6 +1,5 @@
 package com.pharmacore.pharmaciebackend.medicament;
 
-import com.pharmacore.pharmaciebackend.bcaas.BcaasClient;
 import com.pharmacore.pharmaciebackend.config.RessourceIntrouvableException;
 import com.pharmacore.pharmaciebackend.medicament.MedicamentDtos.CreerMedicamentRequest;
 import org.springframework.stereotype.Service;
@@ -9,41 +8,46 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Créer un médicament = créer l'Offre correspondante côté Business Core PUIS la fiche locale,
- * dans cet ordre (cf. backend-test.md §1.3) : l'offreId réel de BCaaS est requis pour la fiche
- * locale, jamais l'inverse. En cas d'échec de la persistance locale après un appel BCaaS réussi,
- * l'Offre reste orpheline côté BCaaS (limitation connue en v1, pas de compensation cross-système —
- * acceptable pour une application de test).
+ * Lecture et gestion locale du catalogue (accessible en runtime, clé API). La <b>création</b> d'un
+ * médicament déclare une Offre Business Core, ce qui est design-time (JWT) depuis la séparation
+ * design-time/runtime — voir {@code AdminMedicamentController} / {@code BcaasAdminClient.declarerOffre}.
+ * Ce service ne sait donc plus créer : seulement lire, alerter, réapprovisionner et enregistrer une
+ * fiche locale une fois l'offre déjà déclarée côté design-time ({@link #sauvegarderDepuisOffre}).
  */
 @Service
 public class MedicamentService {
 
     private final MedicamentRepository repository;
-    private final BcaasClient bcaas;
 
-    public MedicamentService(MedicamentRepository repository, BcaasClient bcaas) {
+    public MedicamentService(MedicamentRepository repository) {
         this.repository = repository;
-        this.bcaas = bcaas;
     }
 
-    public MedicamentDtos.MedicamentResponse creer(CreerMedicamentRequest req) {
-        var offre = bcaas.declarerOffre(req.nom(), req.prixUnitaire(), true);
-
+    /**
+     * Enregistre la fiche locale d'un médicament dont l'Offre a déjà été déclarée côté Business Core
+     * (design-time). L'{@code offreId} réel est requis en entrée, jamais deviné ni généré ici.
+     */
+    public MedicamentDtos.MedicamentResponse sauvegarderDepuisOffre(CreerMedicamentRequest req, UUID offreId) {
         Medicament medicament = new Medicament(
-                offre.id(), req.nom(), req.dci(), req.formeGalenique(), req.codeCip(),
+                offreId, req.nom(), req.dci(), req.formeGalenique(), req.codeCip(),
                 req.categorie(), req.ordonnanceRequise(), req.prixUnitaire(),
                 req.stockInitial(), req.seuilAlerte(), req.fournisseurId());
 
         return MedicamentDtos.MedicamentResponse.depuis(repository.save(medicament));
     }
 
+    /** Catalogue actif — un médicament {@code RETIRE} (cf. {@link #retirer}) reste en base mais n'est
+     * plus proposé à la vente ni au catalogue admin (ordonnances existantes non affectées). */
     public List<MedicamentDtos.MedicamentResponse> lister() {
-        return repository.findAll().stream().map(MedicamentDtos.MedicamentResponse::depuis).toList();
+        return repository.findAll().stream()
+                .filter(m -> !"RETIRE".equals(m.getStatut()))
+                .map(MedicamentDtos.MedicamentResponse::depuis).toList();
     }
 
-    /** Médicaments dont le stock local est au ou sous le seuil d'alerte — calculé à la volée. */
+    /** Médicaments actifs dont le stock local est au ou sous le seuil d'alerte — calculé à la volée. */
     public List<MedicamentDtos.MedicamentResponse> alertesStock() {
         return repository.trouverSousSeuilAlerte().stream()
+                .filter(m -> !"RETIRE".equals(m.getStatut()))
                 .map(MedicamentDtos.MedicamentResponse::depuis).toList();
     }
 
@@ -59,5 +63,28 @@ public class MedicamentService {
                 .orElseThrow(() -> new RessourceIntrouvableException("Médicament", id));
         medicament.reapprovisionner(quantite);
         return MedicamentDtos.MedicamentResponse.depuis(repository.save(medicament));
+    }
+
+    /** {@code offreId} de la fiche locale — nécessaire pour supprimer l'Offre côté Business Core avant. */
+    public UUID offreIdDe(UUID id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new RessourceIntrouvableException("Médicament", id))
+                .getOffreId();
+    }
+
+    /** Supprime uniquement la fiche locale — appeler après suppression réussie de l'Offre côté BCaaS. */
+    public void supprimer(UUID id) {
+        if (!repository.existsById(id)) {
+            throw new RessourceIntrouvableException("Médicament", id);
+        }
+        repository.deleteById(id);
+    }
+
+    /** Retire la fiche du catalogue actif sans la supprimer (référencée par une ordonnance réelle). */
+    public void retirer(UUID id) {
+        Medicament medicament = repository.findById(id)
+                .orElseThrow(() -> new RessourceIntrouvableException("Médicament", id));
+        medicament.retirer();
+        repository.save(medicament);
     }
 }

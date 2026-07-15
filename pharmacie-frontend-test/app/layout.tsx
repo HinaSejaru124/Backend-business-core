@@ -3,6 +3,7 @@ import { Space_Grotesk, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
 import { ToastProvider } from "@/components/Toast";
+import { SessionProvider } from "@/lib/useSession";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
       <body className="font-sans text-body antialiased">
         <ToastProvider>
-          <AppShell>{children}</AppShell>
+          <SessionProvider>
+            <AppShell>{children}</AppShell>
+          </SessionProvider>
         </ToastProvider>
       </body>
     </html>

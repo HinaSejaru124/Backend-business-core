@@ -1,5 +1,10 @@
 server:
   port: ${SERVER_PORT:9090}
+  servlet:
+    session:
+      # Durée d'un poste de travail plutôt que le défaut (30 min) — la session HTTP porte l'identité
+      # PharmacoreSession (titulaire/pharmacien/caissier), pas juste un panier de démo.
+      timeout: 8h
 
 spring:
   application:
@@ -25,6 +30,7 @@ pharmacore:
     api-key: ${BCAAS_API_KEY:}
     type-id: ${BCAAS_TYPE_ID:}
     version-number: ${BCAAS_VERSION_NUMBER:1}
+    business-id: ${BCAAS_BUSINESS_ID:}
 
 springdoc:
   swagger-ui:

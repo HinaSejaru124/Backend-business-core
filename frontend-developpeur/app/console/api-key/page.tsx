@@ -169,7 +169,7 @@ export default function ApiKeyPage() {
   return (
     <div className="animate-fade-up">
       <div className="border-b border-line pb-6">
-        <div className="font-mono text-[12px] uppercase tracking-wider text-brand">Accès</div>
+        <div className="text-[12px] font-semibold uppercase tracking-wider text-brand">Accès</div>
         <h1 className="mt-2 font-display text-3xl font-bold text-ink">Clés d&apos;API</h1>
         <p className="mt-1 text-sm text-muted">
           Chaque entreprise dispose d&apos;une clé API active à la fois.{" "}
@@ -390,8 +390,18 @@ export default function ApiKeyPage() {
                       </button>
                     </div>
                   )}
-                  <div className="mt-1 font-mono text-[12px] text-muted">
-                    Statut : <span className="text-ok">{cle.status}</span>
+                  <div className="mt-1.5">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                        cle.status === "ACTIVE"
+                          ? "border-ok/60 bg-ok-tint text-ok-strong"
+                          : "border-line bg-subtle text-muted"
+                      )}
+                    >
+                      {cle.status === "ACTIVE" && <span className="h-1.5 w-1.5 rounded-full bg-ok" />}
+                      {cle.status}
+                    </span>
                   </div>
                 </div>
                 <div className="flex gap-6">
@@ -408,30 +418,22 @@ export default function ApiKeyPage() {
                   {confirmRevoke ? (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted">Confirmer ?</span>
-                      <button
-                        type="button"
-                        onClick={() => void onRevoquer()}
-                        disabled={action}
-                        className="text-xs font-semibold text-danger hover:underline"
-                      >
+                      <Button variant="danger" size="sm" onClick={() => void onRevoquer()} disabled={action}>
                         Révoquer
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setConfirmRevoke(false)}
-                        className="text-xs text-muted hover:text-ink"
+                        disabled={action}
                       >
                         Non
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmRevoke(true)}
-                      className="border border-line px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:border-danger hover:bg-danger/5"
-                    >
-                      Révoquer
-                    </button>
+                    <Button variant="danger" size="sm" onClick={() => setConfirmRevoke(true)}>
+                      Révoquer la clé
+                    </Button>
                   )}
                 </div>
               </div>

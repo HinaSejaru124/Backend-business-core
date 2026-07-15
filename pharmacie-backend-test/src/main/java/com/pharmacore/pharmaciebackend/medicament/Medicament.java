@@ -80,6 +80,12 @@ public class Medicament {
         this.majLe = Instant.now();
     }
 
+    /** Retire la fiche du catalogue actif sans la supprimer — nécessaire quand une ordonnance la référence. */
+    public void retirer() {
+        this.statut = "RETIRE";
+        this.majLe = Instant.now();
+    }
+
     public UUID getId() { return id; }
     public UUID getOffreId() { return offreId; }
     public String getNom() { return nom; }

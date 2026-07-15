@@ -137,6 +137,77 @@ export type Dashboard = {
   nombreVentesDuJour: number;
 };
 
+// ─── Authentification unifiée (3 rôles, un seul écran de connexion) ──────────
+
+export type Role = "TITULAIRE" | "PHARMACIEN_RESPONSABLE" | "CAISSIER";
+
+export type StatutSession = {
+  connecte: boolean;
+  role: Role | null;
+  nomAffichage: string | null;
+  identifiant: string | null;
+  expireLe: string | null;
+};
+
+export type RapportProvisioning = {
+  actions: string[];
+};
+
+// ─── Personnel (comptes locaux PharmaCore — Pharmacien/Caissier) ─────────────
+
+export type Personnel = {
+  id: string;
+  nom: string;
+  prenom: string;
+  email: string;
+  role: "PHARMACIEN_RESPONSABLE" | "CAISSIER";
+  actif: boolean;
+  creeLe: string;
+};
+
+export type CreerPersonnelRequest = {
+  nom: string;
+  prenom: string;
+  email: string;
+  motDePasse: string;
+  role: "PHARMACIEN_RESPONSABLE" | "CAISSIER";
+};
+
+// ─── Ventes (runtime, clé API + acteur connecté) — briques 5 et 6 ────────────
+
+export type VenteLigne = {
+  id: string;
+  medicamentId: string;
+  quantite: number;
+  prixUnitaireFacture: number;
+};
+
+export type Vente = {
+  id: string;
+  businessId: string;
+  clientId: string | null;
+  ordonnanceId: string | null;
+  montantTotal: number;
+  devise: string;
+  modePaiement: string;
+  /** Recopié de la trace Business Core réelle — "COMPLETEE" est le seul cas jamais persisté à ce jour. */
+  statutBcaas: string;
+  transactionKernelId: string | null;
+  traceId: string | null;
+  idempotencyKey: string;
+  creeLe: string;
+  lignes: VenteLigne[];
+};
+
+export type CreerVenteRequest = {
+  clientId?: string;
+  ordonnanceId?: string;
+  modePaiement: "ESPECES" | "MOBILE_MONEY" | "CARTE";
+  /** Requis par Business Core pour vendre un médicament sur ordonnance en tant que Pharmacien Responsable. */
+  motifDerogation?: string;
+  lignes: { medicamentId: string; quantite: number }[];
+};
+
 /** RFC 7807 — format d'erreur réel du backend Pharmacie (relayé tel quel depuis BCaaS le cas échéant). */
 export type ProblemDetail = {
   type?: string;

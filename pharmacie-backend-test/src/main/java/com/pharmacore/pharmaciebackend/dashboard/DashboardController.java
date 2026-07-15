@@ -1,26 +1,33 @@
 package com.pharmacore.pharmaciebackend.dashboard;
 
-import com.pharmacore.pharmaciebackend.medicament.MedicamentRepository;
+import com.pharmacore.pharmaciebackend.medicament.MedicamentService;
+import com.pharmacore.pharmaciebackend.vente.VenteRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 @RestController
 @RequestMapping("/api/dashboard")
 public class DashboardController {
 
-    private final MedicamentRepository medicamentRepository;
+    private final MedicamentService medicamentService;
+    private final VenteRepository venteRepository;
 
-    public DashboardController(MedicamentRepository medicamentRepository) {
-        this.medicamentRepository = medicamentRepository;
+    public DashboardController(MedicamentService medicamentService, VenteRepository venteRepository) {
+        this.medicamentService = medicamentService;
+        this.venteRepository = venteRepository;
     }
 
     @GetMapping
     public DashboardResponse tableau() {
-        long total = medicamentRepository.count();
-        long alertes = medicamentRepository.trouverSousSeuilAlerte().size();
-        return new DashboardResponse(total, alertes, BigDecimal.ZERO, 0);
+        long total = medicamentService.lister().size();
+        long alertes = medicamentService.alertesStock().size();
+        Instant debutJour = LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant();
+        return new DashboardResponse(total, alertes, venteRepository.sommeMontantDepuis(debutJour),
+                venteRepository.countByCreeLeAfter(debutJour));
     }
 }

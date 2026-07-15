@@ -26,9 +26,14 @@ export default function Logo({
 
   const contenu = (
     <>
-      <span className="grid h-7 w-7 place-items-center bg-ink">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#1B4DF5" strokeWidth={2} strokeLinecap="square">
-          <path d="M9 6L4 12l5 6M15 6l5 6-5 6" />
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-ink to-[#132a5c] shadow-glow-sm">
+        {/* Cube dans un cube (isométrique) — reprend la marque de la maquette. */}
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#4C7CFF" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+          {/* Cube extérieur */}
+          <path d="M12 2.6l8 4.4v9.9l-8 4.5-8-4.5V7z" />
+          <path d="M4 7l8 4.5 8-4.5M12 11.5V21" opacity="0.9" />
+          {/* Cube intérieur */}
+          <path d="M12 7.3l3.7 2.05v4.6L12 16l-3.7-2.05v-4.6z" stroke="#8FB0FF" strokeWidth={1.3} />
         </svg>
       </span>
       <span className="font-display text-[15px] font-semibold tracking-tight text-ink">

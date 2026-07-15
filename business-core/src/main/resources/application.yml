@@ -38,7 +38,10 @@ businesscore:
     client-secret: ${KERNEL_CLIENT_SECRET:VbWi225xzYPoD8rQ2FRniTAqkylh34XYeWxa9HCU}
     organization-service: ${KERNEL_ORGANIZATION_SERVICE:ORGANIZATION}
     business-actor-role: ${KERNEL_BUSINESS_ACTOR_ROLE:OWNER}
-    timeout-ms: 5000
+    # 15s : le kernel RT-Comops a une latence variable observée jusqu'à ~9-10s sous charge (mesuré
+    # empiriquement le 12/07/2026 sur /api/auth/discover-contexts) ; 5s provoquait des échecs de
+    # connexion intermittents sur des comptes pourtant valides.
+    timeout-ms: 15000
     max-retries: 2
   auth:
     tenant-id: ${KERNEL_TENANT_ID:}

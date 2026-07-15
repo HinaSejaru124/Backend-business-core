@@ -1,7 +1,9 @@
 package com.yowyob.businesscore.adapter.in.security;
 
 import com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur;
+import com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogWriter;
 import com.yowyob.businesscore.application.billing.QuotaService;
+import com.yowyob.businesscore.application.context.BusinessContext;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.server.ServerWebExchange;
@@ -12,31 +14,38 @@ import reactor.core.publisher.Mono;
 /**
  * Comptabilise l'usage par clé API : à chaque requête authentifiée par une clé (X-BC-*), incrémente une
  * fois la réponse produite (a) les compteurs Redis par clé/jour ({@link ApiKeyUsageCompteur}, en
- * distinguant les erreurs statut &gt;= 400) pour le dashboard, et (b) le compteur mensuel par développeur
- * ({@link QuotaService}) pour l'enforcement des quotas. Sans effet pour le flux JWT ni les routes
- * publiques. Les requêtes refusées par la porte de quota (402) n'atteignent pas ce filtre.
+ * distinguant les erreurs statut &gt;= 400) pour le dashboard, (b) le compteur mensuel par développeur
+ * ({@link QuotaService}) pour l'enforcement des quotas, et (c) le journal détaillé
+ * {@code requete_log} (catégorie {@code BUSINESS_CORE}, cf. {@link RequeteLogWriter}) pour l'onglet
+ * Audit / Requêtes. Sans effet pour le flux JWT ni les routes publiques. Les requêtes refusées par la
+ * porte de quota (402) n'atteignent pas ce filtre.
  */
 public class UsageTrackingWebFilter implements WebFilter {
 
     /** Attribut d'exchange marquant qu'une requête a déjà été comptée (garde d'idempotence, voir enregistrer). */
     private static final String ATTRIBUT_DEJA_COMPTE = UsageTrackingWebFilter.class.getName() + ".compte";
+    private static final String CATEGORIE_BUSINESS_CORE = "BUSINESS_CORE";
 
     private final ApiKeyUsageCompteur compteur;
     private final QuotaService quotaService;
+    private final RequeteLogWriter requeteLogWriter;
 
-    public UsageTrackingWebFilter(ApiKeyUsageCompteur compteur, QuotaService quotaService) {
+    public UsageTrackingWebFilter(ApiKeyUsageCompteur compteur, QuotaService quotaService,
+                                  RequeteLogWriter requeteLogWriter) {
         this.compteur = compteur;
         this.quotaService = quotaService;
+        this.requeteLogWriter = requeteLogWriter;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        long debut = System.currentTimeMillis();
         return ReactiveSecurityContextHolder.getContext()
                 .map(securityContext -> securityContext.getAuthentication())
                 .filter(auth -> auth instanceof ApiKeyAuthenticationToken token && token.getApiKeyId() != null)
                 .map(auth -> (ApiKeyAuthenticationToken) auth)
                 .flatMap(token -> chain.filter(exchange)
-                        .then(Mono.defer(() -> enregistrer(token, exchange))))
+                        .then(Mono.defer(() -> enregistrer(token, exchange, debut))))
                 // Mono.defer obligatoire ici : voir BusinessContextWebFilter pour l'explication complète
                 // (switchIfEmpty évalue son argument avec empressement — sans defer, chain.filter(exchange)
                 // s'exécute en trop à chaque requête).
@@ -49,7 +58,7 @@ public class UsageTrackingWebFilter implements WebFilter {
      * l'authentification, elles, n'ont lieu qu'une fois ; seul ce point de complétion se répète).
      * On ne compte donc qu'une fois par exchange, quel que soit le nombre d'appels à cette méthode.
      */
-    private Mono<Void> enregistrer(ApiKeyAuthenticationToken token, ServerWebExchange exchange) {
+    private Mono<Void> enregistrer(ApiKeyAuthenticationToken token, ServerWebExchange exchange, long debut) {
         if (exchange.getAttributes().putIfAbsent(ATTRIBUT_DEJA_COMPTE, Boolean.TRUE) != null) {
             return Mono.empty();
         }
@@ -59,6 +68,18 @@ public class UsageTrackingWebFilter implements WebFilter {
         Mono<Void> mensuel = token.getDeveloperId() != null
                 ? quotaService.compter(token.getDeveloperId())
                 : Mono.empty();
+
+        Object principal = token.getPrincipal();
+        if (principal instanceof BusinessContext ctx) {
+            requeteLogWriter.enregistrerAsync(
+                    ctx.tenantId(), CATEGORIE_BUSINESS_CORE,
+                    exchange.getRequest().getMethod().name(),
+                    exchange.getRequest().getPath().value(),
+                    statut != null ? statut.value() : 0,
+                    System.currentTimeMillis() - debut,
+                    true);
+        }
+
         return parCle.then(mensuel);
     }
 }

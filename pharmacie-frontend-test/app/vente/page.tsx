@@ -1,39 +1,65 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { listMedicaments, listClients } from "@/lib/api";
-import type { Medicament, Client } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import { listMedicaments, listClients, listOrdonnances, creerVente, ApiError } from "@/lib/api";
+import { useSession } from "@/lib/useSession";
+import type { Medicament, Client, Ordonnance, Vente } from "@/lib/types";
 import { Button } from "@/components/Button";
 import Select from "@/components/Select";
 import PageHeader from "@/components/PageHeader";
 import BlocageKernel from "@/components/BlocageKernel";
+import { useToast } from "@/components/Toast";
 import { IconCart, IconSearch, IconTrash } from "@/components/icons";
 
 type LignePanier = { medicament: Medicament; quantite: number };
+type Encaissement =
+  | { state: "idle" }
+  | { state: "loading" }
+  | { state: "ok"; vente: Vente }
+  | { state: "error"; erreur: ApiError | null };
 
 /**
- * Écran de caisse — panier fonctionnel (recherche, quantités, client, détection ordonnance requise),
- * mais l'encaissement final est désactivé : POST /api/ventes n'existe pas encore côté backend
- * (bloqué par le Kernel, cf. BlocageKernel). Construire un panier faux qui "réussirait" silencieusement
- * serait justement le genre de donnée inventée que ce projet s'interdit.
+ * Poste de vente — partagé par le Pharmacien Responsable et le Caissier (même écran, même geste de
+ * vente au quotidien). La seule différence réelle : un médicament sur ordonnance déclenche la règle
+ * « ordonnance requise » (effet DEROGER côté Business Core) — le Caissier est bloqué (doit escalader
+ * au pharmacien), le Pharmacien Responsable peut vendre en fournissant un motif, tracé en audit côté
+ * plateforme. PharmaCore n'invente rien : c'est Business Core qui vérifie le rôle réel de l'acteur
+ * connecté, jamais ce frontend.
  */
 export default function VentePage() {
+  const toast = useToast();
+  const { session } = useSession();
+  const role = session.data?.role ?? null;
+  const estPharmacien = role === "PHARMACIEN_RESPONSABLE";
+
   const [medicaments, setMedicaments] = useState<Medicament[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [ordonnances, setOrdonnances] = useState<Ordonnance[]>([]);
   const [recherche, setRecherche] = useState("");
   const [panier, setPanier] = useState<LignePanier[]>([]);
   const [clientId, setClientId] = useState("");
+  const [ordonnanceId, setOrdonnanceId] = useState("");
+  const [motifDerogation, setMotifDerogation] = useState("");
+  const [encaissement, setEncaissement] = useState<Encaissement>({ state: "idle" });
 
   useEffect(() => {
     listMedicaments().then(setMedicaments).catch(() => {});
     listClients().then(setClients).catch(() => {});
+    listOrdonnances().then(setOrdonnances).catch(() => {});
   }, []);
+
+  /** Ordonnances valides du client sélectionné — seules celles-là ont un sens à lier à cette vente. */
+  const ordonnancesDuClient = useMemo(
+    () => ordonnances.filter((o) => o.clientId === clientId && o.statut === "VALIDE"),
+    [ordonnances, clientId]
+  );
 
   const resultats = recherche
     ? medicaments.filter((m) => m.nom.toLowerCase().includes(recherche.toLowerCase()))
     : [];
 
   function ajouter(m: Medicament) {
+    setEncaissement({ state: "idle" });
     setPanier((prev) => {
       const existe = prev.find((l) => l.medicament.id === m.id);
       if (existe) {
@@ -56,9 +82,31 @@ export default function VentePage() {
   const total = panier.reduce((sum, l) => sum + l.medicament.prixUnitaire * l.quantite, 0);
   const ruptureStock = panier.some((l) => l.quantite > l.medicament.stockActuel);
 
+  async function onEncaisser() {
+    setEncaissement({ state: "loading" });
+    try {
+      const vente = await creerVente({
+        clientId: clientId || undefined,
+        ordonnanceId: ordonnanceId || undefined,
+        modePaiement: "ESPECES",
+        motifDerogation: estPharmacien && motifDerogation.trim() ? motifDerogation.trim() : undefined,
+        lignes: panier.map((l) => ({ medicamentId: l.medicament.id, quantite: l.quantite })),
+      });
+      setEncaissement({ state: "ok", vente });
+      setPanier([]);
+      setOrdonnanceId("");
+      setMotifDerogation("");
+      toast("success", `Vente enregistrée — ${vente.montantTotal.toLocaleString("fr-FR")} XAF`);
+    } catch (err) {
+      const erreur = err instanceof ApiError ? err : null;
+      setEncaissement({ state: "error", erreur });
+      toast("error", erreur?.detail || erreur?.title || "Encaissement impossible.");
+    }
+  }
+
   return (
     <div className="animate-fade-up">
-      <PageHeader eyebrow="Caisse" title="Vente" />
+      <PageHeader eyebrow="Caisse" title="Poste de vente" />
 
       <div className="mt-6">
         <BlocageKernel contexte="L'encaissement" />
@@ -100,7 +148,10 @@ export default function VentePage() {
             label="Client (optionnel)"
             id="client"
             value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
+            onChange={(e) => {
+              setClientId(e.target.value);
+              setOrdonnanceId(""); // l'ordonnance choisie appartenait peut-être à l'ancien client
+            }}
             className="mt-6"
           >
             <option value="">Vente comptant, sans client identifié</option>
@@ -110,6 +161,55 @@ export default function VentePage() {
               </option>
             ))}
           </Select>
+
+          {necessiteOrdonnance && clientId && (
+            <Select
+              label="Ordonnance liée à cette vente (optionnel)"
+              id="ordonnance"
+              value={ordonnanceId}
+              onChange={(e) => setOrdonnanceId(e.target.value)}
+              className="mt-4"
+            >
+              <option value="">Aucune ordonnance liée</option>
+              {ordonnancesDuClient.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.medecinNom} — {new Date(o.dateEmission).toLocaleDateString("fr-FR")}
+                </option>
+              ))}
+            </Select>
+          )}
+          {necessiteOrdonnance && clientId && ordonnancesDuClient.length === 0 && (
+            <p className="mt-1.5 text-xs text-muted">
+              Aucune ordonnance valide enregistrée pour ce client —{" "}
+              <a href="/ordonnances/nouvelle" className="underline underline-offset-2 hover:text-brand">
+                en créer une
+              </a>
+              .
+            </p>
+          )}
+
+          {encaissement.state === "ok" && (
+            <div className="mt-6 border-l-2 border-ok bg-ok/5 px-4 py-3 text-sm text-ink">
+              <p className="font-medium">Vente enregistrée.</p>
+              <p className="mt-1 font-mono text-xs text-muted">
+                transactionId : {encaissement.vente.transactionKernelId ?? "—"}
+                <br />
+                traceId : {encaissement.vente.traceId ?? "—"}
+              </p>
+            </div>
+          )}
+          {encaissement.state === "error" && (
+            <div className="mt-6 border-l-2 border-danger bg-danger/5 px-4 py-3 text-sm text-danger">
+              <p className="font-medium">{encaissement.erreur?.title ?? "Encaissement impossible."}</p>
+              {encaissement.erreur?.detail && <p className="mt-1 text-xs">{encaissement.erreur.detail}</p>}
+              {encaissement.erreur?.violatedRule && (
+                <p className="mt-1 font-mono text-xs text-muted">
+                  règle violée : {encaissement.erreur.violatedRule}
+                  {encaissement.erreur.requiredAction && ` → ${encaissement.erreur.requiredAction}`}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Panier */}
@@ -159,10 +259,29 @@ export default function VentePage() {
               <span className="font-display text-lg font-bold text-ink">{total.toLocaleString("fr-FR")} XAF</span>
             </div>
 
-            {necessiteOrdonnance && (
+            {necessiteOrdonnance && estPharmacien && (
+              <div className="mt-3">
+                <label htmlFor="motif" className="mb-1.5 block text-[13px] font-medium text-ink">
+                  Motif de dérogation (ordonnance)
+                </label>
+                <textarea
+                  id="motif"
+                  value={motifDerogation}
+                  onChange={(e) => setMotifDerogation(e.target.value)}
+                  placeholder="Ex. ordonnance vérifiée verbalement, renouvellement autorisé…"
+                  rows={2}
+                  className="w-full border border-line bg-white px-3.5 py-2 text-sm text-body outline-none transition-colors placeholder:text-muted/60 focus:border-brand"
+                />
+                <p className="mt-1 text-xs text-muted">
+                  Requis par Business Core pour vendre un médicament sur ordonnance en tant que
+                  Pharmacien Responsable — tracé en audit.
+                </p>
+              </div>
+            )}
+            {necessiteOrdonnance && !estPharmacien && (
               <p className="mt-2 border-l-2 border-danger bg-danger/5 px-3 py-2 text-xs text-danger">
-                Ordonnance requise pour au moins un article — la vraie vérification a lieu côté Business
-                Core à l&apos;exécution de l&apos;opération (règle EXIGER).
+                Médicament sur ordonnance : seul un Pharmacien Responsable peut le vendre (avec motif).
+                Escaladez cette vente.
               </p>
             )}
             {ruptureStock && (
@@ -171,8 +290,12 @@ export default function VentePage() {
               </p>
             )}
 
-            <Button className="mt-4 w-full" disabled title="Indisponible tant que le blocage Kernel n'est pas levé">
-              Encaisser — indisponible
+            <Button
+              className="mt-4 w-full"
+              disabled={panier.length === 0 || encaissement.state === "loading"}
+              onClick={onEncaisser}
+            >
+              {encaissement.state === "loading" ? "Encaissement…" : "Encaisser"}
             </Button>
           </div>
         </div>

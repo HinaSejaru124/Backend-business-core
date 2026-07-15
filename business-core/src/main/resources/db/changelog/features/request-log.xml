@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : journal détaillé des requêtes (onglet Audit / Requêtes, console développeur).
+      Deux catégories réelles seulement (KNL_CORE, BUSINESS_CORE) — le backend propre du développeur
+      n'est jamais visible depuis Business Core, donc jamais journalisé ici (cf. FEUILLE-DE-ROUTE.md).
+      Table tenant-owned -> tenant_id + RLS (copie exacte du snippet socle, Barrière 3).
+    -->
+
+    <changeSet id="rlog-001-requete-log" author="dev-audit">
+        <createTable tableName="requete_log">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- KNL_CORE : appel sortant Business Core -> Kernel. BUSINESS_CORE : appel entrant clé API -> Business Core. -->
+            <column name="categorie" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="methode" type="varchar(10)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="endpoint" type="varchar(500)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="statut_http" type="int">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="duree_ms" type="bigint"/>
+
+            <column name="cree_le" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <sql>ALTER TABLE requete_log ADD CONSTRAINT chk_requete_log_categorie
+            CHECK (categorie IN ('KNL_CORE', 'BUSINESS_CORE'));
+        </sql>
+
+        <createIndex tableName="requete_log" indexName="idx_requete_log_tenant_date">
+            <column name="tenant_id"/>
+            <column name="cree_le" descending="true"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS requete_log;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="rlog-002-rls-requete-log" author="dev-audit">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE requete_log ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE requete_log FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON requete_log
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON requete_log;
+                ALTER TABLE requete_log NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE requete_log DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+      rlog-003 : distingue les requêtes qui consomment réellement le quota (clé API, flux runtime) de
+      celles qui n'en consomment jamais (JWT, flux design-time — modélisation depuis la console). Les
+      deux sont désormais journalisées (le développeur veut voir TOUT ce que son application a fait),
+      mais seules les premières sont facturables — cf. DOCUMENTATION-REQUETES.md.
+    -->
+    <changeSet id="rlog-003-facturable" author="dev-audit">
+        <addColumn tableName="requete_log">
+            <column name="facturable" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="requete_log" columnName="facturable"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

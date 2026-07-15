@@ -15,6 +15,12 @@ import type {
   CreerCommandeRequest,
   Dashboard,
   ProblemDetail,
+  StatutSession,
+  RapportProvisioning,
+  Personnel,
+  CreerPersonnelRequest,
+  Vente,
+  CreerVenteRequest,
 } from "./types";
 
 export const API_BASE = (
@@ -45,7 +51,9 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  // La session (PharmacoreSession) vit dans le cookie JSESSIONID — "include" est nécessaire pour
+  // qu'il soit envoyé/reçu en cross-origin (frontend et backend sur des ports différents en dev).
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: "include" });
   if (!res.ok) {
     let problem: ProblemDetail = { title: res.statusText };
     try {
@@ -60,11 +68,42 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-// ─── Médicaments ────────────────────────────────────────────────────────────
+// ─── Médicaments (lecture — runtime) ─────────────────────────────────────────
+// La création n'est plus ici : déclarer une Offre est design-time (JWT), voir §Admin ci-dessous.
 export const listMedicaments = () => apiFetch<Medicament[]>("/api/medicaments");
 export const getMedicament = (id: string) => apiFetch<Medicament>(`/api/medicaments/${id}`);
-export const creerMedicament = (body: CreerMedicamentRequest) =>
-  apiFetch<Medicament>("/api/medicaments", { method: "POST", body: JSON.stringify(body) });
+
+// ─── Authentification unifiée (un seul écran, 3 rôles) ───────────────────────
+
+export const login = (email: string, motDePasse: string) =>
+  apiFetch<StatutSession>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, motDePasse }),
+  });
+export const logout = () => apiFetch<StatutSession>("/api/auth/logout", { method: "POST" });
+export const statutSession = () => apiFetch<StatutSession>("/api/auth/status");
+
+// ─── Espace admin (titulaire) — modélisation, catalogue, personnel ───────────
+
+export const provisionnerModele = () =>
+  apiFetch<RapportProvisioning>("/api/admin/modele:provisionner", { method: "POST" });
+export const creerMedicamentAdmin = (body: CreerMedicamentRequest) =>
+  apiFetch<Medicament>("/api/admin/medicaments", { method: "POST", body: JSON.stringify(body) });
+export const supprimerMedicamentAdmin = (id: string) =>
+  apiFetch<void>(`/api/admin/medicaments/${id}`, { method: "DELETE" });
+
+export const listPersonnel = () => apiFetch<Personnel[]>("/api/admin/personnel");
+export const creerPersonnel = (body: CreerPersonnelRequest) =>
+  apiFetch<Personnel>("/api/admin/personnel", { method: "POST", body: JSON.stringify(body) });
+export const desactiverPersonnel = (id: string) =>
+  apiFetch<void>(`/api/admin/personnel/${id}`, { method: "DELETE" });
+
+// ─── Ventes (runtime, clé API + acteur connecté) ─────────────────────────────
+
+export const creerVente = (body: CreerVenteRequest) =>
+  apiFetch<Vente>("/api/ventes", { method: "POST", body: JSON.stringify(body) });
+export const listVentes = () => apiFetch<Vente[]>("/api/ventes");
+export const getVente = (id: string) => apiFetch<Vente>(`/api/ventes/${id}`);
 
 // ─── Fournisseurs ───────────────────────────────────────────────────────────
 export const listFournisseurs = () => apiFetch<Fournisseur[]>("/api/fournisseurs");

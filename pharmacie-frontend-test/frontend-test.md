@@ -159,3 +159,4 @@ CRUD fournisseurs. Création de commande (médicaments + quantités). Réception
 - [ ] Design conforme à la charte (vert unique, pas de dégradé, radius faible) — vérifié visuellement, pas juste déclaré.
 - [ ] Aucune donnée affichée (stock, montant, statut) qui ne provienne d'un appel réel au backend Pharmacie.
 - [ ] Messages d'erreur de règle métier affichés tels que renvoyés par BCaaS (via le backend), jamais reformulés de façon à masquer l'information (`violatedRule`, `requiredAction`).
+ 

@@ -12,6 +12,8 @@ import {
   IconActivity,
   IconKey,
   IconTerminal,
+  IconCheck,
+  IconBook,
 } from "@/components/icons";
 
 const HERO_JSON = `POST /v1/business-types
@@ -53,6 +55,16 @@ Idempotency-Key: 6f2a-…
 
 → 200 { "statut": "COMPLETEE" }`;
 
+const AUDIT_EXAMPLE = `GET /v1/businesses/{id}/traces?limit=1
+
+→ 200
+{
+  "operation": "Vendre",
+  "statut": "COMPLETEE",
+  "declencheur": "acteur:caissier-42",
+  "duree_ms": 118
+}`;
+
 const BRICKS: { icon: React.ComponentType<{ className?: string }>; nom: string; desc: string }[] = [
   { icon: IconLayers, nom: "Types métier", desc: "Le modèle, déclaré une fois, versionné par épinglage." },
   { icon: IconBraces, nom: "Offres", desc: "Unités de valeur : socle + capacités activables." },
@@ -63,9 +75,17 @@ const BRICKS: { icon: React.ComponentType<{ className?: string }>; nom: string; 
   { icon: IconKey, nom: "Configuration", desc: "Les valeurs de réglage, à deux niveaux." },
 ];
 
+const CAPACITES_REELLES = [
+  "Documentation interactive (Swagger / OpenAPI)",
+  "Traces & audit de chaque opération exécutée",
+  "Clé d'API en libre-service, révocable à tout moment",
+  "Essai gratuit inclus, sans carte bancaire",
+  "Isolation multi-tenant par Row-Level Security",
+];
+
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 border border-brand/25 bg-tint px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-brand">
+    <span className="inline-flex items-center gap-2 rounded-full border border-brand/25 bg-tint px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-wider text-brand shadow-glow-sm">
       {children}
     </span>
   );
@@ -74,17 +94,19 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 export default function HomePage() {
   return (
     <>
-      {/* ── Hero (décalé à gauche, fond « environnement de code ») ── */}
+      {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-line">
         <div className="code-photo absolute inset-0" aria-hidden />
-        <div className="absolute inset-0 bg-[rgba(243,246,253,0.93)]" aria-hidden />
-        <div className="dotgrid absolute inset-0 opacity-50" aria-hidden />
-        <Container className="relative py-16 md:py-24">
-          <div className="grid items-center gap-14 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="absolute inset-0 bg-[rgba(243,246,253,0.94)]" aria-hidden />
+        <div className="dotgrid absolute inset-0 opacity-40" aria-hidden />
+        <Container className="relative py-20 md:py-28">
+          <div className="grid items-center gap-16 lg:grid-cols-[1.05fr_0.95fr]">
             <Reveal className="max-w-2xl">
-              <Eyebrow>Business Core · API</Eyebrow>
+              <Eyebrow>
+                <IconBolt className="h-3 w-3" /> Business Core · Plateforme API
+              </Eyebrow>
               <h1 className="mt-6 font-display text-[clamp(42px,6.4vw,72px)] font-bold leading-[1.03] text-ink">
-                Le cœur métier que vous n&apos;aurez plus à réécrire.
+                Le cœur métier que vous <span className="text-brand">n&apos;aurez plus</span> à réécrire.
               </h1>
               <p className="mt-6 max-w-xl text-[19px] leading-relaxed text-muted">
                 Déclarez votre métier en données via une API REST — types, offres, règles, opérations.
@@ -97,23 +119,32 @@ export default function HomePage() {
                   <IconArrowRight className="h-4 w-4" />
                 </ButtonLink>
                 <ButtonLink href="/docs" variant="secondary">
-                  Lire la documentation
+                  <IconBook className="h-4 w-4" /> Lire la documentation
                 </ButtonLink>
               </div>
-              <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 font-mono text-[12px] text-muted">
-                <span>▸ Adossé au Kernel</span>
-                <span>▸ API REST réactive</span>
-                <span>▸ Multi-tenant (RLS)</span>
-                <span>▸ Erreurs RFC 7807</span>
+              <div className="mt-10 flex flex-wrap gap-2.5">
+                {["Adossé au Kernel", "API REST réactive", "Multi-tenant (RLS)", "Erreurs RFC 7807"].map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[12.5px] text-body shadow-card"
+                  >
+                    <IconCheck className="h-3.5 w-3.5 text-brand" /> {t}
+                  </span>
+                ))}
               </div>
             </Reveal>
 
-            <div className="flex flex-col gap-4">
+            <div className="relative">
+              <div className="glow-orb absolute -inset-10 -z-10" aria-hidden />
               <Reveal delay={140}>
-                <CodeWindow filename="declarer-type.json" lang="json" typeText={HERO_JSON} typeSpeed={12} />
+                <div className="tilt-code animate-float">
+                  <CodeWindow filename="declarer-type.json" lang="json" typeText={HERO_JSON} typeSpeed={12} />
+                </div>
               </Reveal>
               <Reveal delay={320}>
-                <CodeWindow filename="terminal" lang="bash" typeText={HERO_TERMINAL} typeSpeed={9} />
+                <div className="tilt-code -mt-4 ml-8">
+                  <CodeWindow filename="terminal" lang="bash" typeText={HERO_TERMINAL} typeSpeed={9} />
+                </div>
               </Reveal>
             </div>
           </div>
@@ -121,25 +152,23 @@ export default function HomePage() {
       </section>
 
       {/* ── Bandeau de confiance ─────────────────────────────── */}
-      <div className="border-b border-line bg-white">
-        <Container className="grid grid-cols-2 md:grid-cols-4">
-          {[
-            { k: "7", v: "briques métier" },
-            { k: "REST", v: "réactif (WebFlux)" },
-            { k: "RLS", v: "isolation multi-tenant" },
-            { k: "JWT", v: "auth déléguée au Kernel" },
-          ].map((s, i) => (
-            <Reveal
-              key={s.v}
-              delay={i * 90}
-              className={cnBorder(i)}
-            >
-              <div className="px-2 py-8 text-center md:px-6">
-                <div className="font-display text-3xl font-semibold text-ink">{s.k}</div>
-                <div className="mt-1 text-sm text-muted">{s.v}</div>
-              </div>
-            </Reveal>
-          ))}
+      <div className="border-b border-line bg-white py-10">
+        <Container>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {[
+              { k: "7", v: "briques métier" },
+              { k: "REST", v: "réactif (WebFlux)" },
+              { k: "RLS", v: "isolation multi-tenant" },
+              { k: "JWT", v: "auth déléguée au Kernel" },
+            ].map((s, i) => (
+              <Reveal key={s.v} delay={i * 90}>
+                <div className="rounded-2xl border border-line bg-subtle px-4 py-7 text-center transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-card">
+                  <div className="font-display text-3xl font-semibold text-ink">{s.k}</div>
+                  <div className="mt-1 text-sm text-muted">{s.v}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </Container>
       </div>
 
@@ -159,7 +188,7 @@ export default function HomePage() {
 
           <div className="mt-12 grid gap-6 lg:grid-cols-2">
             <Reveal>
-              <div className="h-full border border-line bg-white p-6 transition-colors hover:border-line">
+              <div className="h-full rounded-2xl border border-line bg-white p-6 shadow-card transition-all hover:-translate-y-1">
                 <div className="font-mono text-[12px] uppercase tracking-wider text-muted">Sans Business Core</div>
                 <ul className="mt-4 space-y-3 text-[15px] text-body">
                   {[
@@ -177,7 +206,7 @@ export default function HomePage() {
               </div>
             </Reveal>
             <Reveal delay={140}>
-              <div className="h-full border-l-2 border-brand bg-white p-6 shadow-card transition-all hover:-translate-y-1 hover:shadow-pop">
+              <div className="h-full rounded-2xl border border-brand/20 bg-white p-6 shadow-glow-sm transition-all hover:-translate-y-1 hover:shadow-glow">
                 <div className="font-mono text-[12px] uppercase tracking-wider text-brand">Avec Business Core</div>
                 <ul className="mt-4 space-y-3 text-[15px] text-body">
                   {[
@@ -187,7 +216,7 @@ export default function HomePage() {
                     "Isolation RLS et traçabilité intégrées",
                   ].map((t) => (
                     <li key={t} className="flex gap-3">
-                      <span className="mt-2.5 h-px w-4 flex-none bg-brand" />
+                      <IconCheck className="mt-0.5 h-4 w-4 flex-none text-brand" />
                       {t}
                     </li>
                   ))}
@@ -215,7 +244,7 @@ export default function HomePage() {
             ].map((s, i) => (
               <Reveal key={s.n} delay={i * 120} className="flex flex-col">
                 <div className="flex items-baseline gap-3">
-                  <span className="font-mono text-sm text-brand">{s.n}</span>
+                  <span className="rounded-full bg-tint px-2.5 py-0.5 font-mono text-sm text-brand">{s.n}</span>
                   <h3 className="font-display text-xl font-semibold text-ink">{s.t}</h3>
                 </div>
                 <p className="mt-2 text-[15px] text-muted">{s.d}</p>
@@ -228,8 +257,54 @@ export default function HomePage() {
         </Container>
       </Section>
 
+      {/* ── Expérience développeur ────────────────────────────── */}
+      <Section alt className="!py-0">
+        <div className="relative overflow-hidden bg-ink py-20 md:py-24">
+          <div className="linegrid pointer-events-none absolute inset-0 opacity-20" aria-hidden />
+          <Container className="relative">
+            <div className="grid items-center gap-14 lg:grid-cols-[0.95fr_1.05fr]">
+              <Reveal>
+                <Eyebrow>Expérience développeur</Eyebrow>
+                <h2 className="mt-5 font-display text-[clamp(28px,4vw,40px)] font-bold text-white">
+                  Pensée pour aller vite, sans rien cacher.
+                </h2>
+                <p className="mt-4 text-[17px] leading-relaxed text-slate-300">
+                  Tout ce qu&apos;il faut pour intégrer, tester et surveiller une intégration réelle —
+                  rien de plus, rien d&apos;inventé.
+                </p>
+                <ul className="mt-7 space-y-3.5">
+                  {CAPACITES_REELLES.map((c) => (
+                    <li key={c} className="flex items-start gap-3 text-[15px] text-slate-200">
+                      <span className="mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full bg-brand/20">
+                        <IconCheck className="h-3 w-3 text-brand" />
+                      </span>
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+                <ButtonLink
+                  href="/docs"
+                  variant="secondary"
+                  className="mt-8 border-white/25 bg-transparent text-white hover:border-brand hover:bg-brand"
+                >
+                  Explorer la documentation
+                </ButtonLink>
+              </Reveal>
+
+              <Reveal delay={160}>
+                <div className="tilt-code">
+                  <CodeWindow filename="audit.http" lang="http" copyText={AUDIT_EXAMPLE}>
+                    {AUDIT_EXAMPLE}
+                  </CodeWindow>
+                </div>
+              </Reveal>
+            </div>
+          </Container>
+        </div>
+      </Section>
+
       {/* ── Le modèle en briques ─────────────────────────────── */}
-      <Section alt>
+      <Section>
         <Container>
           <Reveal className="max-w-2xl">
             <Eyebrow>Le modèle</Eyebrow>
@@ -242,13 +317,15 @@ export default function HomePage() {
             </p>
           </Reveal>
 
-          <div className="mt-12 grid gap-px border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {BRICKS.map((b, i) => {
               const Icon = b.icon;
               return (
                 <Reveal key={b.nom} delay={i * 70}>
-                  <div className="group h-full bg-white p-6 transition-colors hover:bg-tint">
-                    <Icon className="h-5 w-5 text-brand transition-transform group-hover:scale-110" />
+                  <div className="group h-full rounded-2xl border border-line bg-white p-6 shadow-card transition-all hover:-translate-y-1.5 hover:border-brand/30 hover:shadow-glow-sm">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-tint transition-colors group-hover:bg-brand">
+                      <Icon className="h-5 w-5 text-brand transition-colors group-hover:text-white" />
+                    </span>
                     <h3 className="mt-4 font-display text-base font-semibold text-ink">{b.nom}</h3>
                     <p className="mt-1.5 text-sm leading-relaxed text-muted">{b.desc}</p>
                   </div>
@@ -256,8 +333,10 @@ export default function HomePage() {
               );
             })}
             <Reveal delay={490}>
-              <div className="flex h-full flex-col justify-center bg-ink p-6 text-white">
-                <IconTerminal className="h-5 w-5 text-brand" />
+              <div className="flex h-full flex-col justify-center rounded-2xl bg-ink p-6 text-white shadow-glow">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand/20">
+                  <IconTerminal className="h-5 w-5 text-brand" />
+                </span>
                 <h3 className="mt-4 font-display text-base font-semibold">Le Kernel</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
                   Le noyau générique. Business Core l&apos;orchestre en façade.
@@ -272,7 +351,7 @@ export default function HomePage() {
       <Section className="!py-20">
         <Container>
           <Reveal>
-            <div className="relative overflow-hidden border border-ink bg-ink px-8 py-16 text-center">
+            <div className="relative overflow-hidden rounded-3xl border border-ink bg-ink px-8 py-16 text-center shadow-glow">
               <div className="code-photo absolute inset-0 opacity-20" aria-hidden />
               <div className="linegrid pointer-events-none absolute inset-0 opacity-30" aria-hidden />
               <div className="relative mx-auto max-w-2xl">
@@ -302,13 +381,4 @@ export default function HomePage() {
       </Section>
     </>
   );
-}
-
-/** Bordures de séparation du bandeau (verticales en desktop). */
-function cnBorder(i: number): string {
-  const base = "border-line";
-  const left = i % 2 === 1 ? "border-l" : "";
-  const mdLeft = i % 4 !== 0 ? "md:border-l" : "";
-  const top = i >= 2 ? "border-t md:border-t-0" : "";
-  return [base, left, mdLeft, top].filter(Boolean).join(" ");
 }

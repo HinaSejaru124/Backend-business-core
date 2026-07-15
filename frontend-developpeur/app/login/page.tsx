@@ -140,9 +140,15 @@ function LoginFormContent() {
         </div>
       </div>
 
-      <div className="order-1 flex h-full items-center justify-center overflow-hidden border-b border-line px-6 py-6 lg:order-2 lg:border-b-0 lg:border-l">
-        <div className="flex max-h-full w-full max-w-sm flex-col">
-          <div className="flex flex-none border border-line">
+      <div className="relative order-1 flex h-full items-center justify-center overflow-hidden bg-subtle px-6 py-6 lg:order-2">
+        {/* Halo lumineux animé derrière le grand rectangle — respire doucement, ne bloque jamais les clics. */}
+        <div
+          className="glow-orb pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 animate-pulse-soft"
+          aria-hidden
+        />
+
+        <div className="relative flex max-h-full w-full max-w-sm flex-col rounded-2xl border border-line bg-white p-6 shadow-glow transition-shadow duration-300 hover:shadow-[0_35px_80px_-20px_rgba(27,77,245,.4),0_12px_32px_-10px_rgba(11,27,58,.28)] sm:p-7">
+          <div className="flex flex-none rounded-lg border border-line bg-subtle p-1">
             {(
               [
                 { id: "login", label: "Se connecter" },
@@ -157,8 +163,8 @@ function LoginFormContent() {
                   setRegError(null);
                 }}
                 className={cn(
-                  "h-11 flex-1 text-sm font-medium transition-colors",
-                  tab === t.id ? "bg-ink text-white" : "bg-white text-muted hover:bg-tint hover:text-ink"
+                  "h-10 flex-1 rounded-md text-sm font-semibold transition-all duration-200",
+                  tab === t.id ? "bg-ink text-white shadow-card" : "bg-transparent text-muted hover:text-ink"
                 )}
               >
                 {t.label}
@@ -166,7 +172,7 @@ function LoginFormContent() {
             ))}
           </div>
 
-          <div key={tab} className="mt-6 min-h-0 flex-1 animate-fade-up overflow-y-auto pr-1">
+          <div key={tab} className="no-scrollbar mt-6 min-h-0 flex-1 animate-fade-up overflow-y-auto pr-1">
             {tab === "login" ? (
               <form onSubmit={onLogin} className="space-y-5">
                 <div>

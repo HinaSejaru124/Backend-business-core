@@ -246,6 +246,15 @@ export function getDashboard(): Promise<Dashboard> {
   return apiFetch<Dashboard>("/v1/dashboard");
 }
 
+/**
+ * GET /v1/dashboard/sparkline?jours=N — courbe d'usage sur une fenêtre choisie (sélecteur de période).
+ * Granularité réelle journalière (nos compteurs n'ont pas de grain horaire) — n'affecte jamais le quota
+ * mensuel, toujours calculé sur le mois calendaire réel par GET /v1/dashboard.
+ */
+export function getSparkline(jours: number): Promise<UsagePoint[]> {
+  return apiFetch<UsagePoint[]>(`/v1/dashboard/sparkline?jours=${jours}`);
+}
+
 // ─── Plans & facturation ────────────────────────────────────────────────────
 
 export type Plan = {
@@ -351,4 +360,41 @@ export type OperationTrace = {
 /** GET /v1/businesses/{businessId}/traces — traces d'opérations (Bearer). */
 export function listTraces(businessId: string): Promise<OperationTrace[]> {
   return apiFetch<OperationTrace[]>(`/v1/businesses/${encodeURIComponent(businessId)}/traces`);
+}
+
+// ─── Journal détaillé des requêtes (Audit / Requêtes) ────────────────────────
+// Deux catégories réelles seulement : KNL_CORE (Business Core → Kernel) et BUSINESS_CORE
+// (clé API → Business Core) — le backend propre du développeur n'est jamais visible depuis
+// Business Core, donc jamais journalisé ni affiché ici. Ce sont les 2 seules catégories facturables.
+
+export type CategorieRequete = "KNL_CORE" | "BUSINESS_CORE";
+
+export type RequeteLog = {
+  id: string;
+  categorie: CategorieRequete;
+  methode: string;
+  endpoint: string;
+  statutHttp: number;
+  dureeMs: number;
+  creeLe: string;
+};
+
+export type RequeteLogPage = {
+  items: RequeteLog[];
+  total: number;
+  page: number;
+  taille: number;
+};
+
+/** GET /v1/requetes — journal détaillé, paginé, filtrable par catégorie (Bearer). */
+export function listRequetes(
+  categorie?: CategorieRequete | null,
+  page: number = 0,
+  taille: number = 20
+): Promise<RequeteLogPage> {
+  const params = new URLSearchParams();
+  if (categorie) params.set("categorie", categorie);
+  params.set("page", String(page));
+  params.set("taille", String(taille));
+  return apiFetch<RequeteLogPage>(`/v1/requetes?${params.toString()}`);
 }
