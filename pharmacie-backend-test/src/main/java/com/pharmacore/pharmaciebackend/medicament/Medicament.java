@@ -80,6 +80,16 @@ public class Medicament {
         this.majLe = Instant.now();
     }
 
+    /**
+     * Diminue le stock local après une vente réellement confirmée par Business Core (statut COMPLETEE).
+     * Ne descend jamais sous zéro : une vente kernel réussie fait foi même si le compteur local était
+     * déjà désynchronisé (ex. réapprovisionnement non déclaré).
+     */
+    public void decrementerStock(int quantite) {
+        this.stockActuel = Math.max(0, this.stockActuel - quantite);
+        this.majLe = Instant.now();
+    }
+
     /** Retire la fiche du catalogue actif sans la supprimer — nécessaire quand une ordonnance la référence. */
     public void retirer() {
         this.statut = "RETIRE";

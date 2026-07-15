@@ -47,6 +47,7 @@ function navGroupsPour(role: Role | null): NavGroup[] {
       {
         label: "Patients & ventes",
         items: [
+          { href: "/vente", label: "Poste de vente", icon: IconCart },
           { href: "/clients", label: "Clients", icon: IconUsers },
           { href: "/ordonnances", label: "Ordonnances", icon: IconFileText },
           { href: "/ventes", label: "Historique des ventes", icon: IconHistory },

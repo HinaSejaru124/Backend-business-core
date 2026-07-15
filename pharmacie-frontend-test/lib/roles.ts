@@ -15,7 +15,7 @@ const ROUTES: { segment: string; roles: Role[] }[] = [
   { segment: "/ventes", roles: ["TITULAIRE"] },
   { segment: "/ordonnances", roles: ["TITULAIRE", "PHARMACIEN_RESPONSABLE"] },
   { segment: "/clients", roles: ["TITULAIRE", "PHARMACIEN_RESPONSABLE", "CAISSIER"] },
-  { segment: "/vente", roles: ["PHARMACIEN_RESPONSABLE", "CAISSIER"] },
+  { segment: "/vente", roles: ["TITULAIRE", "PHARMACIEN_RESPONSABLE", "CAISSIER"] },
 ];
 
 /** Page d'accueil naturelle d'un rôle, utilisée après connexion et pour rediriger hors d'un espace interdit. */

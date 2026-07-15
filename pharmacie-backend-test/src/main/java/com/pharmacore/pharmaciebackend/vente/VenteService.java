@@ -34,8 +34,8 @@ import java.util.UUID;
  * ligne pour la seconde). Le statut/transactionId/traceId persistés sur {@code vente} sont ceux de la
  * <b>dernière</b> ligne exécutée — c'est celle qui clôt réellement la vente.
  *
- * <p>Seuls le Pharmacien Responsable et le Caissier peuvent vendre (le titulaire modélise, il ne vend
- * pas — cf. restructuration par rôles, FEUILLE-DE-ROUTE.md). Un médicament sur ordonnance déclenche la
+ * <p>Titulaire, Pharmacien Responsable et Caissier peuvent tous vendre (le titulaire est d'abord un
+ * pharmacien — cf. AUDIT-PHARMACORE.md). Un médicament sur ordonnance déclenche la
  * règle « ordonnance requise » (effet DEROGER) : le Caissier est bloqué (rôle non autorisé, doit
  * escalader), le Pharmacien Responsable peut vendre en fournissant un motif — c'est Business Core qui
  * vérifie le rôle réel de l'acteur connecté, jamais PharmaCore (le motif transmis sans le bon rôle est
@@ -97,6 +97,13 @@ public class VenteService {
             UUID cleLigne = deriverCleLigne(idempotencyKey, medicament.getId());
             dernierResultat = bcaasVenteClient.executerVendre(acteurKernelId, cleLigne, parametres);
 
+            // Vente réellement confirmée par Business Core (aucune exception levée) : le stock local
+            // reflète maintenant la vraie vente, au lieu de rester figé indéfiniment (cf. AUDIT-PHARMACORE.md).
+            if ("COMPLETEE".equals(dernierResultat.statut())) {
+                medicament.decrementerStock(ligneReq.quantite());
+                medicamentRepository.save(medicament);
+            }
+
             montantTotal = montantTotal.add(medicament.getPrixUnitaire().multiply(BigDecimal.valueOf(ligneReq.quantite())));
             lignesAPersister.add(new VenteLigne(null, medicament.getId(), ligneReq.quantite(), medicament.getPrixUnitaire()));
         }
@@ -126,19 +133,21 @@ public class VenteService {
         return VenteResponse.depuis(vente, ligneRepository.findByVenteId(id));
     }
 
-    /** Seuls Pharmacien Responsable et Caissier vendent — le titulaire modélise, il n'encaisse pas. */
+    /**
+     * Le titulaire est d'abord un pharmacien : il est rattaché à Business Core comme un vrai acteur
+     * CAISSIER (cf. FEUILLE-DE-ROUTE.md), donc il peut vendre exactement comme le personnel — Business
+     * Core vérifie de toute façon le rôle réel de l'acteur transmis, PharmaCore ne fait que le laisser
+     * passer jusque-là (cf. AUDIT-PHARMACORE.md).
+     */
     private String exigerActeurConnecte() {
         PharmacoreSession.Role role = session.role();
         if (role == null) {
             throw new BcaasException(401, "Non connecté",
-                    "Connectez-vous (Pharmacien Responsable ou Caissier) avant d'encaisser.", null, null, null);
+                    "Connectez-vous avant d'encaisser.", null, null, null);
         }
-        if (role == PharmacoreSession.Role.TITULAIRE) {
-            throw new BcaasException(403, "Action réservée au personnel",
-                    "Le titulaire ne vend pas — connectez-vous en tant que Pharmacien Responsable ou Caissier.",
-                    null, null, null);
-        }
-        return session.acteurKernelIdOuNull();
+        return role == PharmacoreSession.Role.TITULAIRE
+                ? session.titulaireActorIdOuNull()
+                : session.acteurKernelIdOuNull();
     }
 
     private UUID resoudreBeneficiaire(UUID clientId) {
