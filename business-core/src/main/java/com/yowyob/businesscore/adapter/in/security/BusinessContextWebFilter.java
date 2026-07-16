@@ -35,7 +35,11 @@ public class BusinessContextWebFilter implements WebFilter {
                                         : enrichi;
                             });
                 })
-                .switchIfEmpty(chain.filter(exchange));
+                // Mono.defer : l'argument de switchIfEmpty est évalué avec empressement par Reactor
+                // (avant même de savoir si la branche sera prise). Sans defer, chain.filter(exchange)
+                // — donc TOUTE la suite du pipeline — s'exécutait une fois de trop à chaque requête,
+                // en plus de l'exécution réelle faite par flatMap. Cf. doc Reactor sur switchIfEmpty.
+                .switchIfEmpty(Mono.defer(() -> chain.filter(exchange)));
     }
 
     /**

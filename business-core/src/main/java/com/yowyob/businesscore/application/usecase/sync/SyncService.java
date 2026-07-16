@@ -45,7 +45,7 @@ public class SyncService {
                 .map(SyncEventItem::depuis)
                 .collectList()
                 .flatMap(items -> repository.findFirstByEntrepriseIdOrderByIdDesc(entrepriseId)
-                        .map(SyncEventEntity::getId)
+                        .map(e -> e.getId())
                         .defaultIfEmpty(since)
                         .map(versionCourante -> new SyncResultat(versionCourante, items)));
     }

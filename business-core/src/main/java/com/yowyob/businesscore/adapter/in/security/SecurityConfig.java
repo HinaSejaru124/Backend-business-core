@@ -56,6 +56,7 @@ private static final String[] ROUTES_PUBLIQUES = {
         "/v1/auth/login",
         "/v1/auth/discover",
         "/v1/auth/select",
+        "/v1/plans",
         "/swagger-ui.html",
         "/swagger-ui/**",
         "/v3/api-docs/**",
@@ -87,7 +88,9 @@ private static final String[] ROUTES_PUBLIQUES = {
             CorsConfigurationSource corsConfigurationSource,
             ProblemAuthenticationEntryPoint authenticationEntryPoint,
             ProblemAccessDeniedHandler accessDeniedHandler,
-            com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur usageCompteur) {
+            com.yowyob.businesscore.adapter.out.cache.ApiKeyUsageCompteur usageCompteur,
+            com.yowyob.businesscore.application.billing.QuotaService quotaService,
+            com.yowyob.businesscore.adapter.in.rest.error.ProblemResponseWriter problemResponseWriter) {
 
         // Authentification par clé Business Core (X-BC-*) — réservée aux routes d'usage runtime d'une
         // entreprise (cf. ROUTES_INTEGRATION_TERMINAL). Tout le reste (gestion des types métier, des
@@ -119,8 +122,13 @@ private static final String[] ROUTES_PUBLIQUES = {
                 .addFilterAfter(apiKeyFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 // Propagation du contexte vers le Reactor Context (lisible par use cases + KernelClient).
                 .addFilterAfter(new BusinessContextWebFilter(), SecurityWebFiltersOrder.AUTHENTICATION)
-                // Comptabilise l'usage par clé API (dashboard développeur).
-                .addFilterAfter(new UsageTrackingWebFilter(usageCompteur), SecurityWebFiltersOrder.AUTHENTICATION)
+                // Porte de quota (402 quand le quota mensuel du plan est atteint) — AVANT le comptage,
+                // pour qu'une requête bloquée ne soit pas comptabilisée. Sans effet sur le flux JWT.
+                .addFilterAfter(new QuotaEnforcementWebFilter(quotaService, problemResponseWriter),
+                        SecurityWebFiltersOrder.AUTHENTICATION)
+                // Comptabilise l'usage par clé API (dashboard développeur + compteur mensuel de quota).
+                .addFilterAfter(new UsageTrackingWebFilter(usageCompteur, quotaService),
+                        SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }
 

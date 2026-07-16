@@ -2,9 +2,11 @@ package com.yowyob.businesscore.application.usecase.access;
 
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
+import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.port.in.ApiKeyEmise;
 import com.yowyob.businesscore.domain.port.in.RegistrationUseCase;
 import com.yowyob.businesscore.domain.port.out.AuthentifierUtilisateur;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -39,21 +41,28 @@ public class RegistrationService implements RegistrationUseCase {
                                       String planCode) {
         String plan = (planCode == null || planCode.isBlank()) ? "FREE" : planCode;
 
-        return authentifier.signUp(email, password, firstName, lastName)
-                .flatMap(signUpResult -> {
-                    DeveloperAccountEntity entity = DeveloperAccountEntity.nouveau(
-                            UUID.randomUUID(),
-                            email,
-                            parseUuid(signUpResult.tenantId()),
-                            signUpResult.id(),
-                            null,
-                            null,
-                            plan);
-                    return repository.save(entity);
-                })
-                .map(account -> new ApiKeyEmise(plan,
-                        "Compte créé. Vérifiez votre email, connectez-vous via POST /v1/auth/login, "
-                                + "créez une entreprise puis une clé API pour cette entreprise."));
+        return repository.findByEmail(email)
+                .flatMap(existant -> Mono.<ApiKeyEmise>error(ProblemException.conflict(
+                        "Un compte existe déjà avec l'adresse " + email + ". Connectez-vous plutôt.")
+                        .violatedRule("EMAIL_DEJA_UTILISE")))
+                .switchIfEmpty(Mono.defer(() -> authentifier.signUp(email, password, firstName, lastName)
+                        .flatMap(signUpResult -> {
+                            DeveloperAccountEntity entity = DeveloperAccountEntity.nouveau(
+                                    UUID.randomUUID(),
+                                    email,
+                                    parseUuid(signUpResult.tenantId()),
+                                    signUpResult.id(),
+                                    null,
+                                    null,
+                                    plan);
+                            return repository.save(entity)
+                                    .onErrorMap(DuplicateKeyException.class, ex -> ProblemException.conflict(
+                                            "Un compte existe déjà avec l'adresse " + email + ". Connectez-vous plutôt.")
+                                            .violatedRule("EMAIL_DEJA_UTILISE"));
+                        })
+                        .map(account -> new ApiKeyEmise(plan,
+                                "Compte créé. Vérifiez votre email, connectez-vous via POST /v1/auth/login, "
+                                        + "créez une entreprise puis une clé API pour cette entreprise."))));
     }
 
     private static UUID parseUuid(String valeur) {

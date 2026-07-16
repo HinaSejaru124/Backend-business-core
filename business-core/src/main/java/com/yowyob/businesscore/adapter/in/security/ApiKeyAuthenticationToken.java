@@ -15,6 +15,8 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
     private final String onBehalfOf;
     private final BusinessContext businessContext;
     private final java.util.UUID apiKeyId;
+    private final java.util.UUID developerId;
+    private final String plan;
 
     private ApiKeyAuthenticationToken(String clientId, String apiKey, String onBehalfOf) {
         super(AuthorityUtils.NO_AUTHORITIES);
@@ -23,16 +25,21 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
         this.onBehalfOf = onBehalfOf;
         this.businessContext = null;
         this.apiKeyId = null;
+        this.developerId = null;
+        this.plan = null;
         setAuthenticated(false);
     }
 
-    private ApiKeyAuthenticationToken(BusinessContext businessContext, java.util.UUID apiKeyId) {
+    private ApiKeyAuthenticationToken(BusinessContext businessContext, java.util.UUID apiKeyId,
+                                      java.util.UUID developerId, String plan) {
         super(AuthorityUtils.NO_AUTHORITIES);
         this.clientId = null;
         this.apiKey = null;
         this.onBehalfOf = null;
         this.businessContext = businessContext;
         this.apiKeyId = apiKeyId;
+        this.developerId = developerId;
+        this.plan = plan;
         super.setAuthenticated(true);
     }
 
@@ -40,8 +47,9 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
         return new ApiKeyAuthenticationToken(clientId, apiKey, onBehalfOf);
     }
 
-    public static ApiKeyAuthenticationToken authenticated(BusinessContext businessContext, java.util.UUID apiKeyId) {
-        return new ApiKeyAuthenticationToken(businessContext, apiKeyId);
+    public static ApiKeyAuthenticationToken authenticated(BusinessContext businessContext, java.util.UUID apiKeyId,
+                                                          java.util.UUID developerId, String plan) {
+        return new ApiKeyAuthenticationToken(businessContext, apiKeyId, developerId, plan);
     }
 
     public String getClientId() {
@@ -55,6 +63,16 @@ public class ApiKeyAuthenticationToken extends AbstractAuthenticationToken {
     /** Identifiant de la clé API ayant authentifié la requête (null pour le flux JWT). */
     public java.util.UUID getApiKeyId() {
         return apiKeyId;
+    }
+
+    /** Identifiant du compte développeur propriétaire de la clé (null pour le flux JWT). */
+    public java.util.UUID getDeveloperId() {
+        return developerId;
+    }
+
+    /** Plan tarifaire du développeur au moment de la requête (null pour le flux JWT). */
+    public String getPlan() {
+        return plan;
     }
 
     @Override

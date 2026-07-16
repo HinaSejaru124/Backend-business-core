@@ -100,7 +100,7 @@ public class GestionOffreService {
 
     private Mono<Void> activerCapacites(DefinitionOffre offre) {
         return Flux.fromIterable(offre.capacites())
-                .filter(Capacite::active)
+                .filter(c -> c.active())
                 .flatMap(c -> capacites.activer(c.type(), offre.id()))
                 .then();
     }

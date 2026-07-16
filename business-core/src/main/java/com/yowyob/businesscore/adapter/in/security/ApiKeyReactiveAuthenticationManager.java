@@ -4,7 +4,6 @@ import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyEntity;
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyRepository;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
-import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseEntity;
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseRepository;
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
@@ -108,7 +107,7 @@ public class ApiKeyReactiveAuthenticationManager implements ReactiveAuthenticati
         return entrepriseRepository.findById(cle.getEntrepriseId())
                 .filter(entreprise -> account.getKernelTenantId().equals(entreprise.getTenantId()))
                 .filter(entreprise -> !"FERMEE".equals(entreprise.getCycleVie()))
-                .map(EntrepriseEntity::getId)
+                .map(entreprise -> entreprise.getId())
                 .switchIfEmpty(Mono.error(new BadCredentialsException("Clé Business Core invalide")))
                 .contextWrite(ctx -> BusinessContextHolder.withContext(ctx, contextePreliminaire));
     }
@@ -122,7 +121,8 @@ public class ApiKeyReactiveAuthenticationManager implements ReactiveAuthenticati
                 businessId,
                 UUID.randomUUID().toString(),
                 Locale.getDefault());
-        return ApiKeyAuthenticationToken.authenticated(context, apiKeyId);
+        // developerId + plan portés par le token : lus par la porte de quota et le comptage mensuel.
+        return ApiKeyAuthenticationToken.authenticated(context, apiKeyId, account.getId(), account.getPlan());
     }
 
     private UUID parseActor(String onBehalfOf) {

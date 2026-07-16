@@ -210,7 +210,7 @@ public class KernelClient {
      * Les erreurs 4xx du kernel sont relayées telles quelles (gestion métier dans les adapters).
      * Les 5xx et timeouts sont traduits en {@link ProblemException#badGateway(String)}.
      */
-    @SuppressWarnings("unchecked")
+    
     private static <T> Mono<T> relayerErreurTransport(WebClientResponseException ex) {
         log.warn("Kernel HTTP {} : {}", cheminRequete(ex), detailReponse(ex));
         if (ex.getStatusCode().is4xxClientError()) {

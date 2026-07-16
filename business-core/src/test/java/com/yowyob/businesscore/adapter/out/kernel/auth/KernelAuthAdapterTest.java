@@ -93,7 +93,10 @@ class KernelAuthAdapterTest {
     @DisplayName("login : identifiants invalides (401 sur discover) → ProblemException 401")
     void login_401() {
         wireMock.stubFor(post(urlEqualTo("/api/auth/discover-contexts"))
-                .willReturn(aResponse().withStatus(401).withBody("{}")));
+                .willReturn(aResponse()
+                        .withStatus(401)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"message\":\"Identifiants invalides\"}")));
 
         StepVerifier.create(adapter.login("user@email.com", "mauvais"))
                 .expectErrorMatches(e -> e instanceof ProblemException pe && pe.getStatus().value() == 401)

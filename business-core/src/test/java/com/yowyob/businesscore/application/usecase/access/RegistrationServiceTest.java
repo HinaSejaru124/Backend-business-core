@@ -2,6 +2,7 @@ package com.yowyob.businesscore.application.usecase.access;
 
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
+import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.port.out.AuthentifierUtilisateur;
 import com.yowyob.businesscore.domain.port.out.SignUpResult;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,6 +35,7 @@ class RegistrationServiceTest {
         UUID tenantId = UUID.randomUUID();
         UUID developerId = UUID.randomUUID();
 
+        when(repository.findByEmail("dev@example.com")).thenReturn(Mono.empty());
         when(authentifier.signUp("dev@example.com", "MotDePasse1!", "Ada", "Lovelace"))
                 .thenReturn(Mono.just(new SignUpResult("kernel-user-id", tenantId.toString(), "PENDING", "ok")));
         when(repository.save(any())).thenAnswer(inv -> {
@@ -58,6 +61,7 @@ class RegistrationServiceTest {
     @DisplayName("aucune ClientApplication kernel n'est provisionnée à l'inscription")
     void inscrit_ne_provisionne_pas_de_client_kernel() {
         RegistrationService service = new RegistrationService(repository, authentifier);
+        when(repository.findByEmail(any())).thenReturn(Mono.empty());
         when(authentifier.signUp(any(), any(), any(), any()))
                 .thenReturn(Mono.just(new SignUpResult("id", null, "PENDING", "ok")));
         when(repository.save(any())).thenAnswer(inv -> {
@@ -73,5 +77,25 @@ class RegistrationServiceTest {
         ArgumentCaptor<DeveloperAccountEntity> captor = ArgumentCaptor.forClass(DeveloperAccountEntity.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getKernelClientId()).isNull();
+    }
+
+    @Test
+    @DisplayName("refuse l'inscription si l'email est déjà utilisé")
+    void inscrit_refuse_email_deja_utilise() {
+        RegistrationService service = new RegistrationService(repository, authentifier);
+        when(repository.findByEmail("existant@example.com"))
+                .thenReturn(Mono.just(DeveloperAccountEntity.nouveau(
+                        UUID.randomUUID(), "existant@example.com", UUID.randomUUID(),
+                        "kid", null, null, "FREE")));
+
+        StepVerifier.create(service.inscrire("Ada", "Lovelace", "existant@example.com", "MotDePasse1!", "FREE"))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(ProblemException.class);
+                    assertThat(((ProblemException) ex).getStatus().value()).isEqualTo(409);
+                })
+                .verify();
+
+        verify(authentifier, never()).signUp(any(), any(), any(), any());
+        verify(repository, never()).save(any());
     }
 }

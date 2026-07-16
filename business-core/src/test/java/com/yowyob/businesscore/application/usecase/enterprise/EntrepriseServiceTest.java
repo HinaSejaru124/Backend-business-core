@@ -2,7 +2,6 @@ package com.yowyob.businesscore.application.usecase.enterprise;
 
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.domain.businesstype.VersionType;
-import com.yowyob.businesscore.domain.enterprise.Entreprise;
 import com.yowyob.businesscore.domain.enterprise.spi.DepotEntreprise;
 import com.yowyob.businesscore.domain.port.out.JournaliserChangementSync;
 import com.yowyob.businesscore.domain.port.out.OrganisationProvisionnee;
