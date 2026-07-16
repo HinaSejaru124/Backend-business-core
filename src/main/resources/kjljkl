@@ -1,0 +1,31 @@
+KERNEL_BASE_URL=https://kernel-core.yowyob.com
+# ClientApplication PLATEFORME du Business Core (fournie par le DevOps en prod ; ne pas committer)
+KERNEL_CLIENT_ID=prod-platform-backend
+KERNEL_CLIENT_SECRET=VbWi225xzYPoD8rQ2FRniTAqkylh34XYeWxa9HCU
+
+
+
+{
+  "id": "98143627-6981-426b-8d94-dd8b05ab947a",
+  "clientId": "bck_8dE-5tSl0CZl",
+  "apiKey": "7wl_4jjbCbj13agC68KZcQeqfPQbL6S1e37Z-Db0mAM",
+  "name": "Prod"
+}
+
+
+email@example.com
+{
+  "clientId": "bck_4ntUjXu8AlSj",
+  "apiKey": "JZwlkMVI_iWfs6Ia0N2M3drkMcschmDl8C7WZuJkv6c",
+  "plan": "FREE"
+}
+
+MON-EMAIL
+{
+  "clientId": "bck_HAf0mTenqerA",
+  "apiKey": "5YqbdFhsNfyKHPGLAnpe8Dnt8X9QsIgg2jJTJXLikMc",
+  "plan": "FREE"
+}
+
+
+bruhhhhhhhh

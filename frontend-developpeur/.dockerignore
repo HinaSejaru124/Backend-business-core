@@ -1,9 +1,0 @@
-node_modules
-.next
-.git
-.gitignore
-npm-debug.log*
-.env
-.env*.local
-README.md
-prompt-frontend-developpeur
