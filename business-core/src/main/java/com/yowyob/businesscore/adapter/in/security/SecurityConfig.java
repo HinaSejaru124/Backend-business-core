@@ -75,7 +75,10 @@ private static final String[] ROUTES_PUBLIQUES = {
             "/v1/businesses/*/operations", "/v1/businesses/*/operations/**",
             "/v1/businesses/*/traces", "/v1/businesses/*/traces/**",
             "/v1/businesses/*/transactions", "/v1/businesses/*/transactions/**",
-            "/v1/businesses/*/orders/**"
+            "/v1/businesses/*/orders/**",
+            // Ingestion de télémétrie (requêtes propres de l'app) — clé API. Exclue du comptage facturable
+            // dans UsageTrackingWebFilter : reporter sa télémétrie ne consomme pas le quota.
+            "/v1/telemetry/**"
     };
 
     @Bean

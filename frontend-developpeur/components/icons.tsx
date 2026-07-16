@@ -170,3 +170,27 @@ export function IconCrown(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function IconUsers(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16.5 6a3 3 0 0 1 0 6M20 20c0-2.6-1.7-4.8-4-5.6" />
+    </svg>
+  );
+}
+export function IconWallet(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3M3 7h16" />
+      <path d="M21 10v4h-4a2 2 0 0 1 0-4h4z" />
+    </svg>
+  );
+}
+export function IconBan(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M5.6 5.6l12.8 12.8" />
+    </svg>
+  );
+}

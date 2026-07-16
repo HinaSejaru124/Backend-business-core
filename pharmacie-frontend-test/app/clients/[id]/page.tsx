@@ -41,11 +41,11 @@ export default function ClientDetailPage() {
       <Link href="/clients" className="text-sm text-muted hover:text-ink">
         ← Retour aux clients
       </Link>
-      <h1 className="mt-4 border-b border-line pb-6 font-display text-2xl font-bold text-ink">
+      <h1 className="mt-4 pb-6 font-display text-2xl font-bold tracking-tight text-ink">
         {c.prenom ? `${c.prenom} ${c.nom}` : c.nom}
       </h1>
 
-      <div className="mt-6 grid gap-px border border-line bg-line sm:grid-cols-2">
+      <div className="mt-6 grid gap-px overflow-hidden rounded-2xl border border-line bg-line shadow-card sm:grid-cols-2">
         <Info label="Téléphone" value={c.telephone ?? "—"} />
         <Info label="E-mail" value={c.email ?? "—"} />
         <Info label="Adresse" value={c.adresse ?? "—"} />

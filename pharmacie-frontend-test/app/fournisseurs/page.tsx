@@ -10,6 +10,7 @@ import PageHeader from "@/components/PageHeader";
 import Table, { Th, Td, EmptyRow } from "@/components/Table";
 import { IconPlus } from "@/components/icons";
 import { useToast } from "@/components/Toast";
+import { cn } from "@/lib/cn";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
 
@@ -68,7 +69,7 @@ export default function FournisseursPage() {
                 <EmptyRow colSpan={4}>Aucun fournisseur pour l&apos;instant.</EmptyRow>
               )}
               {fournisseurs.data.map((f, i) => (
-                <tr key={f.id} className={i !== 0 ? "border-t border-line" : ""}>
+                <tr key={f.id} className={cn("transition-colors hover:bg-subtle", i !== 0 && "border-t border-line")}>
                   <Td className="font-medium text-ink">{f.nom}</Td>
                   <Td>{f.contactNom ?? "—"}</Td>
                   <Td>{f.contactTelephone ?? "—"}</Td>
@@ -163,7 +164,7 @@ function NouveauFournisseurForm({
           onChange={(e) => setDelai(e.target.value)}
         />
       </div>
-      {error && <p className="border-l-2 border-danger bg-danger/5 px-3 py-2 text-sm text-danger">{error}</p>}
+      {error && <p className="rounded-lg border-l-2 border-danger bg-danger/5 px-3.5 py-2.5 text-sm text-danger">{error}</p>}
     </form>
   );
 }

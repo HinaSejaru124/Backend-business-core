@@ -39,6 +39,11 @@ public class UsageTrackingWebFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        // La télémétrie (requêtes APP) est déjà journalisée par TelemetryController lui-même,
+        // avec facturable=false — elle ne doit jamais être recomptée ici (quota / compteurs Redis).
+        if (exchange.getRequest().getPath().value().startsWith("/v1/telemetry")) {
+            return chain.filter(exchange);
+        }
         long debut = System.currentTimeMillis();
         return ReactiveSecurityContextHolder.getContext()
                 .map(securityContext -> securityContext.getAuthentication())
@@ -59,6 +64,11 @@ public class UsageTrackingWebFilter implements WebFilter {
      * On ne compte donc qu'une fois par exchange, quel que soit le nombre d'appels à cette méthode.
      */
     private Mono<Void> enregistrer(ApiKeyAuthenticationToken token, ServerWebExchange exchange, long debut) {
+        // L'ingestion de télémétrie (requêtes propres de l'app) ne doit ni être comptée dans le quota,
+        // ni générer une ligne facturable : reporter sa propre télémétrie est gratuit (cf. TelemetryController).
+        if (exchange.getRequest().getPath().value().startsWith("/v1/telemetry")) {
+            return Mono.empty();
+        }
         if (exchange.getAttributes().putIfAbsent(ATTRIBUT_DEJA_COMPTE, Boolean.TRUE) != null) {
             return Mono.empty();
         }

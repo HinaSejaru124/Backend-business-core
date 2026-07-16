@@ -363,11 +363,13 @@ export function listTraces(businessId: string): Promise<OperationTrace[]> {
 }
 
 // ─── Journal détaillé des requêtes (Audit / Requêtes) ────────────────────────
-// Deux catégories réelles seulement : KNL_CORE (Business Core → Kernel) et BUSINESS_CORE
-// (clé API → Business Core) — le backend propre du développeur n'est jamais visible depuis
-// Business Core, donc jamais journalisé ni affiché ici. Ce sont les 2 seules catégories facturables.
+// Trois catégories réelles : KNL_CORE (Business Core → Kernel), BUSINESS_CORE (clé API → Business
+// Core) et APP (requêtes propres du backend du développeur, rapportées via /v1/telemetry/requests).
+// Seules KNL_CORE et BUSINESS_CORE (runtime) sont facturables.
 
-export type CategorieRequete = "KNL_CORE" | "BUSINESS_CORE";
+export type CategorieRequete = "KNL_CORE" | "BUSINESS_CORE" | "APP";
+export type PeriodeRequete = "JOUR" | "SEMAINE" | "MOIS";
+export type StatutRequete = "OK" | "ERREUR";
 
 export type RequeteLog = {
   id: string;
@@ -376,6 +378,7 @@ export type RequeteLog = {
   endpoint: string;
   statutHttp: number;
   dureeMs: number;
+  facturable: boolean;
   creeLe: string;
 };
 
@@ -386,15 +389,203 @@ export type RequeteLogPage = {
   taille: number;
 };
 
-/** GET /v1/requetes — journal détaillé, paginé, filtrable par catégorie (Bearer). */
+export type RequeteFiltres = {
+  categorie?: CategorieRequete | null;
+  methode?: string | null;
+  periode?: PeriodeRequete | null;
+  statut?: StatutRequete | null;
+  facturable?: boolean | null;
+  recherche?: string | null;
+};
+
+/** GET /v1/requetes — journal détaillé, filtrable (catégorie/méthode/période/statut/facturable), paginé (Bearer). */
 export function listRequetes(
-  categorie?: CategorieRequete | null,
+  filtres: RequeteFiltres = {},
   page: number = 0,
-  taille: number = 20
+  taille: number = 25
 ): Promise<RequeteLogPage> {
   const params = new URLSearchParams();
-  if (categorie) params.set("categorie", categorie);
+  if (filtres.categorie) params.set("categorie", filtres.categorie);
+  if (filtres.methode) params.set("methode", filtres.methode);
+  if (filtres.periode) params.set("periode", filtres.periode);
+  if (filtres.statut) params.set("statut", filtres.statut);
+  if (filtres.facturable != null) params.set("facturable", String(filtres.facturable));
   params.set("page", String(page));
   params.set("taille", String(taille));
-  return apiFetch<RequeteLogPage>(`/v1/requetes?${params.toString()}`);
+  return apiFetch<RequeteLogPage>(`/v1/requetes?${params.toString()}`).then((res) => {
+    if (!filtres.recherche || !filtres.recherche.trim()) return res;
+    const terme = filtres.recherche.trim().toLowerCase();
+    const items = res.items.filter((r) => r.endpoint.toLowerCase().includes(terme));
+    return { ...res, items, total: items.length };
+  });
+}
+
+// ─── Console d'administration de la plateforme (JWT admin) ───────────────────
+// Toutes ces routes exigent que le développeur connecté soit administrateur (403 sinon).
+
+export type AdminMe = { email: string; admin: boolean };
+
+/** GET /v1/admin/me — 200 si l'utilisateur courant est admin, 403 sinon. */
+export function adminMe(): Promise<AdminMe> {
+  return apiFetch<AdminMe>("/v1/admin/me");
+}
+
+export type AdminPlanCount = { plan: string; nombre: number };
+
+export type AdminOverview = {
+  nbDeveloppeurs: number;
+  nbDeveloppeursBloques: number;
+  nbClesActives: number;
+  nbClesRevoquees: number;
+  nbEntreprises: number;
+  requetesBusinessCore: number;
+  requetesKernelCore: number;
+  repartitionPlans: AdminPlanCount[];
+};
+
+/** GET /v1/admin/overview — statistiques globales de la plateforme. */
+export function adminOverview(): Promise<AdminOverview> {
+  return apiFetch<AdminOverview>("/v1/admin/overview");
+}
+
+export type AdminDeveloperRow = {
+  id: string;
+  email: string;
+  plan: string;
+  status: string;
+  createdAt: string;
+  nbEntreprises: number;
+  nbClesActives: number;
+  consoMois: number;
+  quota: number;
+  illimite: boolean;
+  pctConso: number;
+};
+
+/** GET /v1/admin/developers — liste des développeurs avec plan, statut, conso. */
+export function adminDevelopers(): Promise<AdminDeveloperRow[]> {
+  return apiFetch<AdminDeveloperRow[]>("/v1/admin/developers");
+}
+
+export type AdminEntrepriseRow = { id: string; nom: string; numeroVersion: number; cycleVie: string };
+
+export type AdminCleRow = {
+  id: string;
+  nom: string;
+  status: string;
+  entrepriseId: string;
+  createdAt: string | null;
+  lastUsedAt: string | null;
+};
+
+export type AdminDeveloperDetail = {
+  resume: AdminDeveloperRow;
+  entreprises: AdminEntrepriseRow[];
+  cles: AdminCleRow[];
+};
+
+/** GET /v1/admin/developers/{id} — détail d'un développeur (entreprises + clés). */
+export function adminDeveloperDetail(id: string): Promise<AdminDeveloperDetail> {
+  return apiFetch<AdminDeveloperDetail>(`/v1/admin/developers/${encodeURIComponent(id)}`);
+}
+
+export type AdminRequeteRow = {
+  id: string;
+  categorie: string;
+  methode: string;
+  endpoint: string;
+  statutHttp: number;
+  dureeMs: number;
+  facturable: boolean;
+  creeLe: string;
+};
+
+export type AdminRequetePage = {
+  items: AdminRequeteRow[];
+  total: number;
+  page: number;
+  taille: number;
+};
+
+export type AdminTrackFiltres = {
+  categorie?: "KNL_CORE" | "BUSINESS_CORE" | null;
+  methode?: string | null;
+  periode?: PeriodeRequete | null;
+  statut?: StatutRequete | null;
+};
+
+/** GET /v1/admin/developers/{id}/requests — track des requêtes FACTURABLES d'un développeur. */
+export function adminTrack(
+  id: string,
+  filtres: AdminTrackFiltres = {},
+  page: number = 0,
+  taille: number = 25
+): Promise<AdminRequetePage> {
+  const params = new URLSearchParams();
+  if (filtres.categorie) params.set("categorie", filtres.categorie);
+  if (filtres.methode) params.set("methode", filtres.methode);
+  if (filtres.periode) params.set("periode", filtres.periode);
+  if (filtres.statut) params.set("statut", filtres.statut);
+  params.set("page", String(page));
+  params.set("taille", String(taille));
+  return apiFetch<AdminRequetePage>(
+    `/v1/admin/developers/${encodeURIComponent(id)}/requests?${params.toString()}`
+  );
+}
+
+export type AdminPricingRow = { code: string; quotaMensuel: number; prixMensuel: number; devise: string; illimite: boolean };
+
+/** GET /v1/admin/pricing — tarification courante de tous les plans. */
+export function adminPricing(): Promise<AdminPricingRow[]> {
+  return apiFetch<AdminPricingRow[]>("/v1/admin/pricing");
+}
+
+/** POST /v1/admin/pricing/{code} — l'administrateur fixe le prix/quota/devise d'un plan (effet réel, persisté). */
+export function adminDefinirTarif(
+  code: string,
+  quotaMensuel: number,
+  prixMensuel: number,
+  devise: string
+): Promise<void> {
+  return apiFetch<void>(`/v1/admin/pricing/${encodeURIComponent(code)}`, {
+    method: "POST",
+    body: JSON.stringify({ quotaMensuel, prixMensuel, devise }),
+  });
+}
+
+export type AdminPlanLigne = {
+  code: string;
+  prixMensuel: number;
+  devise: string;
+  quotaMensuel: number;
+  illimite: boolean;
+  nbAbonnes: number;
+  caTheoriqueMensuel: number;
+};
+
+export type AdminBillingSummary = {
+  plans: AdminPlanLigne[];
+  caTheoriqueMensuelTotal: number;
+  encaisseReel: number;
+  devise: string;
+};
+
+/** GET /v1/admin/billing — facturation : plans, CA théorique, encaissé réel. */
+export function adminBilling(): Promise<AdminBillingSummary> {
+  return apiFetch<AdminBillingSummary>("/v1/admin/billing");
+}
+
+/** POST /v1/admin/developers/{id}/block — suspend un développeur (ses clés cessent de marcher). */
+export function adminBlockDeveloper(id: string): Promise<void> {
+  return apiFetch<void>(`/v1/admin/developers/${encodeURIComponent(id)}/block`, { method: "POST" });
+}
+
+/** POST /v1/admin/developers/{id}/unblock — réactive un développeur suspendu. */
+export function adminUnblockDeveloper(id: string): Promise<void> {
+  return apiFetch<void>(`/v1/admin/developers/${encodeURIComponent(id)}/unblock`, { method: "POST" });
+}
+
+/** POST /v1/admin/keys/{id}/revoke — révoque une clé API (définitif). */
+export function adminRevokeKey(id: string): Promise<void> {
+  return apiFetch<void>(`/v1/admin/keys/${encodeURIComponent(id)}/revoke`, { method: "POST" });
 }

@@ -17,14 +17,14 @@ public class PlanCatalogue {
 
     public static final String PLAN_DEFAUT = "FREE";
 
-    private final BillingProperties properties;
+    private final PlanPricingStore pricingStore;
 
-    public PlanCatalogue(BillingProperties properties) {
-        this.properties = properties;
+    public PlanCatalogue(PlanPricingStore pricingStore) {
+        this.pricingStore = pricingStore;
     }
 
     public Map<String, PlanDef> plans() {
-        return properties.plans();
+        return pricingStore.snapshot();
     }
 
     /** Majuscule + trim ; null/blanc => plan par défaut. */
@@ -35,16 +35,17 @@ public class PlanCatalogue {
     /** Vrai seulement si le code correspond réellement à un plan du catalogue. */
     public boolean existe(String plan) {
         return plan != null && !plan.isBlank()
-                && properties.plans().containsKey(plan.trim().toUpperCase(Locale.ROOT));
+                && pricingStore.snapshot().containsKey(plan.trim().toUpperCase(Locale.ROOT));
     }
 
     /** Définition du plan, avec repli sur FREE si inconnu. */
     public PlanDef definition(String plan) {
-        PlanDef def = properties.plans().get(normaliser(plan));
+        Map<String, PlanDef> plans = pricingStore.snapshot();
+        PlanDef def = plans.get(normaliser(plan));
         if (def != null) {
             return def;
         }
-        return properties.plans().getOrDefault(PLAN_DEFAUT, new PlanDef(1_000, 0, "XAF"));
+        return plans.getOrDefault(PLAN_DEFAUT, new PlanDef(1_000, 0, "XAF"));
     }
 
     public long quotaMensuel(String plan) {

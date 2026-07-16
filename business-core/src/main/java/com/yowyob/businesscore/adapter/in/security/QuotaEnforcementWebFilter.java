@@ -29,6 +29,11 @@ public class QuotaEnforcementWebFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        // La télémétrie (requêtes APP, jamais facturables) ne doit jamais être bloquée par le quota :
+        // un développeur bloqué doit quand même pouvoir rapporter ce que fait son backend.
+        if (exchange.getRequest().getPath().value().startsWith("/v1/telemetry")) {
+            return chain.filter(exchange);
+        }
         return ReactiveSecurityContextHolder.getContext()
                 .map(securityContext -> securityContext.getAuthentication())
                 .filter(auth -> auth instanceof ApiKeyAuthenticationToken token

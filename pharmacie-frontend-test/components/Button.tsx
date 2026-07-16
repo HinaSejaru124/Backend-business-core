@@ -6,12 +6,13 @@ type Variant = "primary" | "secondary" | "danger" | "ghost";
 type Size = "sm" | "md";
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 border font-medium whitespace-nowrap transition-all duration-150 select-none active:translate-y-px disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex items-center justify-center gap-2 rounded-xl border font-semibold whitespace-nowrap transition-all duration-200 ease-out select-none active:translate-y-px disabled:opacity-50 disabled:pointer-events-none";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-brand text-white border-brand hover:bg-brand-hover hover:border-brand-hover",
-  secondary: "bg-white text-ink border-ink hover:bg-ink hover:text-white",
-  danger: "bg-white text-danger border-danger hover:bg-danger hover:text-white",
+  primary:
+    "bg-brand text-white border-brand shadow-glow hover:bg-brand-hover hover:border-brand-hover hover:shadow-glow-lg hover:-translate-y-0.5",
+  secondary: "bg-white text-ink border-line hover:border-brand/40 hover:-translate-y-0.5 hover:shadow-card",
+  danger: "bg-white text-danger border-danger/30 hover:bg-danger hover:text-white hover:border-danger",
   ghost: "bg-transparent text-ink border-transparent hover:bg-brand-tint",
 };
 

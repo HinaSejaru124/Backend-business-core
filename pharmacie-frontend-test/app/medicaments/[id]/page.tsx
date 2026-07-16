@@ -43,7 +43,7 @@ export default function MedicamentDetailPage() {
       <Link href="/medicaments" className="text-sm text-muted hover:text-ink">
         ← Retour au catalogue
       </Link>
-      <div className="mt-4 flex items-start justify-between border-b border-line pb-6">
+      <div className="mt-4 flex items-start justify-between pb-6">
         <div>
           <h1 className="font-display text-2xl font-bold text-ink">{m.nom}</h1>
           <p className="mt-1 text-sm text-muted">{m.dci ?? "DCI non renseignée"}</p>
@@ -51,7 +51,7 @@ export default function MedicamentDetailPage() {
         <Badge value={m.statut} />
       </div>
 
-      <div className="mt-6 grid gap-px border border-line bg-line sm:grid-cols-2">
+      <div className="mt-6 grid gap-px overflow-hidden rounded-2xl border border-line bg-line shadow-card sm:grid-cols-2">
         <Info label="Forme galénique" value={m.formeGalenique ?? "—"} />
         <Info label="Code CIP" value={m.codeCip ?? "—"} />
         <Info label="Catégorie" value={m.categorie} mono />

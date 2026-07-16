@@ -9,6 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/Badge";
 import Table, { Th, Td, EmptyRow } from "@/components/Table";
 import { IconFileText, IconPlus } from "@/components/icons";
+import { cn } from "@/lib/cn";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
 
@@ -63,7 +64,7 @@ export default function OrdonnancesPage() {
               {ordonnances.data.map((o, i) => {
                 const client = clients[o.clientId];
                 return (
-                  <tr key={o.id} className={i !== 0 ? "border-t border-line" : ""}>
+                  <tr key={o.id} className={cn("transition-colors hover:bg-subtle", i !== 0 && "border-t border-line")}>
                     <Td>
                       {client ? (
                         <Link href={`/clients/${client.id}`} className="text-ink hover:text-brand">

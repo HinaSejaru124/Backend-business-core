@@ -14,7 +14,7 @@ export default function Select({
       <select
         id={id}
         className={cn(
-          "h-11 w-full border border-line bg-white px-3 text-sm text-body outline-none focus:border-brand",
+          "h-11 w-full rounded-xl border border-line bg-white px-3 text-sm text-body outline-none transition-all focus:border-brand focus:ring-4 focus:ring-brand/10",
           className
         )}
         {...rest}

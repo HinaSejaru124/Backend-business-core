@@ -15,6 +15,9 @@ public interface ApiKeyRepository extends ReactiveCrudRepository<ApiKeyEntity, U
     /** Candidates pour la résolution d'auth : confrontation du secret aux hachés (cf. auth manager). */
     Flux<ApiKeyEntity> findByDeveloperIdAndStatus(UUID developerId, String status);
 
+    /** Toutes les clés d'un développeur (actives et révoquées) — console admin. */
+    Flux<ApiKeyEntity> findByDeveloperId(UUID developerId);
+
     Flux<ApiKeyEntity> findByEntrepriseIdAndStatus(UUID entrepriseId, String status);
 
     Mono<Long> countByDeveloperIdAndStatus(UUID developerId, String status);

@@ -8,13 +8,14 @@ import Footer from "./Footer";
 /**
  * Sépare les DEUX mondes de l'application :
  *  - Site vitrine (public) : navbar marketing + footer.
- *  - Espace développeur (/console) : aucune chrome marketing — la console fournit
- *    son propre shell plein écran (sidebar + barre supérieure). C'est ce qui évite
- *    d'avoir le dashboard « coincé » au centre sous la navbar de connexion.
+ *  - Espaces applicatifs plein écran (/console développeur, /admin plateforme) : aucune chrome
+ *    marketing — chacun fournit son propre shell (sidebar + barre supérieure).
  */
 export default function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isApp = pathname === "/console" || pathname.startsWith("/console/");
+  const isApp =
+    pathname === "/console" || pathname.startsWith("/console/") ||
+    pathname === "/admin" || pathname.startsWith("/admin/");
 
   if (isApp) return <>{children}</>;
 

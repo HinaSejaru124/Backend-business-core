@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 /** Wrapper de style commun ; chaque page écrit son propre thead/tbody. */
 export default function Table({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto border border-line bg-white">
+    <div className="overflow-x-auto rounded-2xl border border-line bg-white shadow-card">
       <table className="w-full min-w-[640px] border-collapse text-sm">{children}</table>
     </div>
   );
@@ -11,7 +11,7 @@ export default function Table({ children }: { children: ReactNode }) {
 
 export function Th({ children }: { children?: ReactNode }) {
   return (
-    <th className="border-b-2 border-brand/20 bg-brand-tint px-5 py-3.5 text-left font-mono text-[11.5px] uppercase tracking-wider text-ink/70">
+    <th className="border-b border-line bg-subtle px-5 py-3.5 text-left font-mono text-[11.5px] font-semibold uppercase tracking-wider text-ink/70">
       {children}
     </th>
   );

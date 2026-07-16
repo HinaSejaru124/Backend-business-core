@@ -9,6 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/Badge";
 import Table, { Th, Td, EmptyRow } from "@/components/Table";
 import { IconPlus } from "@/components/icons";
+import { cn } from "@/lib/cn";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
 
@@ -59,7 +60,7 @@ export default function CommandesPage() {
                 <EmptyRow colSpan={4}>Aucune commande pour l&apos;instant.</EmptyRow>
               )}
               {commandes.data.map((c, i) => (
-                <tr key={c.id} className={i !== 0 ? "border-t border-line" : ""}>
+                <tr key={c.id} className={cn("transition-colors hover:bg-subtle", i !== 0 && "border-t border-line")}>
                   <Td>
                     <Link href={`/commandes/${c.id}`} className="font-medium text-ink hover:text-brand">
                       {fournisseurs[c.fournisseurId]?.nom ?? c.fournisseurId}

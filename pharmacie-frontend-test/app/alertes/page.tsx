@@ -9,6 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import StockBadge from "@/components/StockBadge";
 import Table, { Th, Td, EmptyRow } from "@/components/Table";
 import { IconCheck, IconPlus } from "@/components/icons";
+import { cn } from "@/lib/cn";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
 
@@ -54,7 +55,7 @@ export default function AlertesPage() {
             </thead>
             <tbody>
               {alertes.data.map((m, i) => (
-                <tr key={m.id} className={i !== 0 ? "border-t border-line" : ""}>
+                <tr key={m.id} className={cn("transition-colors hover:bg-subtle", i !== 0 && "border-t border-line")}>
                   <Td>
                     <Link href={`/medicaments/${m.id}`} className="font-medium text-ink hover:text-brand">
                       {m.nom}

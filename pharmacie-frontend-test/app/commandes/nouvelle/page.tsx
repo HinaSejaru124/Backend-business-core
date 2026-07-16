@@ -70,7 +70,7 @@ export default function NouvelleCommandePage() {
       <Link href="/commandes" className="text-sm text-muted hover:text-ink">
         ← Retour aux commandes
       </Link>
-      <h1 className="mt-4 border-b border-line pb-6 font-display text-2xl font-bold text-ink">
+      <h1 className="mt-4 pb-6 font-display text-2xl font-bold tracking-tight text-ink">
         Nouvelle commande fournisseur
       </h1>
 
@@ -123,12 +123,12 @@ export default function NouvelleCommandePage() {
           </div>
           <div className="space-y-3">
             {lignes.map((l, i) => (
-              <div key={i} className="flex items-end gap-2 border border-line bg-white p-3">
+              <div key={i} className="flex items-end gap-2 rounded-xl border border-line bg-white p-3">
                 <div className="flex-1">
                   <select
                     value={l.medicamentId}
                     onChange={(e) => majLigne(i, { medicamentId: e.target.value })}
-                    className="h-10 w-full border border-line bg-white px-2 text-sm outline-none focus:border-brand"
+                    className="h-10 w-full rounded-lg border border-line bg-white px-2 text-sm outline-none transition-all focus:border-brand focus:ring-4 focus:ring-brand/10"
                   >
                     <option value="">Médicament…</option>
                     {medicaments.map((m) => (
@@ -143,7 +143,7 @@ export default function NouvelleCommandePage() {
                   min={1}
                   value={l.quantiteCommandee}
                   onChange={(e) => majLigne(i, { quantiteCommandee: e.target.value })}
-                  className="h-10 w-20 border border-line px-2 text-sm outline-none focus:border-brand"
+                  className="h-10 w-20 rounded-lg border border-line px-2 text-sm outline-none transition-all focus:border-brand focus:ring-4 focus:ring-brand/10"
                   placeholder="Qté"
                 />
                 <input
@@ -151,14 +151,14 @@ export default function NouvelleCommandePage() {
                   min={0}
                   value={l.prixUnitaireAchat}
                   onChange={(e) => majLigne(i, { prixUnitaireAchat: e.target.value })}
-                  className="h-10 w-28 border border-line px-2 text-sm outline-none focus:border-brand"
+                  className="h-10 w-28 rounded-lg border border-line px-2 text-sm outline-none transition-all focus:border-brand focus:ring-4 focus:ring-brand/10"
                   placeholder="Prix achat"
                 />
                 {lignes.length > 1 && (
                   <button
                     type="button"
                     onClick={() => setLignes((p) => p.filter((_, idx) => idx !== i))}
-                    className="grid h-10 w-10 flex-none place-items-center text-muted hover:text-danger"
+                    className="grid h-10 w-10 flex-none place-items-center rounded-lg text-muted transition-colors hover:bg-danger/5 hover:text-danger"
                     aria-label="Retirer"
                   >
                     <IconTrash className="h-4 w-4" />
@@ -169,7 +169,7 @@ export default function NouvelleCommandePage() {
           </div>
         </div>
 
-        {error && <p className="border-l-2 border-danger bg-danger/5 px-3 py-2 text-sm text-danger">{error}</p>}
+        {error && <p className="rounded-lg border-l-2 border-danger bg-danger/5 px-3.5 py-2.5 text-sm text-danger">{error}</p>}
         <Button type="submit" disabled={loading}>
           {loading ? "Création…" : "Créer la commande"}
         </Button>

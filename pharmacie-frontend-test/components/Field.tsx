@@ -14,7 +14,7 @@ export default function Field({
       <input
         id={id}
         className={cn(
-          "h-11 w-full border border-line bg-white px-3.5 text-sm text-body outline-none transition-colors placeholder:text-muted/60 focus:border-brand",
+          "h-11 w-full rounded-xl border border-line bg-white px-3.5 text-sm text-body outline-none transition-all placeholder:text-muted/60 focus:border-brand focus:ring-4 focus:ring-brand/10",
           className
         )}
         {...rest}

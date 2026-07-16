@@ -12,13 +12,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Locale;
+
 /**
- * Journal détaillé des requêtes (console développeur, onglet Audit / Requêtes) — consultation
- * exclusivement JWT (console). Deux catégories réelles : {@code KNL_CORE} (Business Core → Kernel) et
- * {@code BUSINESS_CORE} (toute requête authentifiée reçue par Business Core, clé API OU JWT). Le champ
- * {@code facturable} distingue ce qui compte dans le quota (clé API + Kernel) de la modélisation JWT
- * (design-time), qui n'en consomme jamais. Le backend propre du développeur n'est jamais visible depuis
- * ici (cf. DOCUMENTATION-REQUETES.md).
+ * Journal détaillé des requêtes (console développeur, onglet Track) — consultation exclusivement JWT.
+ * Trois catégories réelles : {@code KNL_CORE} (Business Core → Kernel), {@code BUSINESS_CORE} (requête
+ * reçue par Business Core) et {@code APP} (requête propre du backend du développeur, rapportée via
+ * l'ingestion de télémétrie). Le champ {@code facturable} distingue ce qui compte dans le quota
+ * (KNL_CORE + BUSINESS_CORE runtime) du reste. Filtres serveur : catégorie, méthode, période, statut,
+ * facturable (cf. DOCUMENTATION-REQUETES.md).
  */
 @Tag(name = "Audit", description = "Journal détaillé des requêtes par catégorie")
 @SecurityRequirement(name = "bearerAuth")
@@ -35,28 +39,62 @@ public class RequeteLogController {
     }
 
     @Operation(summary = "Lister les requêtes journalisées",
-            description = "Filtrable par catégorie (KNL_CORE, BUSINESS_CORE), paginé, tri anti-chronologique.")
+            description = "Filtres optionnels : catégorie (KNL_CORE / BUSINESS_CORE / APP), méthode HTTP, "
+                    + "période (JOUR / SEMAINE / MOIS), statut (OK / ERREUR), facturable. Paginé, anti-chronologique.")
     @GetMapping
     public Mono<RequeteLogPageResponse> lister(
-            @Parameter(description = "KNL_CORE ou BUSINESS_CORE — omis pour les deux") @RequestParam(required = false) String categorie,
+            @Parameter(description = "KNL_CORE, BUSINESS_CORE ou APP — omis pour toutes") @RequestParam(required = false) String categorie,
+            @Parameter(description = "Méthode HTTP exacte (GET, POST, …)") @RequestParam(required = false) String methode,
+            @Parameter(description = "JOUR, SEMAINE ou MOIS — omis pour tout l'historique") @RequestParam(required = false) String periode,
+            @Parameter(description = "OK (succès <400) ou ERREUR (>=400)") @RequestParam(required = false) String statut,
+            @Parameter(description = "true = facturables uniquement") @RequestParam(required = false) Boolean facturable,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int taille) {
+            @RequestParam(defaultValue = "25") int taille) {
         int tailleEffective = Math.min(Math.max(1, taille), TAILLE_MAX);
         int pageEffective = Math.max(0, page);
         long decalage = (long) pageEffective * tailleEffective;
 
-        return BusinessContextHolder.currentContext()
-                .flatMap(ctx -> {
-                    var items = (categorie != null && !categorie.isBlank()
-                            ? repository.pageParTenantEtCategorie(ctx.tenantId(), categorie, tailleEffective, decalage)
-                            : repository.pageParTenant(ctx.tenantId(), tailleEffective, decalage))
-                            .map(RequeteLogResponse::depuis)
-                            .collectList();
-                    var total = categorie != null && !categorie.isBlank()
-                            ? repository.countByTenantIdAndCategorie(ctx.tenantId(), categorie)
-                            : repository.countByTenantId(ctx.tenantId());
-                    return Mono.zip(items, total)
-                            .map(t -> new RequeteLogPageResponse(t.getT1(), t.getT2(), pageEffective, tailleEffective));
-                });
+        String cat = vide(categorie) ? null : categorie.trim().toUpperCase(Locale.ROOT);
+        String meth = vide(methode) ? null : methode.trim().toUpperCase(Locale.ROOT);
+        Instant depuis = bornePeriode(periode);
+        Integer erreurFlag = flagStatut(statut);
+        Integer facturableFlag = facturable == null ? null : (facturable ? 1 : 0);
+
+        return BusinessContextHolder.currentContext().flatMap(ctx -> {
+            var items = repository
+                    .pageFiltree(ctx.tenantId(), cat, meth, depuis, erreurFlag, facturableFlag, tailleEffective, decalage)
+                    .map(RequeteLogResponse::depuis)
+                    .collectList();
+            var total = repository.countFiltree(ctx.tenantId(), cat, meth, depuis, erreurFlag, facturableFlag);
+            return Mono.zip(items, total)
+                    .map(t -> new RequeteLogPageResponse(t.getT1(), t.getT2(), pageEffective, tailleEffective));
+        });
+    }
+
+    private static boolean vide(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private static Instant bornePeriode(String periode) {
+        if (vide(periode)) {
+            return null;
+        }
+        return switch (periode.trim().toUpperCase(Locale.ROOT)) {
+            case "JOUR" -> Instant.now().minus(1, ChronoUnit.DAYS);
+            case "SEMAINE" -> Instant.now().minus(7, ChronoUnit.DAYS);
+            case "MOIS" -> Instant.now().minus(30, ChronoUnit.DAYS);
+            default -> null;
+        };
+    }
+
+    private static Integer flagStatut(String statut) {
+        if (vide(statut)) {
+            return null;
+        }
+        return switch (statut.trim().toUpperCase(Locale.ROOT)) {
+            case "ERREUR" -> 1;
+            case "OK" -> 0;
+            default -> null;
+        };
     }
 }

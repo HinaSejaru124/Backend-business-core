@@ -67,17 +67,17 @@ export default function SidePanel({
       }}
     >
       {/* Fond flouté */}
-      <div className="fixed inset-0 bg-ink/20 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-ink/25 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panneau — position fixed directe (plus de conteneur intermédiaire), couvre toute
           la hauteur de l'écran, du tout en haut au tout en bas. */}
       <div
-        className={`fixed inset-y-0 right-0 flex w-full max-w-xl flex-col border-l-4 border-brand bg-white shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 flex w-full max-w-xl flex-col rounded-l-3xl border-l border-line bg-white shadow-pop transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {/* En-tête : titre + actions (Annuler / Enregistrer), comme un vrai panneau applicatif */}
-        <div className="flex flex-none items-center justify-between gap-4 border-b border-line bg-ink px-6 py-5">
+        <div className="flex flex-none items-center justify-between gap-4 rounded-tl-3xl bg-ink-gradient px-6 py-5">
           <div className="min-w-0">
             <div className="font-mono text-[11px] uppercase tracking-wider text-brand">Nouveau</div>
             <h2 className="mt-1 truncate font-display text-xl font-bold text-white">{title}</h2>
@@ -92,7 +92,7 @@ export default function SidePanel({
             </Button>
             <button
               onClick={onClose}
-              className="grid h-9 w-9 flex-none place-items-center border border-white/20 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              className="grid h-9 w-9 flex-none place-items-center rounded-xl border border-white/20 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
               aria-label="Fermer"
             >
               <IconClose className="h-4 w-4" />

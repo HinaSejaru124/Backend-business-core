@@ -11,7 +11,7 @@ export default function StockBadge({ stock, seuil }: { stock: number; seuil: num
       : "text-ok border-ok/30 bg-ok/5";
   const label = rupture ? "Rupture" : bas ? "Stock bas" : "Stock OK";
   return (
-    <span className={cn("inline-flex items-center gap-1.5 border px-2 py-0.5 font-mono text-[11px]", style)}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-semibold", style)}>
       {stock} <span className="opacity-70">· {label}</span>
     </span>
   );

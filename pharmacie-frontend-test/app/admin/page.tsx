@@ -145,11 +145,11 @@ function PersonnelCard({ toast }: { toast: (type: "success" | "error", message: 
                   <span className="font-medium text-ink">
                     {p.prenom} {p.nom}
                   </span>
-                  <span className="ml-2 border border-brand/30 bg-brand-tint px-2 py-0.5 font-mono text-[11px] text-brand">
+                  <span className="ml-2 rounded-full border border-brand/25 bg-brand-tint px-2.5 py-0.5 font-mono text-[11px] font-semibold text-brand">
                     {LIBELLE_ROLE[p.role]}
                   </span>
                   {!p.actif && (
-                    <span className="ml-2 border border-line px-2 py-0.5 font-mono text-[11px] text-muted">
+                    <span className="ml-2 rounded-full border border-line px-2.5 py-0.5 font-mono text-[11px] font-semibold text-muted">
                       désactivé
                     </span>
                   )}
@@ -243,7 +243,7 @@ function NouveauPersonnelForm({
         onChange={(e) => setMotDePasse(e.target.value)}
         required
       />
-      {error && <p className="border-l-2 border-danger bg-danger/5 px-3 py-2 text-sm text-danger">{error}</p>}
+      {error && <p className="rounded-lg border-l-2 border-danger bg-danger/5 px-3.5 py-2.5 text-sm text-danger">{error}</p>}
       <Button type="submit" disabled={submitting}>
         {submitting ? "Création…" : "Créer le compte"}
       </Button>

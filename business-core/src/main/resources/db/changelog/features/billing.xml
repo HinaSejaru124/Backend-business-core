@@ -41,4 +41,29 @@
         </createIndex>
     </changeSet>
 
+    <!--
+      billing-002 : tarification des plans éditable par l'administrateur (prix, quota, devise). Les
+      valeurs de application.yml servent de valeurs par défaut au premier démarrage ; ensuite l'admin
+      fixe les prix depuis la console et ils sont persistés ici (source de vérité). Global -> pas de RLS.
+    -->
+    <changeSet id="billing-002-plan-pricing" author="billing">
+        <createTable tableName="plan_pricing">
+            <column name="code" type="varchar(32)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="quota_mensuel" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="prix_mensuel" type="bigint" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="devise" type="varchar(8)" defaultValue="XAF">
+                <constraints nullable="false"/>
+            </column>
+            <column name="maj_le" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
 </databaseChangeLog>

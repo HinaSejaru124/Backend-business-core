@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { listMedicaments, creerMedicamentAdmin, ApiError } from "@/lib/api";
 import type { Medicament } from "@/lib/types";
 import { Button } from "@/components/Button";
@@ -12,8 +13,9 @@ import PageHeader from "@/components/PageHeader";
 import StockBadge from "@/components/StockBadge";
 import Badge from "@/components/Badge";
 import Table, { Th, Td, EmptyRow } from "@/components/Table";
-import { IconPlus } from "@/components/icons";
+import { IconClose, IconPlus, IconSearch } from "@/components/icons";
 import { useToast } from "@/components/Toast";
+import { cn } from "@/lib/cn";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
 
@@ -26,6 +28,9 @@ const FORM_ID = "form-nouveau-medicament";
  * apparaît directement dans la liste, sans rechargement de page.
  */
 export default function MedicamentsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const q = searchParams.get("q") ?? "";
   const [medicaments, setMedicaments] = useState<Charge<Medicament[]>>({ state: "loading", data: [] });
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +44,15 @@ export default function MedicamentsPage() {
 
   useEffect(recharger, []);
 
+  /** Filtre réel sur le catalogue déjà chargé — alimenté par la recherche de l'en-tête (?q=). */
+  const filtres = useMemo(() => {
+    if (medicaments.state !== "ok" || !q.trim()) return medicaments.state === "ok" ? medicaments.data : [];
+    const terme = q.trim().toLowerCase();
+    return medicaments.data.filter(
+      (m) => m.nom.toLowerCase().includes(terme) || (m.dci ?? "").toLowerCase().includes(terme)
+    );
+  }, [medicaments, q]);
+
   return (
     <div className="animate-fade-up">
       <PageHeader
@@ -51,6 +65,21 @@ export default function MedicamentsPage() {
           </Button>
         }
       />
+
+      {q.trim() && (
+        <div className="mt-6 flex items-center gap-2 rounded-xl border border-brand/20 bg-brand-tint px-4 py-2.5 text-sm text-ink">
+          <IconSearch className="h-4 w-4 flex-none text-brand" />
+          <span>
+            Résultats pour <strong>« {q} »</strong> ({filtres.length})
+          </span>
+          <button
+            onClick={() => router.push("/medicaments")}
+            className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-brand hover:bg-white"
+          >
+            <IconClose className="h-3.5 w-3.5" /> Effacer
+          </button>
+        </div>
+      )}
 
       <div className="mt-8">
         {medicaments.state === "loading" && <p className="text-sm text-muted">Chargement…</p>}
@@ -72,13 +101,15 @@ export default function MedicamentsPage() {
               </tr>
             </thead>
             <tbody>
-              {medicaments.data.length === 0 && (
+              {filtres.length === 0 && (
                 <EmptyRow colSpan={6}>
-                  Aucun médicament pour l&apos;instant — créez-en un avec le bouton ci-dessus.
+                  {q.trim()
+                    ? "Aucun médicament ne correspond à cette recherche."
+                    : "Aucun médicament pour l'instant — créez-en un avec le bouton ci-dessus."}
                 </EmptyRow>
               )}
-              {medicaments.data.map((m, i) => (
-                <tr key={m.id} className={i !== 0 ? "border-t border-line" : ""}>
+              {filtres.map((m, i) => (
+                <tr key={m.id} className={cn("transition-colors hover:bg-subtle", i !== 0 && "border-t border-line")}>
                   <Td>
                     <Link href={`/medicaments/${m.id}`} className="font-medium text-ink hover:text-brand">
                       {m.nom}
@@ -212,7 +243,7 @@ function NouveauMedicamentForm({
           onChange={(e) => setSeuilAlerte(e.target.value)}
         />
       </div>
-      {error && <p className="border-l-2 border-danger bg-danger/5 px-3 py-2 text-sm text-danger">{error}</p>}
+      {error && <p className="rounded-lg border-l-2 border-danger bg-danger/5 px-3.5 py-2.5 text-sm text-danger">{error}</p>}
     </form>
   );
 }

@@ -94,4 +94,25 @@
         </rollback>
     </changeSet>
 
+    <!--
+      rlog-004 : 3e catégorie APP = requêtes propres du backend de l'application développeur (ex.
+      PharmaCore → sa propre base). Business Core ne peut pas les observer lui-même ; l'application les
+      lui rapporte via l'endpoint d'ingestion de télémétrie (clé API). Jamais facturables — elles ne
+      consomment que le backend du développeur, pas Business Core ni Kernel.
+    -->
+    <changeSet id="rlog-004-categorie-app" author="dev-audit">
+        <sql>
+            ALTER TABLE requete_log DROP CONSTRAINT IF EXISTS chk_requete_log_categorie;
+            ALTER TABLE requete_log ADD CONSTRAINT chk_requete_log_categorie
+                CHECK (categorie IN ('KNL_CORE', 'BUSINESS_CORE', 'APP'));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE requete_log DROP CONSTRAINT IF EXISTS chk_requete_log_categorie;
+                ALTER TABLE requete_log ADD CONSTRAINT chk_requete_log_categorie
+                    CHECK (categorie IN ('KNL_CORE', 'BUSINESS_CORE'));
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

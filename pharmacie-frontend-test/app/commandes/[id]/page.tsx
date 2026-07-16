@@ -9,6 +9,7 @@ import { Button } from "@/components/Button";
 import Badge from "@/components/Badge";
 import Table, { Th, Td } from "@/components/Table";
 import { useToast } from "@/components/Toast";
+import { cn } from "@/lib/cn";
 
 type Charge = { state: "loading" | "error" | "ok"; data: CommandeFournisseur | null; message?: string };
 
@@ -66,7 +67,7 @@ export default function CommandeDetailPage() {
         ← Retour aux commandes
       </Link>
 
-      <div className="mt-4 flex items-start justify-between border-b border-line pb-6">
+      <div className="mt-4 flex items-start justify-between pb-6">
         <div>
           <h1 className="font-display text-2xl font-bold text-ink">
             Commande — {fournisseur?.nom ?? c.fournisseurId}
@@ -90,7 +91,7 @@ export default function CommandeDetailPage() {
           </thead>
           <tbody>
             {c.lignes.map((l, i) => (
-              <tr key={l.id} className={i !== 0 ? "border-t border-line" : ""}>
+              <tr key={l.id} className={cn("transition-colors hover:bg-subtle", i !== 0 && "border-t border-line")}>
                 <Td className="font-mono text-xs">{l.medicamentId}</Td>
                 <Td>{l.quantiteCommandee}</Td>
                 <Td>{l.quantiteRecue ?? "—"}</Td>

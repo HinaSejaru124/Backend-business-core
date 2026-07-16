@@ -20,7 +20,7 @@ const STYLES: Record<string, string> = {
 export default function Badge({ value }: { value: string }) {
   const style = STYLES[value] ?? "text-muted border-line bg-subtle";
   return (
-    <span className={cn("inline-block border px-2 py-0.5 font-mono text-[11px]", style)}>
+    <span className={cn("inline-block rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-semibold", style)}>
       {value}
     </span>
   );

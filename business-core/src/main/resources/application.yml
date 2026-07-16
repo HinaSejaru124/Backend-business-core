@@ -55,14 +55,25 @@ businesscore:
     topic-prefix: business-core
   billing:
     # Quota mensuel de requêtes par plan (quota-mensuel < 0 => illimité).
-    # Prix/paiement réels gérés par Kernel Core (indisponible) ; ici seul le quota est appliqué.
+    # prix-mensuel : montant facturé théorique (console admin). L'encaissement réel reste géré par
+    # Kernel Core (indisponible) — la console admin distingue toujours « facturé » de « encaissé ».
     plans:
       FREE:
         quota-mensuel: 1000
+        prix-mensuel: 0
+        devise: XAF
       PRO:
         quota-mensuel: 100000
+        prix-mensuel: 15000
+        devise: XAF
       ENTERPRISE:
         quota-mensuel: -1
+        prix-mensuel: 75000
+        devise: XAF
+  # Administrateurs de la plateforme Business Core (console admin). Un développeur dont l'e-mail figure
+  # ici obtient l'accès admin après connexion normale — cf. AdminAccess. Vide = aucun admin.
+  admin:
+    emails: ${BC_ADMIN_EMAILS:techlan500@gmail.com}
 
 springdoc:
   swagger-ui:

@@ -16,9 +16,15 @@ export default function Card({
   tinted?: boolean;
 }) {
   return (
-    <div className={cn("border border-line", tinted ? "bg-brand-tint" : "bg-white", className)}>
+    <div
+      className={cn(
+        "rounded-2xl border shadow-card transition-shadow duration-200",
+        tinted ? "border-brand/15 bg-brand-tint" : "border-line bg-white",
+        className
+      )}
+    >
       {(title || action) && (
-        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+        <div className="flex items-center justify-between border-b border-line-soft px-6 py-4">
           {title && <h2 className="font-display text-[17px] font-semibold text-ink">{title}</h2>}
           {action}
         </div>

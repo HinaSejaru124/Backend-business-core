@@ -17,7 +17,7 @@ import {
   IconShield,
 } from "@/components/icons";
 import { useAuth } from "@/lib/auth-context";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, adminMe } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
 const NAV = [
@@ -40,6 +40,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { status, principal, profil, logout } = useAuth();
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [estAdmin, setEstAdmin] = useState(false);
 
   useEffect(() => {
     function onExpired() {
@@ -48,6 +49,17 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
     window.addEventListener("bc:session-expired", onExpired);
     return () => window.removeEventListener("bc:session-expired", onExpired);
   }, []);
+
+  // L'entrée « Administration » n'apparaît que pour un compte réellement admin (GET /v1/admin/me).
+  useEffect(() => {
+    if (status !== "authed") {
+      setEstAdmin(false);
+      return;
+    }
+    adminMe()
+      .then(() => setEstAdmin(true))
+      .catch(() => setEstAdmin(false));
+  }, [status]);
 
   useEffect(() => {
     if (status === "authed") setSessionExpired(false);
@@ -121,7 +133,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "group relative flex items-center gap-3 overflow-hidden px-3 py-2.5 text-sm transition-all duration-200 ease-out",
+                  "group relative flex items-center gap-3 overflow-hidden px-3.5 py-3 text-sm transition-all duration-200 ease-out",
                   activeItem
                     ? "bg-tint font-medium text-ink"
                     : "text-muted hover:translate-x-0.5 hover:bg-subtle hover:text-ink"
@@ -145,6 +157,20 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
             );
           })}
 
+          {estAdmin && (
+            <div className="mt-4 border-t border-line pt-4">
+              <div className="px-3 pb-1 font-mono text-[10px] uppercase tracking-wider text-muted">
+                Plateforme
+              </div>
+              <Link
+                href="/admin"
+                className="group flex items-center gap-3 px-3.5 py-3 text-sm font-medium text-brand transition-all duration-200 hover:translate-x-0.5 hover:bg-tint"
+              >
+                <IconShield className="h-4 w-4" /> Administration
+              </Link>
+            </div>
+          )}
+
           <div className="mt-4 border-t border-line pt-4">
             <div className="px-3 pb-1 font-mono text-[10px] uppercase tracking-wider text-muted">
               Ressources
@@ -153,7 +179,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
               href={`${API_BASE}/swagger-ui.html`}
               target="_blank"
               rel="noreferrer"
-              className="group flex items-center gap-3 px-3 py-2.5 text-sm text-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-subtle hover:text-ink"
+              className="group flex items-center gap-3 px-3.5 py-3 text-sm text-muted transition-all duration-200 hover:translate-x-0.5 hover:bg-subtle hover:text-ink"
             >
               <IconExternal className="h-4 w-4 transition-colors group-hover:text-brand" /> Swagger UI
             </a>
@@ -164,7 +190,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
         <div className="flex-none border-r border-t border-line p-3">
           <button
             onClick={onLogout}
-            className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-danger transition-colors hover:bg-danger/5"
+            className="flex w-full items-center gap-3 px-3.5 py-3 text-sm text-danger transition-colors hover:bg-danger/5"
           >
             <IconLogout className="h-4 w-4" /> Se déconnecter
           </button>
@@ -189,7 +215,7 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
                 {profil?.plan && <span> · {profil.plan}</span>}
               </div>
             </div>
-            <span className="grid h-9 w-9 flex-none place-items-center bg-gradient-to-br from-ink to-[#132a5c] font-mono text-sm font-semibold text-white shadow-glow-sm">
+            <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-gradient-to-br from-ink to-[#132a5c] font-mono text-sm font-semibold text-white shadow-glow-sm">
               {(principal || "?").charAt(0).toUpperCase()}
             </span>
           </div>

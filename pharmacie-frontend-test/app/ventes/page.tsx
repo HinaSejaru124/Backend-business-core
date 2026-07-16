@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import BlocageKernel from "@/components/BlocageKernel";
 import Badge from "@/components/Badge";
 import Table, { Th, Td, EmptyRow } from "@/components/Table";
+import { cn } from "@/lib/cn";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
 
@@ -68,7 +69,7 @@ export default function VentesPage() {
                 </EmptyRow>
               )}
               {ventes.data.map((v, i) => (
-                <tr key={v.id} className={i !== 0 ? "border-t border-line" : ""}>
+                <tr key={v.id} className={cn("transition-colors hover:bg-subtle", i !== 0 && "border-t border-line")}>
                   <Td>{fmtDate(v.creeLe)}</Td>
                   <Td>
                     {v.lignes.reduce((n, l) => n + l.quantite, 0)} article

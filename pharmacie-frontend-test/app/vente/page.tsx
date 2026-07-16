@@ -121,16 +121,16 @@ export default function VentePage() {
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
               placeholder="Rechercher un médicament (nom, code CIP)…"
-              className="h-11 w-full border border-line bg-white pl-10 pr-3 text-sm outline-none focus:border-brand"
+              className="h-11 w-full rounded-xl border border-line bg-white pl-10 pr-3 text-sm outline-none transition-all focus:border-brand focus:ring-4 focus:ring-brand/10"
             />
           </div>
           {resultats.length > 0 && (
-            <div className="mt-2 border border-line bg-white">
+            <div className="mt-2 overflow-hidden rounded-xl border border-line bg-white shadow-card">
               {resultats.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => ajouter(m)}
-                  className="flex w-full items-center justify-between border-b border-line px-4 py-3 text-left text-sm last:border-0 hover:bg-brand-tint"
+                  className="flex w-full items-center justify-between border-b border-line px-4 py-3 text-left text-sm transition-colors last:border-0 hover:bg-brand-tint"
                 >
                   <span>
                     {m.nom}
@@ -189,7 +189,7 @@ export default function VentePage() {
           )}
 
           {encaissement.state === "ok" && (
-            <div className="mt-6 border-l-2 border-ok bg-ok/5 px-4 py-3 text-sm text-ink">
+            <div className="mt-6 rounded-xl border-l-2 border-ok bg-ok/5 px-4 py-3 text-sm text-ink">
               <p className="font-medium">Vente enregistrée.</p>
               <p className="mt-1 font-mono text-xs text-muted">
                 transactionId : {encaissement.vente.transactionKernelId ?? "—"}
@@ -199,7 +199,7 @@ export default function VentePage() {
             </div>
           )}
           {encaissement.state === "error" && (
-            <div className="mt-6 border-l-2 border-danger bg-danger/5 px-4 py-3 text-sm text-danger">
+            <div className="mt-6 rounded-xl border-l-2 border-danger bg-danger/5 px-4 py-3 text-sm text-danger">
               <p className="font-medium">{encaissement.erreur?.title ?? "Encaissement impossible."}</p>
               {encaissement.erreur?.detail && <p className="mt-1 text-xs">{encaissement.erreur.detail}</p>}
               {encaissement.erreur?.violatedRule && (
@@ -213,8 +213,8 @@ export default function VentePage() {
         </div>
 
         {/* Panier */}
-        <div className="border border-line bg-white">
-          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+        <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+          <div className="flex items-center gap-2 border-b border-line bg-subtle px-4 py-3">
             <IconCart className="h-4 w-4 text-brand" />
             <h2 className="font-display text-[15px] font-semibold text-ink">Panier</h2>
           </div>
@@ -237,7 +237,7 @@ export default function VentePage() {
                       min={1}
                       value={l.quantite}
                       onChange={(e) => majQuantite(l.medicament.id, Number(e.target.value))}
-                      className="h-8 w-16 border border-line px-2 text-sm outline-none focus:border-brand"
+                      className="h-8 w-16 rounded-lg border border-line px-2 text-sm outline-none transition-all focus:border-brand focus:ring-4 focus:ring-brand/10"
                     />
                     <span className="font-mono text-sm text-ink">
                       {(l.medicament.prixUnitaire * l.quantite).toLocaleString("fr-FR")} XAF
@@ -270,7 +270,7 @@ export default function VentePage() {
                   onChange={(e) => setMotifDerogation(e.target.value)}
                   placeholder="Ex. ordonnance vérifiée verbalement, renouvellement autorisé…"
                   rows={2}
-                  className="w-full border border-line bg-white px-3.5 py-2 text-sm text-body outline-none transition-colors placeholder:text-muted/60 focus:border-brand"
+                  className="w-full rounded-xl border border-line bg-white px-3.5 py-2 text-sm text-body outline-none transition-all placeholder:text-muted/60 focus:border-brand focus:ring-4 focus:ring-brand/10"
                 />
                 <p className="mt-1 text-xs text-muted">
                   Requis par Business Core pour vendre un médicament sur ordonnance en tant que
@@ -279,13 +279,13 @@ export default function VentePage() {
               </div>
             )}
             {necessiteOrdonnance && !estPharmacien && (
-              <p className="mt-2 border-l-2 border-danger bg-danger/5 px-3 py-2 text-xs text-danger">
+              <p className="mt-2 rounded-lg border-l-2 border-danger bg-danger/5 px-3.5 py-2.5 text-xs text-danger">
                 Médicament sur ordonnance : seul un Pharmacien Responsable peut le vendre (avec motif).
                 Escaladez cette vente.
               </p>
             )}
             {ruptureStock && (
-              <p className="mt-2 border-l-2 border-warning bg-warning/5 px-3 py-2 text-xs text-warning">
+              <p className="mt-2 rounded-lg border-l-2 border-warning bg-warning/5 px-3 py-2 text-xs text-warning">
                 Quantité demandée supérieure au stock local pour au moins un article.
               </p>
             )}

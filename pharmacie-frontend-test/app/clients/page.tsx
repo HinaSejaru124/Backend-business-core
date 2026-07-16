@@ -10,6 +10,7 @@ import SidePanel from "@/components/SidePanel";
 import PageHeader from "@/components/PageHeader";
 import Table, { Th, Td, EmptyRow } from "@/components/Table";
 import { IconPlus } from "@/components/icons";
+import { cn } from "@/lib/cn";
 import { useToast } from "@/components/Toast";
 
 type Charge<T> = { state: "loading" | "error" | "ok"; data: T };
@@ -63,7 +64,7 @@ export default function ClientsPage() {
                 <EmptyRow colSpan={3}>Aucun client pour l&apos;instant.</EmptyRow>
               )}
               {clients.data.map((c, i) => (
-                <tr key={c.id} className={i !== 0 ? "border-t border-line" : ""}>
+                <tr key={c.id} className={cn("transition-colors hover:bg-subtle", i !== 0 && "border-t border-line")}>
                   <Td>
                     <Link href={`/clients/${c.id}`} className="font-medium text-ink hover:text-brand">
                       {c.prenom ? `${c.prenom} ${c.nom}` : c.nom}
@@ -149,7 +150,7 @@ function NouveauClientForm({
         <Field label="E-mail" id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       </div>
       <Field label="Adresse" id="adresse" value={adresse} onChange={(e) => setAdresse(e.target.value)} />
-      {error && <p className="border-l-2 border-danger bg-danger/5 px-3 py-2 text-sm text-danger">{error}</p>}
+      {error && <p className="rounded-lg border-l-2 border-danger bg-danger/5 px-3.5 py-2.5 text-sm text-danger">{error}</p>}
     </form>
   );
 }

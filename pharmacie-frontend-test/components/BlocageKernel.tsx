@@ -17,19 +17,21 @@ import { IconAlertTriangle } from "./icons";
  */
 export default function BlocageKernel({ contexte }: { contexte: string }) {
   return (
-    <div className="border border-warning/30 bg-warning/5 p-6">
+    <div className="rounded-2xl border border-warning/25 bg-warning/5 p-6">
       <div className="flex items-start gap-3">
-        <IconAlertTriangle className="mt-0.5 h-5 w-5 flex-none text-warning" />
+        <span className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-warning/15 text-warning">
+          <IconAlertTriangle className="h-4.5 w-4.5" />
+        </span>
         <div>
           <h2 className="font-display text-base font-semibold text-ink">
             {contexte} temporairement indisponible
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-body">
             La vente échoue dès la première étape kernel (vérification du stock), car Kernel rejette
-            le grant OAuth2 <code className="bg-white px-1 font-mono text-xs">client_credentials</code>{" "}
+            le grant OAuth2 <code className="rounded-md bg-white px-1.5 py-0.5 font-mono text-xs">client_credentials</code>{" "}
             utilisé pour le jeton machine-à-machine (
-            <code className="bg-white px-1 font-mono text-xs">Unsupported grant_type</code> sur{" "}
-            <code className="bg-white px-1 font-mono text-xs">/oauth2/token</code>). PharmaCore appelant
+            <code className="rounded-md bg-white px-1.5 py-0.5 font-mono text-xs">Unsupported grant_type</code> sur{" "}
+            <code className="rounded-md bg-white px-1.5 py-0.5 font-mono text-xs">/oauth2/token</code>). PharmaCore appelant
             Business Core par clé API (jamais de JWT délégué), toutes les étapes kernel de la vente sont
             concernées. Ce n&apos;est pas un bug de PharmaCore ni de Business Core — c&apos;est un
             blocage d&apos;infrastructure Kernel, confirmé et remonté à l&apos;équipe.
