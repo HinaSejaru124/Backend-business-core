@@ -1,53 +1,39 @@
 services:
-  postgres:
-    image: postgres:16
-    container_name: bc-postgres
-    environment:
-      POSTGRES_DB: ${BC_DB_NAME:-businesscore}
-      POSTGRES_USER: ${BC_DB_SUPERUSER:-postgres}
-      POSTGRES_PASSWORD: ${BC_DB_SUPERPASSWORD:-postgres}
+  business-core:
+    build: .
+    container_name: business-core
     ports:
-      - "${BC_DB_PORT:-5432}:5432"
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      BC_DB_NAME: ${BC_DB_NAME:-businesscore}
+      BC_DB_OWNER_PASSWORD: ${BC_DB_OWNER_PASSWORD}
+      BC_DB_APP_PASSWORD: ${BC_DB_APP_PASSWORD}
+      BC_R2DBC_URL: r2dbc:postgresql://localhost:5432/${BC_DB_NAME:-businesscore}
+      BC_DB_APP_USER: bc_app
+      BC_JDBC_URL: jdbc:postgresql://localhost:5432/${BC_DB_NAME:-businesscore}
+      BC_DB_OWNER_USER: bc_owner
+      BC_REDIS_HOST: localhost
+      BC_REDIS_PORT: "6379"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+      KERNEL_BASE_URL: ${KERNEL_BASE_URL:-}
+      KERNEL_CLIENT_ID: ${KERNEL_CLIENT_ID:-}
+      KERNEL_CLIENT_SECRET: ${KERNEL_CLIENT_SECRET:-}
+      BC_ENCRYPTION_KEY: ${BC_ENCRYPTION_KEY}
+      BC_CORS_ORIGINS: ${BC_CORS_ORIGINS:-*}
+      BC_ADMIN_EMAILS: ${BC_ADMIN_EMAILS:-}
     volumes:
       - bc-pgdata:/var/lib/postgresql/data
-      - ./infra/postgres:/docker-entrypoint-initdb.d:ro
+      - bc-kafkadata:/var/lib/kafka/data
+      - bc-redisdata:/var/lib/redis
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${BC_DB_SUPERUSER:-postgres} -d ${BC_DB_NAME:-businesscore}"]
-      interval: 5s
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
       timeout: 5s
-      retries: 10
-
-  redis:
-    image: redis:7
-    container_name: bc-redis
-    ports:
-      - "${BC_REDIS_PORT:-6379}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  kafka:
-    # 3.9.1 corrige KAFKA-18281 (3.9.0 validait à tort le listener CONTROLLER non-advertised
-    # en 0.0.0.0 au format du stockage KRaft -> "advertised.listeners cannot use 0.0.0.0").
-    image: apache/kafka:3.9.1
-    container_name: bc-kafka
-    ports:
-      - "${BC_KAFKA_PORT:-9092}:9092"
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      start_period: 90s
+      retries: 12
 
 volumes:
   bc-pgdata:
+  bc-kafkadata:
+  bc-redisdata:

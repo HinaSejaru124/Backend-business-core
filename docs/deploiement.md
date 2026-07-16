@@ -1,36 +1,39 @@
 # Déploiement sur l'infrastructure yowyob
 
-Le Business Core se déploie sur le serveur yowyob via **GitLab CI** : un push sur `main` construit
-l'image sur le serveur (runner local, sans registry) puis la (re)déploie par SSH. Les fichiers de
-déploiement sont à la **racine du dépôt** : [`Dockerfile`](../../Dockerfile),
-[`docker-compose.prod.yml`](../../docker-compose.prod.yml), [`.gitlab-ci.yml`](../../.gitlab-ci.yml).
+Le Business Core se déploie comme une image **all-in-one** : l'application Spring Boot,
+PostgreSQL, Redis et Kafka (KRaft) tournent tous dans le **même conteneur**, supervisés par
+supervisord. Un push sur `main` recopie les sources sur le serveur puis relance le conteneur
+via **GitLab CI** + SSH. Les fichiers de déploiement sont à la **racine du dépôt** :
+[`Dockerfile`](../../Dockerfile), [`docker-compose.yml`](../../docker-compose.yml),
+[`.gitlab-ci.yml`](../../.gitlab-ci.yml), [`.env.example`](../../.env.example).
 
 ## Schéma
 
 ```mermaid
 flowchart LR
-  push["push sur main"] --> build["GitLab CI - build image (Dockerfile)"]
-  build --> deploy["deploy SSH -> serveur yowyob"]
-  deploy --> compose["docker compose -f docker-compose.prod.yml up -d"]
-  compose --> svc["business-core (reseau yowyob)"]
-  svc --> traefik["Traefik /business-core-api"]
-  svc --> pg[("database:5432")]
-  svc --> redis[("bc-redis")]
-  svc --> kernel["kernel-core-kernel-layer-1:8080"]
-  svc --> kafka["kafka:29092"]
+  push["push sur main"] --> deploy["GitLab CI : deploy SSH -> serveur yowyob"]
+  deploy --> compose["docker compose build && up -d"]
+  compose --> ctn["conteneur business-core"]
+  ctn --> app["app Spring Boot :8080"]
+  ctn --> pg[("PostgreSQL :5432")]
+  ctn --> redis[("Redis :6379")]
+  ctn --> kafka[("Kafka KRaft :9092")]
+  app --> kernel["kernel-core.yowyob.com"]
 ```
 
-## Réseau yowyob (services partagés)
+## Contenu du conteneur
 
-Le service rejoint le réseau Docker **externe** `yowyob` et adresse les dépendances par leur nom interne :
+Un seul `docker-compose.yml`, un seul service `business-core` :
 
-| Dépendance | Hôte interne | Notes |
+| Composant | Rôle | Port (interne au conteneur) |
 |---|---|---|
-| PostgreSQL | `database:5432` | base + user **dédiés** `businesscore` (à demander à l'admin) |
-| kernel-core | `kernel-core-kernel-layer-1:8080` | pas l'URL publique `kernel-core.yowyob.com` |
-| Kafka | `kafka:29092` | SASL_PLAINTEXT / SCRAM-SHA-256, user dédié |
-| Redis | `bc-redis` | conteneur **dédié** au Business Core (défini dans le compose) |
-| Traefik | — | exposition TLS, routage par chemin `/business-core-api` |
+| App Spring Boot | API business-core | 8080 (exposé sur l'hôte via `APP_PORT`) |
+| PostgreSQL 16 | Persistance (R2DBC + Liquibase/JDBC) | 5432 |
+| Redis | Cache | 6379 |
+| Kafka (KRaft, sans Zookeeper) | Bus d'événements | 9092 |
+
+Les données de chaque composant sont persistées via des volumes Docker nommés
+(`bc-pgdata`, `bc-kafkadata`, `bc-redisdata`), déclarés dans `docker-compose.yml`.
 
 ## Authentification kernel
 
@@ -45,36 +48,29 @@ d'entreprise. Le socle gère cela dans `KernelClient`. Deux niveaux d'identité 
 
 ## Variables d'environnement (`.env` sur le serveur)
 
-Déposé **manuellement** dans `${DEPLOY_DIR}` (jamais commité ; lu via `env_file`) :
+Copier [`.env.example`](../../.env.example) en `.env` et renseigner (déposé **manuellement**
+dans `${DEPLOY_DIR}`, jamais commité, lu via `env_file` par `docker-compose.yml`) :
 
 | Variable | Rôle |
 |---|---|
-| `APP_IMAGE` | injectée par le CI (`business-core/backend:<branche>_<sha>`) |
-| `DB_PASSWORD` | mot de passe du user PostgreSQL dédié |
+| `BC_DB_OWNER_PASSWORD` / `BC_DB_APP_PASSWORD` | mots de passe des rôles PostgreSQL internes au conteneur |
 | `KERNEL_CLIENT_ID` / `KERNEL_CLIENT_SECRET` | ClientApplication plateforme |
 | `BC_ENCRYPTION_KEY` | clé AES-256-GCM (chiffrement des secrets kernel) |
-| `KAFKA_PASSWORD` | si Kafka SASL activé |
+| `BC_ADMIN_EMAILS` | emails avec accès console admin |
+| `APP_PORT` | port exposé sur l'hôte (défaut `8080`) |
 
 Variables CI GitLab (groupe) : `SSH_KEY`, `HOST_ADDR` (173.212.216.20), `HOST_USER` (gi) ; runner tag `kernel-core`.
 
 ## Isolation tenant en prod
 
-Un seul user PostgreSQL dédié (`businesscore`) est propriétaire de sa base. La RLS reste effective
-car les policies utilisent `FORCE ROW LEVEL SECURITY` (le propriétaire non-superuser y est soumis) et
-le pool R2DBC pose `app.current_tenant` par connexion. Voir
-[sécurité — défense en profondeur](architecture/securite-defense-profondeur.md).
+PostgreSQL tourne dans le même conteneur avec deux rôles dédiés : `bc_owner` (migrations
+Liquibase) et `bc_app` (runtime R2DBC, non-owner, soumis à la RLS). La RLS reste effective car
+les policies utilisent `FORCE ROW LEVEL SECURITY` et le pool R2DBC pose `app.current_tenant` par
+connexion. Voir [sécurité — défense en profondeur](architecture/securite-defense-profondeur.md).
 
 ## Santé et exposition
 
-- Health check : `GET /actuator/health` (utilisé par le `healthcheck` du compose).
-- Derrière Traefik, l'app est servie sous `https://business-core.yowyob.com/business-core-api`
-  (stripprefix + `server.forward-headers-strategy=framework`).
-
-## Local vs prod
-
-| | Local (`docker-compose.yml`) | Prod (`docker-compose.prod.yml`) |
-|---|---|---|
-| Infra | conteneurs PG/Redis/Kafka dédiés | réseau `yowyob` partagé |
-| Kernel | mock WireMock / `localhost` | `kernel-core-kernel-layer-1:8080` |
-| Profil | `dev` | `prod` (config de base + env) |
-| Kafka | PLAINTEXT | SASL_PLAINTEXT / SCRAM |
+- Health check : `GET /actuator/health`, utilisé par le `HEALTHCHECK` du Dockerfile et le
+  `healthcheck` du compose.
+- Derrière Traefik (ou reverse proxy équivalent), l'app est servie sous
+  `https://business-core.yowyob.com` (`server.forward-headers-strategy=framework`).

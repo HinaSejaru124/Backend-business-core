@@ -1,9 +1,9 @@
 # ============================================================================
-#  .gitlab-ci.yml — build + déploiement auto du Business Core sur le serveur yowyob
+#  .gitlab-ci.yml — déploiement auto du Business Core (image all-in-one) sur yowyob
 # ============================================================================
-#  Push sur `main` => build de l'image SUR le serveur (runner local, pas de registry)
-#  PUIS déploiement auto via SSH. La compilation se fait dans le Dockerfile : un échec
-#  de build bloque le déploiement.
+#  Push sur `main` => recopie des sources sur le serveur PUIS `docker compose build`
+#  + `up -d` via SSH (runner local, pas de registry). L'image contient l'app ET ses
+#  dépendances (PostgreSQL, Redis, Kafka) dans un seul conteneur — voir Dockerfile.
 #
 #  Variables GitLab requises (Settings > CI/CD, idéalement au niveau GROUPE) :
 #    - SSH_KEY    : clé privée SSH de déploiement
@@ -11,33 +11,17 @@
 #    - HOST_USER  : gi
 #  + un runner avec le tag `kernel-core`.
 #
-#  Le `.env` (secrets) est déposé MANUELLEMENT sur le serveur dans $DEPLOY_DIR.
+#  Le `.env` (secrets, cf. .env.example) est déposé MANUELLEMENT sur le serveur dans $DEPLOY_DIR.
 # ============================================================================
 
 stages:
-  - build
   - deploy
 
 variables:
   GIT_DEPTH: "0"
-  IMAGE: "business-core/backend"
   DEPLOY_DIR: "/home/gi/business-core"
-  IMMUTABLE_TAG: "${CI_COMMIT_BRANCH}_${CI_COMMIT_SHORT_SHA}"
 
-# ── 1) BUILD : compile + construit l'image (la compilation Maven est dans le Dockerfile)
-Build-image:
-  stage: build
-  tags: [kernel-core]
-  image: docker:27
-  variables:
-    DOCKER_HOST: "unix:///var/run/docker.sock"
-    DOCKER_BUILDKIT: "1"
-  script:
-    - docker build -t "$IMAGE:$IMMUTABLE_TAG" -t "$IMAGE:$CI_COMMIT_BRANCH" .
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-# ── 2) DEPLOY : recopie le compose puis (re)lance le service avec l'image fraîche
+# ── DEPLOY : recopie le compose puis (re)construit/relance le conteneur all-in-one
 deploy:
   stage: deploy
   tags: [kernel-core]
@@ -50,15 +34,18 @@ deploy:
     - ssh-keyscan "$HOST_ADDR" >> ~/.ssh/known_hosts 2>/dev/null
     - chmod 644 ~/.ssh/known_hosts
   script:
-    # Le dépôt est la SOURCE DE VÉRITÉ : on recopie le compose à chaque déploiement.
-    - scp -o StrictHostKeyChecking=no docker-compose.prod.yml "${HOST_USER}@${HOST_ADDR}:${DEPLOY_DIR}/docker-compose.prod.yml"
+    # Le dépôt est la SOURCE DE VÉRITÉ : on recopie le Dockerfile + compose à chaque déploiement.
+    - scp -o StrictHostKeyChecking=no Dockerfile docker-compose.yml "${HOST_USER}@${HOST_ADDR}:${DEPLOY_DIR}/"
+    - scp -o StrictHostKeyChecking=no -r docker infra "${HOST_USER}@${HOST_ADDR}:${DEPLOY_DIR}/"
+    - scp -o StrictHostKeyChecking=no pom.xml "${HOST_USER}@${HOST_ADDR}:${DEPLOY_DIR}/"
+    - scp -o StrictHostKeyChecking=no -r src "${HOST_USER}@${HOST_ADDR}:${DEPLOY_DIR}/"
     - |
       ssh "${HOST_USER}@${HOST_ADDR}" "
         set -e
         cd '${DEPLOY_DIR}'
-        export APP_IMAGE='$IMAGE:$IMMUTABLE_TAG'
-        docker compose -f docker-compose.prod.yml up -d
-        docker compose -f docker-compose.prod.yml ps
+        docker compose build
+        docker compose up -d
+        docker compose ps
         docker image prune -f
       "
   rules:
