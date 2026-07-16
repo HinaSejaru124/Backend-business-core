@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
 import com.yowyob.businesscore.adapter.out.kernel.organization.PersisterEntrepriseKernelAdapter;
+import com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogWriter;
 import com.yowyob.businesscore.domain.shared.CycleVie;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.junit.jupiter.api.AfterEach;
@@ -57,7 +58,8 @@ class PersisterEntrepriseKernelAdapterTest {
                 "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
         KernelClient kernel = new KernelClient(
-                webClient, tokenService, credentialStore, JsonMapper.builder().build(), props);
+                webClient, tokenService, credentialStore, JsonMapper.builder().build(),
+                mock(RequeteLogWriter.class), props);
         adapter = new PersisterEntrepriseKernelAdapter(kernel, props);
     }
 

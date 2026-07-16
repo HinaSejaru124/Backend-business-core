@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
+import com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogWriter;
 import com.yowyob.businesscore.domain.port.out.CreationProduit;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
 import org.junit.jupiter.api.AfterEach;
@@ -54,7 +55,8 @@ class CatalogueOffreKernelAdapterTest {
                 "http://localhost:" + wireMock.port(), 5000, 0, "", "", "BUSINESS_CORE", "OWNER", null);
         WebClient webClient = WebClient.builder().baseUrl(props.baseUrl()).build();
         KernelClient kernel = new KernelClient(
-                webClient, tokenService, credentialStore, JsonMapper.builder().build(), props);
+                webClient, tokenService, credentialStore, JsonMapper.builder().build(),
+                mock(RequeteLogWriter.class), props);
         adapter = new CatalogueOffreKernelAdapter(kernel);
     }
 

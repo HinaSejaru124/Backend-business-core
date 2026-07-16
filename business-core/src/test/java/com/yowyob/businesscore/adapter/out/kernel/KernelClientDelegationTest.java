@@ -5,6 +5,7 @@ import com.yowyob.businesscore.adapter.in.security.JwtAuthenticationToken;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore.KernelCreds;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
+import com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogWriter;
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.context.BusinessContextHolder;
 import com.yowyob.businesscore.application.error.ProblemException;
@@ -68,7 +69,7 @@ class KernelClientDelegationTest {
         credentialStore = mock(KernelCredentialStore.class);
         kernel = new KernelClient(
                 webClient, tokenService, credentialStore,
-                JsonMapper.builder().build(), props);
+                JsonMapper.builder().build(), mock(RequeteLogWriter.class), props);
     }
 
     @AfterEach
