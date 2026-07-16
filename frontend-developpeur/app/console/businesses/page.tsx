@@ -46,6 +46,7 @@ export default function BusinessesPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [created, setCreated] = useState<Business | null>(null);
+  const [versionsError, setVersionsError] = useState<string | null>(null);
 
   const charger = useCallback(async () => {
     setLoadError(null);
@@ -66,6 +67,7 @@ export default function BusinessesPage() {
   const versionsPubliees = versions.filter((v) => v.immuable || v.publieeLe);
 
   useEffect(() => {
+    setVersionsError(null);
     if (!typeId) {
       setVersions([]);
       setVersionNumber("");
@@ -76,10 +78,13 @@ export default function BusinessesPage() {
       .then((data) => {
         setVersions(data);
         const pub = data.filter((v) => v.immuable || v.publieeLe);
-        if (pub.length > 0) setVersionNumber(String(pub[0].numero));
-        else setVersionNumber("");
+        setVersionNumber(pub.length > 0 ? String(pub[0].numero) : "");
       })
-      .catch(() => setVersions([]))
+      .catch((e) => {
+        setVersions([]);
+        setVersionNumber("");
+        setVersionsError(e instanceof ApiError ? e.detail || e.title : "Chargement des versions impossible.");
+      })
       .finally(() => setLoadingVersions(false));
   }, [typeId]);
 
@@ -177,9 +182,9 @@ export default function BusinessesPage() {
           <div className="mt-3">
             <EmptyState
               title="Aucun type métier publié"
-              description="Publiez d'abord un type métier et une version via l'API avant de créer une entreprise."
-              actionHref="/console/docs"
-              actionLabel="Voir la documentation →"
+              description="Créez un type métier, publiez-le, publiez sa version — vous pourrez ensuite créer une entreprise à partir de lui."
+              actionHref="/console/business-types"
+              actionLabel="Gérer les types métier →"
             />
           </div>
         )}
@@ -243,7 +248,9 @@ export default function BusinessesPage() {
               </label>
             )}
 
-            {typeId && !loadingVersions && versionsPubliees.length === 0 && (
+            {versionsError && <Banner variant="error">{versionsError}</Banner>}
+
+            {typeId && !loadingVersions && !versionsError && versionsPubliees.length === 0 && (
               <Banner variant="info">
                 Ce type métier n&apos;a aucune version <strong>publiée</strong> — publiez-en une (elle
                 devient alors immuable) avant de pouvoir créer une entreprise dessus.
@@ -268,6 +275,21 @@ export default function BusinessesPage() {
                   Gérer la clé API
                 </ButtonLink>
               </Banner>
+            )}
+
+            {/* Ce qui manque encore, pour ne jamais laisser un bouton grisé sans explication. */}
+            {!creating && (!typeId || !versionNumber || !nom.trim()) && (
+              <p className="text-[12.5px] text-muted">
+                Pour activer le bouton, il manque :{" "}
+                {[
+                  !typeId && "le type métier",
+                  typeId && !versionNumber && "une version publiée pour ce type",
+                  !nom.trim() && "le nom de l'entreprise",
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+                .
+              </p>
             )}
 
             <Button type="submit" disabled={creating || !typeId || !versionNumber || !nom.trim()}>

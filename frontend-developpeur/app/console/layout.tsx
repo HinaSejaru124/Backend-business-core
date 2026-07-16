@@ -12,6 +12,7 @@ import {
   IconBook,
   IconBolt,
   IconBuilding,
+  IconBraces,
   IconExternal,
   IconLogout,
   IconShield,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/cn";
 
 const NAV = [
   { href: "/console", label: "Tableau de bord", icon: IconLayers, exact: true },
+  { href: "/console/business-types", label: "Types métier", icon: IconBraces },
   { href: "/console/businesses", label: "Entreprises", icon: IconBuilding },
   { href: "/console/api-key", label: "Clés d'API", icon: IconKey },
   { href: "/console/audit", label: "Audit", icon: IconActivity },

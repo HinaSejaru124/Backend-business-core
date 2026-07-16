@@ -289,14 +289,44 @@ export function upgradePlan(targetPlan: string): Promise<UpgradeResult> {
 
 export type BusinessType = {
   id: string;
+  tenantId: string;
+  businessDomainId: string | null;
   code: string;
   nom: string;
-  statut: string;
+  statut: "BROUILLON" | "PUBLIE" | "ARCHIVE";
 };
 
-/** GET /v1/business-types — types métier du tenant courant (Bearer). */
+/** GET /v1/business-types — types métier du tenant courant (Bearer). Privés au tenant (RLS) — jamais partagés entre développeurs. */
 export function listBusinessTypes(): Promise<BusinessType[]> {
   return apiFetch<BusinessType[]>("/v1/business-types");
+}
+
+/** GET /v1/business-types/{typeId} — un type métier. */
+export function getBusinessType(typeId: string): Promise<BusinessType> {
+  return apiFetch<BusinessType>(`/v1/business-types/${encodeURIComponent(typeId)}`);
+}
+
+/** POST /v1/business-types — crée un type métier en BROUILLON. */
+export function createBusinessType(
+  code: string,
+  nom: string,
+  domainCode?: string,
+  domainNom?: string
+): Promise<BusinessType> {
+  return apiFetch<BusinessType>("/v1/business-types", {
+    method: "POST",
+    body: JSON.stringify({ code, nom, domainCode, domainNom }),
+  });
+}
+
+/** POST /v1/business-types/{typeId}/publish — BROUILLON → PUBLIE. */
+export function publishBusinessType(typeId: string): Promise<BusinessType> {
+  return apiFetch<BusinessType>(`/v1/business-types/${encodeURIComponent(typeId)}/publish`, { method: "POST" });
+}
+
+/** POST /v1/business-types/{typeId}/archive — PUBLIE → ARCHIVE. */
+export function archiveBusinessType(typeId: string): Promise<BusinessType> {
+  return apiFetch<BusinessType>(`/v1/business-types/${encodeURIComponent(typeId)}/archive`, { method: "POST" });
 }
 
 export type BusinessTypeVersion = {
@@ -312,6 +342,58 @@ export type BusinessTypeVersion = {
 export function listBusinessTypeVersions(typeId: string): Promise<BusinessTypeVersion[]> {
   return apiFetch<BusinessTypeVersion[]>(
     `/v1/business-types/${encodeURIComponent(typeId)}/versions`
+  );
+}
+
+/** GET /v1/business-types/{typeId}/versions/{n} — une version précise. */
+export function getBusinessTypeVersion(typeId: string, numero: number): Promise<BusinessTypeVersion> {
+  return apiFetch<BusinessTypeVersion>(
+    `/v1/business-types/${encodeURIComponent(typeId)}/versions/${numero}`
+  );
+}
+
+/** POST /v1/business-types/{typeId}/versions — crée la version suivante (numérotation auto). */
+export function createBusinessTypeVersion(typeId: string): Promise<BusinessTypeVersion> {
+  return apiFetch<BusinessTypeVersion>(
+    `/v1/business-types/${encodeURIComponent(typeId)}/versions`,
+    { method: "POST" }
+  );
+}
+
+/** POST /v1/business-types/{typeId}/versions/{n}/publish — verrouille et rend la version utilisable. */
+export function publishBusinessTypeVersion(typeId: string, numero: number): Promise<BusinessTypeVersion> {
+  return apiFetch<BusinessTypeVersion>(
+    `/v1/business-types/${encodeURIComponent(typeId)}/versions/${numero}/publish`,
+    { method: "POST" }
+  );
+}
+
+export type ConfigParam = {
+  id: string;
+  cle: string;
+  valeur: string;
+  verrouille: boolean;
+  portee: "TYPE" | "ENTREPRISE";
+};
+
+/** GET /v1/business-types/{typeId}/versions/{n}/config — paramètres de configuration de la version. */
+export function listConfigParams(typeId: string, numero: number): Promise<ConfigParam[]> {
+  return apiFetch<ConfigParam[]>(
+    `/v1/business-types/${encodeURIComponent(typeId)}/versions/${numero}/config`
+  );
+}
+
+/** POST /v1/business-types/{typeId}/versions/{n}/config — définit un paramètre (clé/valeur/verrouillage). */
+export function defineConfigParam(
+  typeId: string,
+  numero: number,
+  cle: string,
+  valeur: string,
+  verrouille: boolean
+): Promise<ConfigParam> {
+  return apiFetch<ConfigParam>(
+    `/v1/business-types/${encodeURIComponent(typeId)}/versions/${numero}/config`,
+    { method: "POST", body: JSON.stringify({ cle, valeur, verrouille }) }
   );
 }
 

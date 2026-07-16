@@ -194,3 +194,10 @@ export function IconBan(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+export function IconPlus(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(p)}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
