@@ -50,13 +50,18 @@ com.yowyob.businesscore
 
 ## Ports
 
-### Ports de sortie (17) — vers le kernel et l'infra
+### Ports de sortie — vers le kernel et l'infra
 Nommés **par capacité métier**, jamais par core du kernel (un port reste stable même si le kernel
-renomme/fusionne un core) : `ProvisionnerAccesDev`, `ResoudreBusinessDomain`, `PersisterEntreprise`,
-`GererCatalogueOffre`, `VerifierDisponibilite`, `ResoudrePersonne`, `ResoudreBeneficiaire`,
-`AppliquerRoleTechnique`, `RattacherAOrganisation`, `EnregistrerVente`, `ExecuterWorkflow`,
-`PublierEvenement`, `JournaliserAudit`, `StockerDocument`, `RegistreDeRegles`, `DepotDeConfiguration`,
-`VerrouDIdempotence`.
+renomme/fusionne un core), par exemple : `ResoudreBusinessDomain`, `PersisterEntreprise`,
+`GererCatalogueOffre`, `VerifierDisponibilite`, `ResoudreBeneficiaire`, `AppliquerRoleTechnique`,
+`RattacherAOrganisation`, `EnregistrerVente`, `ExecuterWorkflow`, `PublierEvenement`, `JournaliserAudit`,
+`StockerDocument`, `RegistreDeRegles`, `DepotDeConfiguration`, `VerrouDIdempotence`,
+`AuthentifierUtilisateur`. Liste exhaustive et à jour : `domain/port/out/`.
+
+> Un port disparaît quand la responsabilité qu'il portait est retirée — ex. `ResoudrePersonne`
+> (`POST /api/actors`) a été supprimé quand le rattachement d'acteur a cessé de résoudre/créer une
+> identité kernel à partir d'un identifiant texte (cf. `architecture/authentification-trois-flux.md` §3).
+> Ne fige jamais un nombre ou une liste ici : le code source fait foi.
 
 ### Ports internes (6) — stratégies extensibles
 Partout où le domaine fait un choix qui pourra varier, ce choix passe par une interface dont

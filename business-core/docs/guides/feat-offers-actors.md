@@ -99,18 +99,29 @@ Un **Acteur métier** = association (personne + rôle + entreprise). Apport clé
 Opérateur et Bénéficiaire ne vivent pas dans les mêmes cores kernel : **étanches**. On ne transforme jamais un bénéficiaire en opérateur par modification de rôle. Si une personne change de statut, on crée un **nouvel** ActeurMetier.
 
 ### Ports de sortie
-- `ResoudrePersonne` → `POST /api/actors` (opérateur).
 - `ResoudreBeneficiaire` → `POST /api/third-parties` (bénéficiaire).
 - `AppliquerRoleTechnique` → `POST /api/roles` **puis** `POST /api/roles/assignments` (2 appels).
 - `RattacherAOrganisation` → `POST /api/organizations/{orgId}/actors`.
 
-### Endpoints
+> ⚠️ **Évolution depuis ce brief initial** : le port `ResoudrePersonne` (`POST /api/actors`, résolution
+> d'un opérateur à partir d'un identifiant texte) a été supprimé. Business Core ne résout/crée plus
+> jamais d'identité kernel à partir d'un email pour un OPERATEUR — soit l'identité est déjà connue
+> (`acteurKernelId` fourni directement à `POST .../actors`), soit la personne s'inscrit elle-même
+> (`POST .../actors:register`, qui délègue entièrement au kernel : login d'abord, sign-up seulement si
+> le compte n'existe pas). Le chemin BENEFICIAIRE (`ResoudreBeneficiaire`) est inchangé. Détail complet :
+> [`architecture/authentification-trois-flux.md`](../architecture/authentification-trois-flux.md) §3.
+
+### Endpoints (voir le lien ci-dessus pour le détail complet, notamment `:register`/`:login`/`/me`)
 | Verbe | Chemin |
 |---|---|
 | POST | `/v1/business-types/{typeId}/versions/{n}/roles` |
-| POST | `/v1/businesses/{businessId}/actors` |
+| POST | `/v1/businesses/{businessId}/actors` (identité déjà connue uniquement) |
 | GET | `/v1/businesses/{businessId}/actors` |
+| PUT | `/v1/businesses/{businessId}/actors/{actorId}` |
 | DELETE | `/v1/businesses/{businessId}/actors/{actorId}` |
+| POST | `/v1/businesses/{businessId}/actors:register` (inscription libre-service) |
+| POST | `/v1/businesses/{businessId}/actors:login` |
+| GET | `/v1/businesses/{businessId}/actors/me` |
 
 ---
 

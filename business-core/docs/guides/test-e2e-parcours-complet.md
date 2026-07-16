@@ -22,15 +22,18 @@ export PASSWORD="MotDePasse1!Secur"
 
 ## Règle d'authentification (important)
 
+Trois flux distincts — détail complet et schémas :
+[`architecture/authentification-trois-flux.md`](../architecture/authentification-trois-flux.md).
+
 | Surface | Headers | Usage |
 | ------- | ------- | ----- |
-| **Console dev** | `Authorization: Bearer <JWT>` | `/v1/api-keys`, `/v1/dashboard`, `/v1/auth/me` |
-| **API intégration** | Bearer **obligatoire** + `X-BC-Client-Id` / `X-BC-Api-Key` **recommandés** | Types métier, entreprises, opérations… |
+| **Console dev** (JWT uniquement) | `Authorization: Bearer <JWT>` | `/v1/businesses` (CRUD), `/v1/businesses/{id}/api-keys*`, `/v1/businesses/{id}/actors` (CRUD), `/v1/dashboard`, `/v1/auth/me` |
+| **API intégration** (Bearer OU clé) | `Authorization: Bearer <JWT>` **ou** `X-BC-Client-Id` + `X-BC-Api-Key` | `/v1/sync`, `/v1/businesses/{id}/operations*`, `/traces*`, `/transactions*` |
+| **API à clé seule** (clé uniquement, Bearer refusé) | `X-BC-Client-Id` + `X-BC-Api-Key` | `/v1/businesses/{id}/actors:register`, `:login` |
 | **Public** | aucun | `/health`, `/v1/registration`, `/v1/auth/login` |
 
-Le **Bearer JWT** délègue l'identité utilisateur au kernel (création d'organisation, exécution d'opérations).
-Les headers **`X-BC-*`** identifient la clé API du développeur (suivi d'usage, acteur `X-BC-On-Behalf-Of`).
-Ils se complètent : Bearer seul suffit pour tester ; en production le backend du dev envoie les deux.
+Pour ce parcours (piloté par le développeur), le **Bearer JWT seul suffit** sur toutes les étapes sauf
+celles marquées « API à clé seule », qui n'existent que côté acteur (hors de ce script).
 
 Dans Swagger : **Authorize** → JWT, puis renseigner `X-BC-*` dans Try it out sur les routes d'intégration.
 
@@ -71,13 +74,10 @@ curl -s -X POST $BC_URL/v1/registration \
 **Attendu** :
 
 - BC appelle le kernel `POST /api/auth/sign-up`
-- HTTP 201 : `{ "clientId": "bck_...", "apiKey": "...", "plan": "FREE" }`
-- Conserver les clés (optionnel pour ce parcours JWT) :
-
-```bash
-export BC_CLIENT="<clientId>"
-export BC_KEY="<apiKey>"
-```
+- HTTP 201 : `{ "plan": "FREE", "message": "..." }` — **aucune clé API n'est émise ici** (une clé est
+  scopée à une entreprise, qui n'existe pas encore à ce stade). Se connecter (phase 2), créer une
+  entreprise (étape 13), puis émettre une clé pour cette entreprise si besoin
+  (`POST /v1/businesses/{id}/api-keys`).
 
 **Si 500** : logs `mvn spring-boot:run` — souvent kernel injoignable ou `KERNEL_CLIENT_ID`/`SECRET` invalides.
 
