@@ -40,13 +40,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Kafka (mode KRaft, sans Zookeeper)
-RUN curl -fsSL "https://downloads.apache.org/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz" \
+RUN curl -fsSL "https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz" \
       -o /tmp/kafka.tgz && \
     mkdir -p /opt/kafka && \
     tar -xzf /tmp/kafka.tgz -C /opt/kafka --strip-components=1 && \
     rm /tmp/kafka.tgz
 
-ENV PATH="/opt/kafka/bin:${PATH}" \
+ENV PATH="/usr/lib/postgresql/16/bin:/opt/kafka/bin:${PATH}" \
     PGDATA=/var/lib/postgresql/data \
     KAFKA_DATA_DIR=/var/lib/kafka/data \
     REDIS_DATA_DIR=/var/lib/redis
