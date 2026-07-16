@@ -38,21 +38,36 @@ traverser deux protections indépendantes.
 
 ## Authentification
 
-- **Développeur → Business Core** :
-  - **JWT Bearer** (login kernel délégué) : identité utilisateur et délégation vers le kernel.
-  - **Clé BC** (`X-BC-Client-Id` / `X-BC-Api-Key`) : identifie la clé API du développeur sur les routes
-    d'intégration (hachée BCrypt, révocation, suivi d'usage). Complète le JWT ; ne le remplace pas pour
-    les appels kernel.
-- **Business Core → kernel** : credentials plateforme (`KERNEL_CLIENT_ID`/`SECRET`) + Bearer utilisateur
-  re-transmis + `X-Tenant-Id`. Voir ADR-003.
+Trois flux distincts, détaillés avec schémas dans
+[`authentification-trois-flux.md`](authentification-trois-flux.md) :
+
+- **Développeur → Business Core** : JWT Bearer (login kernel délégué), obligatoire sur les routes de
+  gestion de plateforme — jamais remplaçable par une clé BC sur ces routes-là.
+- **Backend terminal → Business Core** : clé BC (`X-BC-Client-Id` / `X-BC-Api-Key`, hachée BCrypt,
+  révocation, suivi d'usage), scopée à **une** entreprise. Utilisable **seule** (sans JWT) sur les routes
+  runtime (`/v1/sync`, opérations, traces, transactions) ; le Bearer y reste une alternative acceptée.
+- **Acteur métier → Business Core** : identité KCore propre (email/mot de passe, jamais stockés côté BC),
+  résolue via `:register`/`:login` (qui exigent la clé BC de l'entreprise, **refusent** le Bearer
+  développeur — un seul mode d'appel, sans ambiguïté), puis JWT acteur sur les appels suivants.
+- **Business Core → kernel** : `X-Client-Id`/`X-Api-Key` de l'application BC sur chaque appel, plus
+  `Authorization: Bearer` **quand une requête en porte un à déléguer** ; sinon repli app-only
+  (`X-Client-Id`/`X-Api-Key` seuls, sans Bearer — le contrat OpenAPI du kernel l'accepte sur les
+  endpoints concernés).
 
 ## Autorisation et identité de l'acteur
 
-Authentifié ≠ autorisé. L'identité de l'opérateur agissant est **assertée** par le backend du
-développeur via `X-BC-On-Behalf-Of` (modèle de confiance ; le Business Core n'authentifie pas les
-utilisateurs finaux). `AuthorizationService` vérifie le rôle métier requis avant une action sensible ;
-l'effet `DEROGER` est limité aux rôles autorisés. Évolution documentée : RFC 8693 (OAuth Token
-Exchange, claims `sub`/`act`) si une validation cryptographique de l'acteur devient nécessaire.
+Authentifié ≠ autorisé. Deux mécanismes coexistent pour identifier l'opérateur agissant :
+- **Assertion** (`X-BC-On-Behalf-Of`, modèle de confiance côté clé BC) — le backend terminal affirme
+  qui agit, sans preuve cryptographique.
+- **Authentification réelle** (flux acteur, JWT KCore propre à l'acteur) — Business Core résout le rôle
+  métier de l'acteur via `acteur_metier`, sans faire confiance à une simple assertion.
+
+`ExecuterOperationService`/`ResoudreRolesMetier` vérifient le rôle métier requis avant une action
+sensible ; l'effet `DEROGER` est limité aux rôles autorisés. Le mécanisme RFC 8693 (OAuth Token
+Exchange) évoqué comme évolution future reste pertinent, mais pour un usage différent de celui prévu
+initialement : pas pour authentifier l'acteur (résolu), mais pour les appels Business Core → kernel en
+mode machine sur les endpoints qui exigeraient une preuve d'autorité au-delà de `X-Client-Id`/`X-Api-Key`
+(cf. `authentification-trois-flux.md` §4).
 
 ## Autres volets
 

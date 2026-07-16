@@ -7,9 +7,14 @@
 - **Build** : Spring Boot **4.0.7**, Java **21**, Maven. WebFlux + R2DBC + Redis réactif + Kafka + Liquibase + Resilience4j + Testcontainers + WireMock.
 - **Package base** : `com.yowyob.businesscore`.
 - **Sécurité** : `BusinessContextWebFilter` (barrière 1), `TenantGuard` (barrière 2), RLS PostgreSQL (barrière 3) déjà en place. `SecretCipher` (AES-256-GCM) pour les secrets kernel.
-- **Kernel** : `KernelClient` prêt. Il pose **automatiquement** `X-Client-Id` + `X-Api-Key` + `Authorization: Bearer` (JWT caché Redis). Pour une opération liée à une organisation, utilise `getForOrganization/postForOrganization` qui ajoutent `X-Organization-Id`.
+- **Kernel** : `KernelClient` prêt. Il pose **automatiquement** `X-Client-Id` + `X-Api-Key` sur chaque appel, et
+  `Authorization: Bearer` **quand une requête en porte un à déléguer** (JWT de l'utilisateur courant). Sans
+  JWT à déléguer (ex. appel authentifié par clé `X-BC-*`, sans utilisateur), le client passe en app-only —
+  `X-Client-Id`/`X-Api-Key` seuls, pas de Bearer (le contrat OpenAPI du kernel l'accepte pour les endpoints
+  concernés). Pour une opération liée à une organisation, utilise `getForOrganization/postForOrganization`
+  qui ajoutent `X-Organization-Id`.
 - **Contexte** : `BusinessContext` (record) avec `tenantId`, `actorId`, `roles`, `businessId`, `traceId`, `locale`. Récupéré via `BusinessContextHolder`.
-- **Erreurs** : `ProblemException` avec factory statiques — `notFound`, `conflict`, `unprocessable`, `forbidden`, `badRequest`. Le format RFC 7807 est géré par `GlobalProblemHandler`.
+- **Erreurs** : `ProblemException` avec factory statiques — `notFound`, `conflict`, `unprocessable`, `forbidden`, `badRequest`, `badGateway` (échec d'un appel kernel). Le format RFC 7807 est géré par `GlobalProblemHandler`.
 - **Ports** : tous définis dans `domain/port/out`, `domain/port/internal`, `domain/port/in`. Tu les **implémentes**, tu ne les modifies pas.
 
 ## Convention d'entité R2DBC (reproduis ce patron)

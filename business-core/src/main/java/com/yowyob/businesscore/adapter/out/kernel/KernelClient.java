@@ -30,8 +30,11 @@ import java.util.UUID;
  *   <li><b>{@code X-Client-Id} / {@code X-Api-Key}</b> sur <b>chaque</b> appel {@code /api/**} :
  *       l'identité de la ClientApplication du développeur courant (résolue depuis le tenant du
  *       BusinessContext).</li>
- *   <li><b>{@code Authorization: Bearer}</b> : JWT court obtenu par échange de la clé kernel
- *       ({@code /oauth2/token}) et mis en cache Redis ; requis par les endpoints protégés.</li>
+ *   <li><b>{@code Authorization: Bearer}</b> : JWT utilisateur re-transmis (flux délégué) quand une
+ *       requête en porte un. Sans JWT à déléguer, les appels passent en app-only
+ *       ({@code X-Client-Id}/{@code X-Api-Key} seuls, pas de Bearer) — le contrat OpenAPI du kernel
+ *       accepte cette identité d'application seule sur les endpoints exercés par ce flux (rôles,
+ *       rattachement d'acteur à une organisation) ; voir {@link #exchangeMachine}.</li>
  *   <li><b>{@code X-Organization-Id}</b> : pour les opérations liées à une organisation (entreprise),
  *       via les variantes {@code *ForOrganization}.</li>
  * </ul>
@@ -142,23 +145,30 @@ public class KernelClient {
     }
 
     /**
-     * Flux <b>machine</b> (client-credentials) : réservé aux appels système sans contexte utilisateur JWT.
+     * Flux <b>machine</b> (app-only) : réservé aux appels système sans contexte utilisateur JWT — ex.
+     * {@code actors:register}, où l'appelant est un backend terminal (clé {@code X-BC-*}), jamais un JWT
+     * utilisateur. N'envoie <b>pas</b> de {@code Authorization} : d'après le contrat OpenAPI du kernel,
+     * ces endpoints acceptent {@code X-Client-Id}/{@code X-Api-Key} seuls (sécurité globale
+     * {@code {ClientId, ApiKey}} OU {@code {ClientId, ApiKey, BearerAuth}} — le Bearer est additif, pas
+     * requis). Remplace l'ancien échange {@code client_credentials} via {@code /oauth2/token}, que le
+     * kernel réel rejette ({@code Unsupported grant_type} — seul le grant token-exchange RFC 8693 y est
+     * supporté, cf. {@code docs/Guide_Special_Auth.md} §4).
      */
     private <T> Mono<T> exchangeMachine(HttpMethod method, String path, Object body, Class<T> type,
                                         UUID organizationId) {
         return credentialStore.pourTenantCourant().flatMap(creds ->
-                tokenService.tokenPour(creds.clientId(), creds.secret()).flatMap(jwt ->
-                        envoyer(method, path, body, type, creds.clientId(), creds.secret(), jwt,
-                                null, organizationId)));
+                envoyer(method, path, body, type, creds.clientId(), creds.secret(), null,
+                        null, organizationId));
     }
 
     private <T> Mono<T> envoyer(HttpMethod method, String path, Object body, Class<T> type,
                                 String clientId, String apiKey, String bearer,
                                 String tenantId, UUID organizationId) {
         WebClient.RequestBodySpec spec = kernelWebClient.method(method).uri(path);
-        spec.header(HEADER_CLIENT_ID, clientId)
-                .header(HEADER_API_KEY, apiKey)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
+        spec.header(HEADER_CLIENT_ID, clientId).header(HEADER_API_KEY, apiKey);
+        if (bearer != null) {
+            spec.header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
+        }
         if (tenantId != null) {
             spec.header(HEADER_TENANT_ID, tenantId);
         }
@@ -270,18 +280,18 @@ public class KernelClient {
 
     private Mono<byte[]> exchangeBytesMachine(HttpMethod method, String path, UUID organizationId) {
         return credentialStore.pourTenantCourant().flatMap(creds ->
-                tokenService.tokenPour(creds.clientId(), creds.secret()).flatMap(jwt ->
-                        envoyerBytes(method, path, creds.clientId(), creds.secret(), jwt,
-                                null, organizationId)));
+                envoyerBytes(method, path, creds.clientId(), creds.secret(), null,
+                        null, organizationId));
     }
 
     private Mono<byte[]> envoyerBytes(HttpMethod method, String path,
                                       String clientId, String apiKey, String bearer,
                                       String tenantId, UUID organizationId) {
         WebClient.RequestBodySpec spec = kernelWebClient.method(method).uri(path);
-        spec.header(HEADER_CLIENT_ID, clientId)
-                .header(HEADER_API_KEY, apiKey)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
+        spec.header(HEADER_CLIENT_ID, clientId).header(HEADER_API_KEY, apiKey);
+        if (bearer != null) {
+            spec.header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
+        }
         if (tenantId != null) {
             spec.header(HEADER_TENANT_ID, tenantId);
         }

@@ -143,14 +143,14 @@ class KernelClientDelegationTest {
     }
 
     @Test
-    @DisplayName("BusinessContext scopé à un business (clé API, pas de JWT possible) → repli machine, pas 403")
+    @DisplayName("BusinessContext scopé à un business (clé API, pas de JWT possible) → repli machine "
+            + "app-only, pas 403, pas de Bearer")
     void contexte_scope_business_bascule_en_machine() {
         UUID tenant = UUID.randomUUID();
         UUID businessId = UUID.randomUUID();
         wireMock.stubFor(get(urlEqualTo("/api/echo"))
                 .willReturn(okJson("{\"success\":true,\"data\":{\"value\":\"ok\"},\"errorCode\":null}")));
         when(credentialStore.pourTenantCourant()).thenReturn(Mono.just(new KernelCreds("tenant-client", "tenant-secret")));
-        when(tokenService.tokenPour("tenant-client", "tenant-secret")).thenReturn(Mono.just("machine-jwt"));
 
         // Authentifié via X-BC-Client-Id/X-BC-Api-Key (ApiKeyReactiveAuthenticationManager) : businessId
         // non nul, et par construction aucun JWT à déléguer — ce n'est pas une anomalie.
@@ -161,10 +161,13 @@ class KernelClientDelegationTest {
                 .assertNext(echo -> assertThat(echo.value()).isEqualTo("ok"))
                 .verifyComplete();
 
+        // App-only : X-Client-Id/X-Api-Key seuls, pas de client_credentials via /oauth2/token (contrat
+        // OpenAPI du kernel : {ClientId, ApiKey} suffit sur ces endpoints, le Bearer est additif).
         wireMock.verify(getRequestedFor(urlEqualTo("/api/echo"))
-                .withHeader("Authorization", equalTo("Bearer machine-jwt"))
                 .withHeader("X-Client-Id", equalTo("tenant-client"))
-                .withHeader("X-Api-Key", equalTo("tenant-secret")));
+                .withHeader("X-Api-Key", equalTo("tenant-secret"))
+                .withoutHeader("Authorization"));
+        verifyNoInteractions(tokenService);
     }
 
     @Test

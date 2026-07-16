@@ -9,22 +9,37 @@ façade hexagonale au-dessus du kernel RT-Comops.
 - [Architecture hexagonale](architecture/hexagonale.md) — couches, ports & adapters, règle de dépendance.
 - [Les sept briques](architecture/sept-briques.md) — le modèle métier piloté par les métadonnées.
 - [Sécurité — défense en profondeur](architecture/securite-defense-profondeur.md) — isolation multi-tenant, RLS, secrets.
+- [Authentification — trois flux](architecture/authentification-trois-flux.md) — développeur (JWT délégué),
+  backend terminal (clé API business), acteur métier (identité KCore) : mécanismes, surfaces, schémas.
 
 ### Décisions d'architecture — ADR (le « pourquoi »)
 - [ADR-001 — Spring Boot 4 réactif](adr/ADR-001-spring-boot-4-reactif.md)
 - [ADR-002 — Isolation tenant par RLS](adr/ADR-002-isolation-tenant-rls.md)
-- [ADR-003 — Façade kernel à double clé](adr/ADR-003-facade-kernel-double-cle.md)
 - [ADR-004 — Modèle metadata-driven en 7 briques](adr/ADR-004-metadata-driven-7-briques.md)
 
 ### Guides développeur
 - [Guide d'implémentation](guides/README-implementation.md) — conventions, workflow Git, règles anti-conflit.
-- [feat/business-types](guides/feat-business-types.md) — Dev 2 : Type Métier + Configuration.
-- [feat/offers-actors](guides/feat-offers-actors.md) — Dev 3 : Offre + Acteurs + Entreprise.
-- [feat/rules](guides/feat-rules.md) — Dev 4 : Règles.
-- [feat/operations](guides/feat-operations.md) — Dev 5 : Opérations + Transactions.
+- [Conventions du socle](guides/CONVENTIONS-SOCLE.md) — patrons réels (entités, repositories, RLS, KernelClient).
+- [feat/business-types](guides/feat-business-types.md) — Type Métier + Configuration (brief de kickoff).
+- [feat/offers-actors](guides/feat-offers-actors.md) — Offre + Acteurs + Entreprise (brief de kickoff).
+- [feat/rules](guides/feat-rules.md) — Règles (brief de kickoff).
+- [feat/operations](guides/feat-operations.md) — Opérations + Transactions (brief de kickoff).
+- [Parcours de test E2E](guides/test-e2e-parcours-complet.md) — script manuel bout en bout.
 
-### API
-- [Spécification OpenAPI](api/business-core-openapi.yaml) — l'API exposée (importable dans Swagger / Postman).
+> Les briefs `feat-*.md` datent du lancement du projet (répartition initiale par développeur) : ils
+> restent utiles pour le découpage conceptuel des briques, mais pour le contrat exact d'un endpoint ou
+> d'un port, la référence est le code et la spécification OpenAPI **auto-générée et toujours à jour**,
+> servie par l'application elle-même (`GET /v3/api-docs`, `/swagger-ui.html`) — pas un fichier statique.
+
+### Référence kernel (le contrat externe)
+- [Guide spécial auth](Guide_Special_Auth.md) — comment le kernel expose son authentification OAuth2/OIDC.
+- [Authentification déléguée](AUTHENTIFICATION-DELEGUEE%20(2).md) — proposition de conception initiale ;
+  **le flux Authorization Code + redirection qu'elle décrit n'a pas été retenu**, voir le guide spécial
+  auth et `architecture/authentification-trois-flux.md` pour le flux réellement implémenté
+  (discover-contexts/select-context).
+- [Référence kernel](REFERENCE-KERNEL%20(1).md) — endpoints, DTO, pièges empiriques.
+- [Identifiants kernel non modélisés](IDENTIFIANTS-KERNEL%20(1).md) — stratégie de résolution
+  (`ResolveurContexteKernel`).
 
 ### Exploitation
 - [Déploiement sur l'infra yowyob](deploiement.md) — GitLab CI, réseau `yowyob`, Traefik, variables.
@@ -36,13 +51,4 @@ Voir le [README racine](../../README.md) pour lancer l'infrastructure et l'appli
 ## Statut
 
 Le **socle** (fondations figées : sécurité, ports, BusinessContext, client kernel, RLS, RFC 7807) est
-livré. Les quatre features se branchent dessus via leurs sous-packages, sans modifier le socle.
-
-
-BASE_URL=https://kernel-core.yowyob.com
-CLIENT_ID=prod-platform-backend
-TENANT_ID=11111111-1111-1111-1111-111111111111
-USER_ID=0303cc67-924f-4a16-aa69-bd1e463995b5
-BUSINESS_ACTOR_ID=461f1f3b-efb7-42a5-8166-ce01764bd90e
-ORGANIZATION_ID=0920af6a-aee9-45de-b57f-f0102106a7e5
-ACCESS_TOKEN=eyJraWQiOiJrZXJuZWwtY29yZS1rZXktMSIsImFsZyI6IlJTMjU2In0.eyJhY3RvciI6ImNmMTBlNGZiLTJiY2QtNDUwMS04MDdjLTEyNjg1NjFiMWMxNiIsInN1YiI6IjAzMDNjYzY3LTkyNGYtNGExNi1hYTY5LWJkMWU0NjM5OTViNSIsImF1ZCI6Iml3bS1hcGkiLCJpc3MiOiJrZXJuZWwtY29yZSIsIm1mYSI6ZmFsc2UsImFkbSI6ZmFsc2UsImV4cCI6MTc4MjQ4ODk0MCwiaWF0IjoxNzgyNDg4MDQwLCJqdGkiOiJkZmJiOTAxYi03YmJjLTQ1OTctYjY1Mi00ZWYxZDNkZmJjMTMiLCJ0aWQiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEifQ.iJt83PlD-tilR3eX90qn_MeOcun4QYngqSHdnshMU8k7HQ35bYwKjPWMDouRsMkMRR_aSS3uDNcJrEejPUrhjv_5nz10BuDmWpKaW3ffK2xxJPZkJVBwj2GgjxC4JTHncBLG2u8BrgZeEw1mI7DcqJyrdt_xpzbh0PWLXTTdLMifFqbGKCnQzEZVFAKZ6BChaonHQvyRNEeFfEMvWbA1VCtEp445IfED_5OuFhGcXj2qex1GmwIh5tUvyUf5k_CVrSw_PpupaVRaOU91BM85ZkgHKEKCl9xql5i0-6tc6p8VbD_0vOK2lsxzoTYh4K0K_9AQ0kYSwXQP6DjoQV-SaQ
+livré. Les features se branchent dessus via leurs sous-packages, sans modifier le socle.
