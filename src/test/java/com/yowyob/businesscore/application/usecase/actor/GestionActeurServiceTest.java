@@ -4,10 +4,12 @@ import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.actor.ActeurMetier;
 import com.yowyob.businesscore.domain.actor.RoleMetier;
 import com.yowyob.businesscore.domain.actor.spi.DepotActeur;
+import com.yowyob.businesscore.domain.businesstype.VersionType;
 import com.yowyob.businesscore.domain.enterprise.Entreprise;
 import com.yowyob.businesscore.domain.enterprise.spi.LireEntreprise;
 import com.yowyob.businesscore.domain.port.out.AppliquerRoleTechnique;
 import com.yowyob.businesscore.domain.port.out.AuthentifierUtilisateur;
+import com.yowyob.businesscore.domain.port.out.PersisterVersionType;
 import com.yowyob.businesscore.domain.port.out.RattacherAOrganisation;
 import com.yowyob.businesscore.domain.port.out.ResoudreBeneficiaire;
 import com.yowyob.businesscore.domain.port.out.ResultatLogin;
@@ -37,10 +39,16 @@ class GestionActeurServiceTest {
     private final AppliquerRoleTechnique appliquerRoleTechnique = mock(AppliquerRoleTechnique.class);
     private final RattacherAOrganisation rattacherAOrganisation = mock(RattacherAOrganisation.class);
     private final AuthentifierUtilisateur authentifier = mock(AuthentifierUtilisateur.class);
+    private final PersisterVersionType persisterVersionType = mock(PersisterVersionType.class);
 
     private final GestionActeurService service = new GestionActeurService(
             depot, lireEntreprise, resoudreBeneficiaire, appliquerRoleTechnique, rattacherAOrganisation,
-            authentifier);
+            authentifier, persisterVersionType);
+
+    {
+        when(persisterVersionType.trouverParId(any()))
+                .thenAnswer(inv -> Mono.just(VersionType.creer(UUID.randomUUID(), UUID.randomUUID(), 1)));
+    }
 
     private final UUID businessId = UUID.randomUUID();
     private final UUID orgId = UUID.randomUUID();
@@ -228,5 +236,24 @@ class GestionActeurServiceTest {
                 .verify();
 
         verifyNoInteractions(authentifier);
+    }
+
+    @Test
+    @DisplayName("declarerRole : version publiée → 409 RG-03, rôle jamais enregistré")
+    void declarerRole_sur_version_publiee_est_rejete_RG03() {
+        UUID versionTypeId = UUID.randomUUID();
+        VersionType publiee = VersionType.creer(UUID.randomUUID(), UUID.randomUUID(), 1)
+                .publier(Instant.now());
+        when(persisterVersionType.trouverParId(versionTypeId)).thenReturn(Mono.just(publiee));
+
+        StepVerifier.create(service.declarerRole(
+                        new GestionActeurService.DeclarerRoleCommande(versionTypeId, "CAISSIER", CategorieActeur.OPERATEUR)))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(((ProblemException) ex).getStatus().value()).isEqualTo(409);
+                    assertThat(((ProblemException) ex).getExtensions().get("violatedRule")).isEqualTo("RG-03");
+                })
+                .verify();
+
+        verify(depot, never()).enregistrerRole(any());
     }
 }

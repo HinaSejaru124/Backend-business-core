@@ -105,4 +105,17 @@ class DeclarerOperationServiceTest {
                 .expectErrorMatches(e -> e instanceof ProblemException pe && pe.getStatus().value() == 404)
                 .verify();
     }
+
+    @Test
+    @DisplayName("rejette la déclaration sur une version publiée (409 RG-03)")
+    void declare_version_publiee_rejete_RG03() {
+        VersionType publiee = VersionType.creer(TYPE, TENANT, 1).publier(java.time.Instant.now());
+        when(persisterVersionType.trouverParTypeEtNumero(TYPE, 1)).thenReturn(Mono.just(publiee));
+
+        StepVerifier.create(service.declarer(TYPE, 1, "vente", "caissier",
+                        Declencheur.AVANT_VENTE, false, etapesVente(), ctx))
+                .expectErrorMatches(e -> e instanceof ProblemException pe && pe.getStatus().value() == 409
+                        && "RG-03".equals(pe.getExtensions().get("violatedRule")))
+                .verify();
+    }
 }

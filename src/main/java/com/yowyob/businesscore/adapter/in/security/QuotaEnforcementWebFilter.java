@@ -9,6 +9,8 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
+import java.util.Optional;
+
 /**
  * Porte de quota mensuel. Pour le trafic authentifié par clé API (machine à machine), refuse la requête
  * avec <b>HTTP 402 Payment Required</b> quand le développeur a atteint le quota mensuel de son plan.
@@ -34,19 +36,26 @@ public class QuotaEnforcementWebFilter implements WebFilter {
         if (exchange.getRequest().getPath().value().startsWith("/v1/telemetry")) {
             return chain.filter(exchange);
         }
+        // chain.filter(exchange) souscrit EXACTEMENT une fois (voir BusinessContextWebFilter pour le
+        // détail du bug de double abonnement via switchIfEmpty sur un Mono<Void>). On résout d'abord la
+        // décision de quota en Optional<String> (présent = plan dont le quota est atteint → refus 402 ;
+        // vide = ne pas bloquer : trafic non-clé-API, ou clé API sous le quota), toujours exactement un
+        // élément grâce à defaultIfEmpty. Un unique flatMap tranche ensuite : refuser (la requête
+        // n'atteint jamais le handler) OU forwarder une seule fois. L'ancienne forme laissait passer la
+        // requête APRÈS avoir écrit le 402 (switchIfEmpty relançait chain.filter) — corrigé ici.
         return ReactiveSecurityContextHolder.getContext()
                 .map(securityContext -> securityContext.getAuthentication())
                 .filter(auth -> auth instanceof ApiKeyAuthenticationToken token
                         && token.getApiKeyId() != null && token.getDeveloperId() != null)
                 .map(auth -> (ApiKeyAuthenticationToken) auth)
                 .flatMap(token -> quotaService.doitBloquer(token.getDeveloperId(), token.getPlan())
-                        .flatMap(bloque -> Boolean.TRUE.equals(bloque)
-                                ? refuser(exchange, token.getPlan())
-                                : chain.filter(exchange)))
-                // Mono.defer obligatoire ici : voir BusinessContextWebFilter pour l'explication complète
-                // (switchIfEmpty évalue son argument avec empressement — sans defer, chain.filter(exchange)
-                // s'exécute en trop à chaque requête, faussant le comptage d'usage et le quota).
-                .switchIfEmpty(Mono.defer(() -> chain.filter(exchange)));
+                        .map(bloque -> Boolean.TRUE.equals(bloque)
+                                ? Optional.of(token.getPlan())
+                                : Optional.<String>empty()))
+                .defaultIfEmpty(Optional.empty())
+                .flatMap(planBloque -> planBloque
+                        .map(plan -> refuser(exchange, plan))
+                        .orElseGet(() -> chain.filter(exchange)));
     }
 
     private Mono<Void> refuser(ServerWebExchange exchange, String plan) {

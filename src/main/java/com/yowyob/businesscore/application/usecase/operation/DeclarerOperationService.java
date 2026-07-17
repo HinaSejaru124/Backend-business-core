@@ -42,6 +42,7 @@ public class DeclarerOperationService {
                         "Version " + numeroVersion + " introuvable pour le type " + typeId)))
                 .flatMap(version -> {
                     version.verifierAppartenance(ctx.tenantId());
+                    version.verifierModifiable();
                     UUID versionTypeId = version.id();
                     return persisterOperation.trouverParVersionEtNom(versionTypeId, nom)
                             .flatMap(existante -> Mono.<OperationAvecEtapes>error(ProblemException.conflict(

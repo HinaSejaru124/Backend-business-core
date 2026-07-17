@@ -118,7 +118,7 @@ public class GlobalProblemHandler {
         @ExceptionHandler(Exception.class)
         public Mono<ResponseEntity<ProblemDetail>> handleUnexpected(Exception ex, ServerWebExchange exchange) {
                 if (exchange.getResponse().isCommitted()) {
-                        log.warn("Réponse déjà commitée, ignoré exception : {}", ex.toString());
+                        log.warn("Réponse déjà commitée, exception ignorée (trace pour diagnostic)", ex);
                         return Mono.empty();
                 }
                 ProblemException problemEx = chercherCause(ex, ProblemException.class);

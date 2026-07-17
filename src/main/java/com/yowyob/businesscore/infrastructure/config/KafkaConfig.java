@@ -49,6 +49,12 @@ public class KafkaConfig {
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 
+        // Résilience : si le broker est injoignable, send() ne bloque plus 60 s (défaut) mais échoue
+        // vite. Propriété indépendante des autres timeouts producer (pas de contrainte croisée avec
+        // request.timeout.ms / delivery.timeout.ms), donc sans risque au démarrage. La publication est
+        // best-effort côté KafkaPublierEvenement : l'échec est avalé, l'action métier n'est pas bloquée.
+        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 3000);
+
         // Sécurité SASL appliquée uniquement si configurée (prod yowyob).
         if (!securityProtocol.isBlank()) {
             props.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, securityProtocol);

@@ -156,9 +156,9 @@ public class KernelClient {
      */
     private <T> Mono<T> exchangeMachine(HttpMethod method, String path, Object body, Class<T> type,
                                         UUID organizationId) {
-        return credentialStore.pourTenantCourant().flatMap(creds ->
-                envoyer(method, path, body, type, creds.clientId(), creds.secret(), null,
-                        null, organizationId));
+        return Mono.zip(credentialStore.pourTenantCourant(), BusinessContextHolder.currentTenantId())
+                .flatMap(t -> envoyer(method, path, body, type, t.getT1().clientId(), t.getT1().secret(), null,
+                        t.getT2().map(UUID::toString).orElse(null), organizationId));
     }
 
     private <T> Mono<T> envoyer(HttpMethod method, String path, Object body, Class<T> type,
@@ -279,9 +279,9 @@ public class KernelClient {
     }
 
     private Mono<byte[]> exchangeBytesMachine(HttpMethod method, String path, UUID organizationId) {
-        return credentialStore.pourTenantCourant().flatMap(creds ->
-                envoyerBytes(method, path, creds.clientId(), creds.secret(), null,
-                        null, organizationId));
+        return Mono.zip(credentialStore.pourTenantCourant(), BusinessContextHolder.currentTenantId())
+                .flatMap(t -> envoyerBytes(method, path, t.getT1().clientId(), t.getT1().secret(), null,
+                        t.getT2().map(UUID::toString).orElse(null), organizationId));
     }
 
     private Mono<byte[]> envoyerBytes(HttpMethod method, String path,

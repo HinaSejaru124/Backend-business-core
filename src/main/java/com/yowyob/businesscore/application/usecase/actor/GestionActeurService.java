@@ -4,10 +4,12 @@ import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.actor.ActeurMetier;
 import com.yowyob.businesscore.domain.actor.RoleMetier;
 import com.yowyob.businesscore.domain.actor.spi.DepotActeur;
+import com.yowyob.businesscore.domain.businesstype.VersionType;
 import com.yowyob.businesscore.domain.enterprise.Entreprise;
 import com.yowyob.businesscore.domain.enterprise.spi.LireEntreprise;
 import com.yowyob.businesscore.domain.port.out.AppliquerRoleTechnique;
 import com.yowyob.businesscore.domain.port.out.AuthentifierUtilisateur;
+import com.yowyob.businesscore.domain.port.out.PersisterVersionType;
 import com.yowyob.businesscore.domain.port.out.RattacherAOrganisation;
 import com.yowyob.businesscore.domain.port.out.ResoudreBeneficiaire;
 import com.yowyob.businesscore.domain.shared.CategorieActeur;
@@ -61,25 +63,39 @@ public class GestionActeurService {
     private final AppliquerRoleTechnique appliquerRoleTechnique;
     private final RattacherAOrganisation rattacherAOrganisation;
     private final AuthentifierUtilisateur authentifier;
+    private final PersisterVersionType persisterVersionType;
 
     public GestionActeurService(DepotActeur depot,
                                 LireEntreprise lireEntreprise,
                                 ResoudreBeneficiaire resoudreBeneficiaire,
                                 AppliquerRoleTechnique appliquerRoleTechnique,
                                 RattacherAOrganisation rattacherAOrganisation,
-                                AuthentifierUtilisateur authentifier) {
+                                AuthentifierUtilisateur authentifier,
+                                PersisterVersionType persisterVersionType) {
         this.depot = depot;
         this.lireEntreprise = lireEntreprise;
         this.resoudreBeneficiaire = resoudreBeneficiaire;
         this.appliquerRoleTechnique = appliquerRoleTechnique;
         this.rattacherAOrganisation = rattacherAOrganisation;
         this.authentifier = authentifier;
+        this.persisterVersionType = persisterVersionType;
+    }
+
+    /** RG-03 : une version publiée (immuable) ne peut plus voir ses rôles métier créés/modifiés/supprimés. */
+    private Mono<Void> verifierVersionModifiable(UUID versionTypeId) {
+        return persisterVersionType.trouverParId(versionTypeId)
+                .switchIfEmpty(Mono.error(ProblemException.notFound("Version introuvable : " + versionTypeId)))
+                .doOnNext(VersionType::verifierModifiable)
+                .then();
     }
 
     public Mono<RoleMetier> declarerRole(DeclarerRoleCommande commande) {
-        RoleMetier role = RoleMetier.nouveau(
-                UUID.randomUUID(), commande.versionTypeId(), commande.code(), commande.categorie());
-        return depot.enregistrerRole(role);
+        return verifierVersionModifiable(commande.versionTypeId())
+                .then(Mono.defer(() -> {
+                    RoleMetier role = RoleMetier.nouveau(
+                            UUID.randomUUID(), commande.versionTypeId(), commande.code(), commande.categorie());
+                    return depot.enregistrerRole(role);
+                }));
     }
 
     public Flux<RoleMetier> listerRoles(UUID versionTypeId) {
@@ -87,9 +103,10 @@ public class GestionActeurService {
     }
 
     public Mono<RoleMetier> modifierRole(ModifierRoleCommande commande) {
-        return depot.roleParId(commande.roleId())
-                .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Rôle métier introuvable : " + commande.roleId())))
+        return verifierVersionModifiable(commande.versionTypeId())
+                .then(depot.roleParId(commande.roleId())
+                        .switchIfEmpty(Mono.error(ProblemException.notFound(
+                                "Rôle métier introuvable : " + commande.roleId()))))
                 .filter(r -> r.versionTypeId().equals(commande.versionTypeId()))
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                         "Rôle " + commande.roleId() + " absent de cette version")))
@@ -98,9 +115,10 @@ public class GestionActeurService {
     }
 
     public Mono<Void> supprimerRole(UUID versionTypeId, UUID roleId) {
-        return depot.roleParId(roleId)
-                .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Rôle métier introuvable : " + roleId)))
+        return verifierVersionModifiable(versionTypeId)
+                .then(depot.roleParId(roleId)
+                        .switchIfEmpty(Mono.error(ProblemException.notFound(
+                                "Rôle métier introuvable : " + roleId))))
                 .filter(r -> r.versionTypeId().equals(versionTypeId))
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                         "Rôle " + roleId + " absent de cette version")))

@@ -52,10 +52,31 @@ public class GestionRegleService {
         return versionTypeRepo.findByTypeMetierIdAndNumero(typeId, numeroVersion)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                         "Version " + numeroVersion + " introuvable pour le type " + typeId)))
-                .flatMap(version -> depot.sauvegarder(new RegleMetier(
-                        UUID.randomUUID(), ctx.tenantId(),
-                        version.getId(), null,
-                        declencheur, condition, effet, rolesAutorisesADeroger)));
+                .flatMap(version -> {
+                    if (version.isImmuable()) {
+                        return Mono.error(versionNonModifiable(numeroVersion));
+                    }
+                    return depot.sauvegarder(new RegleMetier(
+                            UUID.randomUUID(), ctx.tenantId(),
+                            version.getId(), null,
+                            declencheur, condition, effet, rolesAutorisesADeroger));
+                });
+    }
+
+    /** RG-03 : une version publiée (immuable) ne peut plus recevoir de nouvelle règle de Type. */
+    private static ProblemException versionNonModifiable(int numeroVersion) {
+        return ProblemException.conflict(
+                "La version " + numeroVersion + " est publiée et ne peut plus être modifiée (RG-03).")
+                .violatedRule("RG-03");
+    }
+
+    private Mono<Void> verifierVersionModifiable(UUID typeId, int numeroVersion) {
+        return versionTypeRepo.findByTypeMetierIdAndNumero(typeId, numeroVersion)
+                .switchIfEmpty(Mono.error(ProblemException.notFound(
+                        "Version " + numeroVersion + " introuvable pour le type " + typeId)))
+                .<Void>flatMap(version -> version.isImmuable()
+                        ? Mono.error(versionNonModifiable(numeroVersion))
+                        : Mono.empty());
     }
 
     public Mono<RegleMetier> creerRegleLocale(
@@ -108,7 +129,8 @@ public class GestionRegleService {
     public Mono<RegleMetier> modifierDeType(
             UUID typeId, int numeroVersion, UUID ruleId, Declencheur declencheur,
             String condition, Effet effet, List<String> rolesAutorisesADeroger) {
-        return trouverDeType(typeId, numeroVersion, ruleId)
+        return verifierVersionModifiable(typeId, numeroVersion)
+                .then(trouverDeType(typeId, numeroVersion, ruleId))
                 .flatMap(existante -> depot.sauvegarder(new RegleMetier(
                         existante.getId(), existante.getTenantId(),
                         existante.getVersionTypeId(), null,
@@ -127,7 +149,8 @@ public class GestionRegleService {
     }
 
     public Mono<Void> supprimerDeType(UUID typeId, int numeroVersion, UUID ruleId) {
-        return trouverDeType(typeId, numeroVersion, ruleId)
+        return verifierVersionModifiable(typeId, numeroVersion)
+                .then(trouverDeType(typeId, numeroVersion, ruleId))
                 .flatMap(r -> depot.supprimer(r.getId()));
     }
 

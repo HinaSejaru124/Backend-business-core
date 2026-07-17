@@ -2,8 +2,10 @@ package com.yowyob.businesscore.application.usecase.offer;
 
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.saga.FournisseurDeCapaciteDispatcher;
+import com.yowyob.businesscore.domain.businesstype.VersionType;
 import com.yowyob.businesscore.domain.offer.spi.DepotOffre;
 import com.yowyob.businesscore.domain.offer.spi.DepotProduitEntreprise;
+import com.yowyob.businesscore.domain.port.out.PersisterVersionType;
 import com.yowyob.businesscore.domain.shared.FormePrix;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
 import org.junit.jupiter.api.Test;
@@ -23,7 +25,17 @@ class GestionOffreServiceTest {
     private final DepotOffre depot = mock(DepotOffre.class);
     private final DepotProduitEntreprise depotProduit = mock(DepotProduitEntreprise.class);
     private final FournisseurDeCapaciteDispatcher capacites = mock(FournisseurDeCapaciteDispatcher.class);
-    private final GestionOffreService service = new GestionOffreService(depot, depotProduit, capacites);
+    private final PersisterVersionType persisterVersionType = mock(PersisterVersionType.class);
+    private final GestionOffreService service =
+            new GestionOffreService(depot, depotProduit, capacites, persisterVersionType);
+
+    private VersionType versionModifiable() {
+        return VersionType.creer(UUID.randomUUID(), UUID.randomUUID(), 1);
+    }
+
+    {
+        when(persisterVersionType.trouverParId(any())).thenAnswer(inv -> Mono.just(versionModifiable()));
+    }
 
     @Test
     void declarer_offre_stockable_active_la_strategie_correspondante() {
@@ -70,5 +82,25 @@ class GestionOffreServiceTest {
         StepVerifier.create(service.declarer(cmd))
                 .expectError(ProblemException.class)
                 .verify();
+    }
+
+    @Test
+    void declarer_offre_sur_version_publiee_est_rejete_RG03() {
+        UUID versionTypeId = UUID.randomUUID();
+        VersionType publiee = VersionType.creer(UUID.randomUUID(), UUID.randomUUID(), 1)
+                .publier(java.time.Instant.now());
+        when(persisterVersionType.trouverParId(versionTypeId)).thenReturn(Mono.just(publiee));
+
+        GestionOffreService.DeclarerOffreCommande cmd = new GestionOffreService.DeclarerOffreCommande(
+                versionTypeId, "Offre tardive", FormePrix.GRATUIT, null, Set.of());
+
+        StepVerifier.create(service.declarer(cmd))
+                .expectErrorSatisfies(e -> {
+                    assert e instanceof ProblemException;
+                    assert "RG-03".equals(((ProblemException) e).getExtensions().get("violatedRule"));
+                })
+                .verify();
+
+        verify(depot, never()).enregistrer(any());
     }
 }

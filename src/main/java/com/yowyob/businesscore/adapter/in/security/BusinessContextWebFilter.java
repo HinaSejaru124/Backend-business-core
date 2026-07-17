@@ -11,6 +11,8 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
+import java.util.Optional;
+
 /**
  * Après authentification, copie le {@link BusinessContext} et, en flux JWT, le token brut kernel
  * dans le Reactor Context ({@link BusinessContextHolder}, {@link KernelTokenHolder}) pour les
@@ -20,11 +22,30 @@ public class BusinessContextWebFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        // chain.filter(exchange) doit être souscrit EXACTEMENT une fois : c'est lui qui exécute tout le
+        // reste du pipeline (filtres suivants + handler + écriture de la réponse). L'ancienne forme
+        // `flatMap(auth -> chain.filter(...).contextWrite(...)).switchIfEmpty(chain.filter(...))` en
+        // souscrivait DEUX fois pour toute requête authentifiée : le chemin nominal renvoie un Mono<Void>,
+        // toujours « vide » au sens de switchIfEmpty (aucun onNext), donc switchIfEmpty relançait
+        // chain.filter — d'où une double exécution du handler, une double écriture de la réponse
+        // (UnsupportedOperationException : setContentLength sur en-têtes read-only) et, selon le filtre,
+        // une fuite de connexion R2DBC finissant par geler le serveur. Le Mono.defer ne corrigeait rien :
+        // il ne fait que retarder l'assemblage, pas empêcher le second abonnement.
+        //
+        // On résout donc d'abord l'authentification éventuelle en Optional (toujours exactement un
+        // élément grâce à defaultIfEmpty), puis un unique flatMap appelle chain.filter une seule fois,
+        // avec ou sans enrichissement du Reactor Context selon la présence du BusinessContext.
         return ReactiveSecurityContextHolder.getContext()
                 .map(securityContext -> securityContext.getAuthentication())
                 .filter(auth -> auth != null && auth.isAuthenticated()
                         && auth.getPrincipal() instanceof BusinessContext)
-                .flatMap(auth -> {
+                .map(Optional::of)
+                .defaultIfEmpty(Optional.empty())
+                .flatMap(authOpt -> {
+                    if (authOpt.isEmpty()) {
+                        return chain.filter(exchange);
+                    }
+                    var auth = authOpt.get();
                     BusinessContext businessContext = (BusinessContext) auth.getPrincipal();
                     String jwtDelegue = resoudreBearer(auth, exchange);
                     return chain.filter(exchange)
@@ -34,12 +55,7 @@ public class BusinessContextWebFilter implements WebFilter {
                                         ? KernelTokenHolder.withToken(enrichi, jwtDelegue)
                                         : enrichi;
                             });
-                })
-                // Mono.defer : l'argument de switchIfEmpty est évalué avec empressement par Reactor
-                // (avant même de savoir si la branche sera prise). Sans defer, chain.filter(exchange)
-                // — donc TOUTE la suite du pipeline — s'exécutait une fois de trop à chaque requête,
-                // en plus de l'exécution réelle faite par flatMap. Cf. doc Reactor sur switchIfEmpty.
-                .switchIfEmpty(Mono.defer(() -> chain.filter(exchange)));
+                });
     }
 
     /**

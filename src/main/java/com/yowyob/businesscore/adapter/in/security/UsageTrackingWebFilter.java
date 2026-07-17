@@ -45,16 +45,17 @@ public class UsageTrackingWebFilter implements WebFilter {
             return chain.filter(exchange);
         }
         long debut = System.currentTimeMillis();
-        return ReactiveSecurityContextHolder.getContext()
-                .map(securityContext -> securityContext.getAuthentication())
-                .filter(auth -> auth instanceof ApiKeyAuthenticationToken token && token.getApiKeyId() != null)
-                .map(auth -> (ApiKeyAuthenticationToken) auth)
-                .flatMap(token -> chain.filter(exchange)
-                        .then(Mono.defer(() -> enregistrer(token, exchange, debut))))
-                // Mono.defer obligatoire ici : voir BusinessContextWebFilter pour l'explication complète
-                // (switchIfEmpty évalue son argument avec empressement — sans defer, chain.filter(exchange)
-                // s'exécute en trop à chaque requête).
-                .switchIfEmpty(Mono.defer(() -> chain.filter(exchange)));
+        // chain.filter(exchange) souscrit EXACTEMENT une fois (sinon double écriture de la réponse +
+        // fuite de connexion R2DBC ; voir DesignTimeAuditWebFilter pour le détail complet du bug). Le
+        // comptage d'usage (lecture du SecurityContext, disponible dans le Reactor Context) est fait
+        // APRÈS la réponse, sans switchIfEmpty sur un Mono<Void> (toujours « vide »).
+        return chain.filter(exchange)
+                .then(Mono.defer(() -> ReactiveSecurityContextHolder.getContext()
+                        .map(securityContext -> securityContext.getAuthentication())
+                        .filter(auth -> auth instanceof ApiKeyAuthenticationToken token && token.getApiKeyId() != null)
+                        .map(auth -> (ApiKeyAuthenticationToken) auth)
+                        .flatMap(token -> enregistrer(token, exchange, debut))
+                        .then()));
     }
 
     /**

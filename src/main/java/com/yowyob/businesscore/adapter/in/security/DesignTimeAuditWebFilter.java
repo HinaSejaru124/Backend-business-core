@@ -40,16 +40,23 @@ public class DesignTimeAuditWebFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         long debut = System.currentTimeMillis();
-        return ReactiveSecurityContextHolder.getContext()
-                .map(securityContext -> securityContext.getAuthentication())
-                .filter(auth -> auth != null && auth.isAuthenticated()
-                        && !(auth instanceof ApiKeyAuthenticationToken)
-                        && auth.getPrincipal() instanceof BusinessContext)
-                .map(auth -> (BusinessContext) auth.getPrincipal())
-                .flatMap(ctx -> chain.filter(exchange)
-                        .then(Mono.defer(() -> journaliser(ctx, exchange, debut))))
-                // Mono.defer obligatoire : voir BusinessContextWebFilter pour l'explication complète.
-                .switchIfEmpty(Mono.defer(() -> chain.filter(exchange)));
+        // chain.filter(exchange) est souscrit EXACTEMENT une fois : le pipeline en aval (handler +
+        // écriture de la réponse) ne doit jamais être ré-exécuté. La décision de journaliser (lecture du
+        // SecurityContext, toujours disponible dans le Reactor Context à ce stade) est prise APRÈS la
+        // réponse. L'ancienne forme `flatMap(...).switchIfEmpty(chain.filter)` ré-abonnait chain.filter :
+        // le chemin nominal se terminait « vide » (un Mono<Void> est toujours vide au sens de
+        // switchIfEmpty), donc switchIfEmpty relançait TOUTE la suite -> double écriture de la réponse
+        // -> UnsupportedOperationException sur en-têtes read-only (setContentLength) + fuite de connexion
+        // R2DBC (pool épuisé après quelques requêtes = gel du serveur).
+        return chain.filter(exchange)
+                .then(Mono.defer(() -> ReactiveSecurityContextHolder.getContext()
+                        .map(securityContext -> securityContext.getAuthentication())
+                        .filter(auth -> auth != null && auth.isAuthenticated()
+                                && !(auth instanceof ApiKeyAuthenticationToken)
+                                && auth.getPrincipal() instanceof BusinessContext)
+                        .map(auth -> (BusinessContext) auth.getPrincipal())
+                        .flatMap(ctx -> journaliser(ctx, exchange, debut))
+                        .then()));
     }
 
     private Mono<Void> journaliser(BusinessContext ctx, ServerWebExchange exchange, long debut) {
