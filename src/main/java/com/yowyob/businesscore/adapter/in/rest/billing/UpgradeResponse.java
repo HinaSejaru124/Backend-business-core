@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public record UpgradeResponse(
         @Schema(description = "Plan effectif après l'opération", example = "PRO") String plan,
         @Schema(description = "Issue du paiement", example = "CONFIRME",
-                allowableValues = {"CONFIRME", "EN_ATTENTE"}) String statut,
+                allowableValues = {"CONFIRME", "EN_ATTENTE", "REFUSE"}) String statut,
         @Schema(description = "URL de paiement à finaliser (cas EN_ATTENTE, sinon null)") String urlPaiement,
         @Schema(description = "Référence de paiement") String reference
 ) {

@@ -1,25 +1,28 @@
 package com.yowyob.businesscore.adapter.out.payment;
 
 import com.yowyob.businesscore.domain.port.out.PaiementPort;
-import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
 /**
- * Adapter de paiement de <b>SIMULATION</b> — placeholder de l'API de paiement Kernel Core (indisponible).
+ * Adapter de paiement de <b>SIMULATION</b> — confirme immédiatement tout changement de plan.
  *
- * <p>Confirme immédiatement tout changement de plan, ce qui rend le parcours d'upgrade et le déblocage du
- * quota testables de bout en bout dès maintenant. À remplacer/compléter par un {@code KernelPaiementAdapter}
- * (même port {@link PaiementPort}) quand l'API existera — sélection par profil ou propriété, sans toucher
- * à {@code PlanService}.
+ * <p><b>Non câblé</b> (pas de {@code @Component}) : l'implémentation active de {@link PaiementPort} est
+ * {@code KernelPaiementAdapter} (vrai paiement mobile money). Cette classe est conservée pour les tests et
+ * comme repli éventuel (déblocage instantané sans débit réel) — la réactiver = ajouter {@code @Component}
+ * et retirer celui de {@code KernelPaiementAdapter}.
  */
-@Component
 public class SimulationPaiementAdapter implements PaiementPort {
 
     @Override
     public Mono<ResultatPaiement> demanderPaiement(DemandePaiement demande) {
         return Mono.just(new ResultatPaiement(
                 ResultatPaiement.Statut.CONFIRME, null, "SIMULATION-" + UUID.randomUUID()));
+    }
+
+    @Override
+    public Mono<ResultatPaiement> verifierStatut(String reference) {
+        return Mono.just(new ResultatPaiement(ResultatPaiement.Statut.CONFIRME, null, reference));
     }
 }

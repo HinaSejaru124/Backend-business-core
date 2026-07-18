@@ -53,17 +53,35 @@ public class PlanController {
     }
 
     @Operation(summary = "Changer de plan",
-            description = "Demande le passage vers le plan cible (paiement via Kernel Core, simulé pour l'instant).")
+            description = "Ouvre le paiement mobile money (MyCoolPay) du passage vers le plan cible. Le "
+                    + "paiement est asynchrone : la réponse EN_ATTENTE porte l'URL de redirection ; le plan "
+                    + "n'est activé qu'après confirmation via POST /v1/plan/finalize.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Plan changé (CONFIRME) ou paiement en attente"),
-            @ApiResponse(responseCode = "400", description = "Plan cible invalide"),
+            @ApiResponse(responseCode = "200", description = "Paiement ouvert (EN_ATTENTE) ou confirmé"),
+            @ApiResponse(responseCode = "400", description = "Plan cible ou numéro payeur invalide"),
             @ApiResponse(responseCode = "409", description = "Déjà sur ce plan"),
             @ApiResponse(responseCode = "422", description = "Paiement refusé")
     })
     @PostMapping("/plan/upgrade")
     public Mono<UpgradeResponse> upgrade(@Valid @RequestBody UpgradePlanRequest requete) {
         return developpeurCourant.id()
-                .flatMap(developerId -> planService.changer(developerId, requete.targetPlan()))
+                .flatMap(developerId -> planService.changer(developerId, requete.targetPlan(),
+                        requete.payerReference()))
+                .map(UpgradeResponse::depuis);
+    }
+
+    @Operation(summary = "Finaliser le paiement d'un upgrade",
+            description = "Interroge le kernel sur l'issue du dernier paiement en attente du développeur. "
+                    + "Active le plan uniquement si le paiement mobile money est confirmé (SUCCESS).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Plan activé (CONFIRME) ou toujours en attente"),
+            @ApiResponse(responseCode = "404", description = "Aucun paiement en attente"),
+            @ApiResponse(responseCode = "422", description = "Paiement refusé")
+    })
+    @PostMapping("/plan/finalize")
+    public Mono<UpgradeResponse> finaliserPaiement() {
+        return developpeurCourant.id()
+                .flatMap(planService::finaliser)
                 .map(UpgradeResponse::depuis);
     }
 }

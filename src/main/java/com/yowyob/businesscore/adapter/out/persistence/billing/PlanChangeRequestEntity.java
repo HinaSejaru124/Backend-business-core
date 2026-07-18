@@ -83,6 +83,14 @@ public class PlanChangeRequestEntity implements Persistable<UUID> {
         return statut;
     }
 
+    /**
+     * Transition d'issue de paiement ({@code EN_ATTENTE → CONFIRME/REFUSE}) lors de la finalisation.
+     * L'entité est chargée depuis la base ({@code nouveau = false}), donc {@code save} fait un UPDATE.
+     */
+    public void marquerIssue(String nouveauStatut) {
+        this.statut = nouveauStatut;
+    }
+
     public String getPaymentReference() {
         return paymentReference;
     }
