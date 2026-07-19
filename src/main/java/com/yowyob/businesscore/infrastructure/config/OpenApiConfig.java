@@ -17,13 +17,13 @@ import org.springframework.context.annotation.Configuration;
                         API du Business Core — noyau métier générique intégré au kernel RT-Comops.
 
                         Le Business Core expose un modèle piloté par les métadonnées : le développeur
-                        déclare des Types Métier (le modèle), crée des Entreprises (les instances),
+                        déclare des Types Métier (le modèle), crée des Applications (les instances),
                         et déclenche des Opérations. Le Business Core orchestre le kernel en façade.
 
                         ## Authentification
                         L'API identifie le **développeur** et délègue l'**utilisateur** au kernel :
                         - **JWT Bearer** (`Authorize`, via `POST /v1/auth/login`) : obligatoire sur toutes les
-                          routes protégées qui appellent le kernel (entreprises, opérations, etc.).
+                          routes protégées qui appellent le kernel (applications, opérations, etc.).
                         - **Headers `X-BC-*`** (Try it out) : identifient la clé API du développeur sur les
                           routes d'intégration (`/v1/business-types`, `/v1/businesses`, opérations…).
                           Recommandés pour le backend du dev (suivi d'usage, `X-BC-On-Behalf-Of`).
@@ -48,7 +48,7 @@ import org.springframework.context.annotation.Configuration;
                 @Tag(name = "Auth", description = "Login délégué kernel et profil utilisateur"),
                 @Tag(name = "Types métier", description = "Déclaration du modèle métier (niveau Type)"),
                 @Tag(name = "Contenu de version", description = "Offres, rôles, règles, opérations et configuration d'une version"),
-                @Tag(name = "Entreprises", description = "Instances de métier (niveau Entreprise)"),
+                @Tag(name = "Applications", description = "Instances de métier (niveau Application)"),
                 @Tag(name = "Opérations", description = "Exécution des actes métier"),
                 @Tag(name = "Consultation", description = "Transactions et traces"),
                 @Tag(name = "Santé", description = "Sondes de disponibilité")
@@ -59,7 +59,7 @@ import org.springframework.context.annotation.Configuration;
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
         bearerFormat = "JWT",
-        description = "JWT kernel obtenu via POST /v1/auth/login. Obligatoire pour les appels kernel (entreprises, opérations…)."
+        description = "JWT kernel obtenu via POST /v1/auth/login. Obligatoire pour les appels kernel (applications, opérations…)."
 )
 public class OpenApiConfig {
 }

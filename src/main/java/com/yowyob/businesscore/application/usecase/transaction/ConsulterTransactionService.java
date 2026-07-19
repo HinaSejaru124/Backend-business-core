@@ -31,7 +31,7 @@ public class ConsulterTransactionService {
     public Flux<TransactionVue> lister(UUID entrepriseId, int page, int taille, BusinessContext ctx) {
         return resoudreEntreprise.resoudre(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMapMany(entreprise -> entreprise.organizationId() == null
                         ? Flux.empty()
                         : lireTransactions.listerParOrganisation(entreprise.organizationId(), page, taille));
@@ -40,7 +40,7 @@ public class ConsulterTransactionService {
     public Mono<TransactionVue> trouver(UUID entrepriseId, UUID billId, BusinessContext ctx) {
         return resoudreEntreprise.resoudre(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMap(entreprise -> entreprise.organizationId() == null
                         ? Mono.error(ProblemException.notFound("Organisation kernel absente."))
                         : lireTransactions.trouverBill(entreprise.organizationId(), billId));
@@ -49,7 +49,7 @@ public class ConsulterTransactionService {
     public Mono<TransactionVue> trouverCommande(UUID entrepriseId, UUID commandeId, BusinessContext ctx) {
         return resoudreEntreprise.resoudre(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMap(entreprise -> entreprise.organizationId() == null
                         ? Mono.error(ProblemException.notFound("Organisation kernel absente."))
                         : lireTransactions.trouverCommande(entreprise.organizationId(), commandeId));

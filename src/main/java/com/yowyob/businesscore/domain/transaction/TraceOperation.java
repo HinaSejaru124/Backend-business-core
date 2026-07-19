@@ -27,6 +27,8 @@ public record TraceOperation(
         UUID transactionKernelId,   // null tant qu'aucune transaction kernel n'est produite
         StatutTrace statut,
         String resultatRegles,      // JSON des effets de règles appliqués (audit), nullable
+        String codeErreur,          // renseigné si COMPENSEE : la règle/cause violée (ex. ProblemException.violatedRule)
+        String messageErreur,       // renseigné si COMPENSEE : message lisible, pour diagnostic côté application cliente
         Instant creeLe,
         Instant resoluLe            // null tant que EN_COURS
 ) {
@@ -49,22 +51,27 @@ public record TraceOperation(
                                           String operationNom, String cleIdempotence, Instant maintenant) {
         return new TraceOperation(
                 UUID.randomUUID(), tenantId, entrepriseId, operationId, operationNom,
-                cleIdempotence, null, StatutTrace.EN_COURS, null, maintenant, null);
+                cleIdempotence, null, StatutTrace.EN_COURS, null, null, null, maintenant, null);
     }
 
     /** Transition : opération terminée avec succès → COMPLETEE, horodatée. */
     public TraceOperation completer(UUID transactionKernelId, String resultatRegles, Instant maintenant) {
         return new TraceOperation(id, tenantId, entrepriseId, operationId, operationNom,
-                cleIdempotence, transactionKernelId, StatutTrace.COMPLETEE, resultatRegles, creeLe, maintenant);
+                cleIdempotence, transactionKernelId, StatutTrace.COMPLETEE, resultatRegles,
+                null, null, creeLe, maintenant);
     }
 
     /**
      * Transition : une étape a échoué, les précédentes ont été annulées → COMPENSEE, horodatée.
      * {@code transactionKernelId} mémorise ce qui a été annulé (peut être null si rien n'était engagé).
+     * {@code codeErreur}/{@code messageErreur} donnent à l'application cliente le pourquoi et permettent
+     * de décider quelle action prendre, sans avoir à ré-interroger l'erreur HTTP d'origine.
      */
-    public TraceOperation compenser(UUID transactionKernelId, String resultatRegles, Instant maintenant) {
+    public TraceOperation compenser(UUID transactionKernelId, String resultatRegles,
+                                    String codeErreur, String messageErreur, Instant maintenant) {
         return new TraceOperation(id, tenantId, entrepriseId, operationId, operationNom,
-                cleIdempotence, transactionKernelId, StatutTrace.COMPENSEE, resultatRegles, creeLe, maintenant);
+                cleIdempotence, transactionKernelId, StatutTrace.COMPENSEE, resultatRegles,
+                codeErreur, messageErreur, creeLe, maintenant);
     }
 
     public boolean estResolue() {

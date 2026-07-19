@@ -139,11 +139,11 @@ public class ExecuterOperationService {
                                                        Map<String, Object> parametres, BusinessContext ctx) {
         return resoudreEntreprise.resoudre(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMap(entreprise -> persisterOperation
                         .trouverParVersionEtNom(entreprise.versionTypeId(), nom)
                         .switchIfEmpty(Mono.error(ProblemException.notFound(
-                                "Opération '" + nom + "' introuvable pour cette entreprise.")))
+                                "Opération '" + nom + "' introuvable pour cette application.")))
                         .flatMap(definition -> resoudreRolesMetier
                                 .rolesActifs(entreprise.entrepriseId(), ctx.actorId())
                                 .flatMap(rolesActeur -> {
@@ -219,10 +219,12 @@ public class ExecuterOperationService {
 
                     if (transactionKernelId != null) {
                         // Un effet a été engagé puis compensé par le moteur : on trace COMPENSEE.
+                        String codeErreur = codeErreur(resultat.erreur());
+                        String messageErreur = resultat.erreur().getMessage();
                         TraceOperation trace = TraceOperation.demarrer(
                                         tenantId, entreprise.entrepriseId(), definition.id(),
                                         definition.nom(), cle, maintenant)
-                                .compenser(transactionKernelId, resultatRegles, maintenant);
+                                .compenser(transactionKernelId, resultatRegles, codeErreur, messageErreur, maintenant);
                         return persisterTrace.sauvegarder(trace).then(Mono.error(resultat.erreur()));
                     }
 
@@ -270,6 +272,17 @@ public class ExecuterOperationService {
         if (valeur != null) {
             details.put(cle, valeur);
         }
+    }
+
+    /** Code d'erreur exploitable par l'application cliente : la règle violée si connue, sinon le type d'erreur. */
+    private String codeErreur(Throwable erreur) {
+        if (erreur instanceof ProblemException problem) {
+            Object violatedRule = problem.getExtensions().get("violatedRule");
+            if (violatedRule != null) {
+                return violatedRule.toString();
+            }
+        }
+        return erreur.getClass().getSimpleName();
     }
 
     /** Sérialise les effets de règles appliqués (audit) ; null si aucun ou en cas d'échec de sérialisation. */

@@ -30,7 +30,7 @@ public class ConsulterOperationService {
     public Flux<OperationAvecEtapes> listerParEntreprise(UUID entrepriseId, BusinessContext ctx) {
         return resoudreEntreprise.resoudre(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMapMany(entreprise -> persisterOperation.listerParVersion(entreprise.versionTypeId())
                         .flatMap(definition -> persisterOperation.listerEtapes(definition.id())
                                 .collectList()
@@ -40,7 +40,7 @@ public class ConsulterOperationService {
     public Mono<OperationAvecEtapes> trouverParNom(UUID entrepriseId, String nom, BusinessContext ctx) {
         return resoudreEntreprise.resoudre(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMap(entreprise -> persisterOperation
                         .trouverParVersionEtNom(entreprise.versionTypeId(), nom)
                         .switchIfEmpty(Mono.error(ProblemException.notFound(

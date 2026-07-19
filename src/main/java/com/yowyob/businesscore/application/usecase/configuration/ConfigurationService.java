@@ -96,7 +96,7 @@ public class ConfigurationService {
                          .map(parametre -> parametre.valeur())
                 )
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                    "Paramètre '" + cle + "' introuvable pour cette entreprise.")));
+                    "Paramètre '" + cle + "' introuvable pour cette application.")));
     }
 
     // ─── Lire ─────────────────────────────────────────────────────────────

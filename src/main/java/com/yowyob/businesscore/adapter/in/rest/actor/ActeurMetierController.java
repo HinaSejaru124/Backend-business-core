@@ -25,7 +25,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-@Tag(name = "Entreprises", description = "Instances de métier (niveau Entreprise)")
+@Tag(name = "Applications", description = "Instances de métier (niveau Application)")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/v1/businesses/{businessId}/actors")
@@ -39,7 +39,7 @@ public class ActeurMetierController {
 
     @Operation(summary = "Rattacher un acteur déjà connu",
             description = """
-                    Associe une identité déjà connue à un rôle métier de l'entreprise. Ne crée ni ne résout
+                    Associe une identité déjà connue à un rôle métier de l'application. Ne crée ni ne résout
                     aucune identité kernel : pour OPERATEUR, fournir acteurKernelId (une personne inconnue
                     doit s'inscrire elle-même via POST .../actors:register) ; pour BENEFICIAIRE, fournir
                     identifiantPersonne (RG-04, pas d'identifiants de connexion).
@@ -47,7 +47,7 @@ public class ActeurMetierController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Acteur rattaché"),
             @ApiResponse(responseCode = "400", description = "Champ requis manquant pour cette catégorie de rôle"),
-            @ApiResponse(responseCode = "404", description = "Entreprise ou rôle introuvable"),
+            @ApiResponse(responseCode = "404", description = "Application ou rôle introuvable"),
             @ApiResponse(responseCode = "409", description = "Acteur déjà rattaché")
     })
     @PostMapping
@@ -59,7 +59,7 @@ public class ActeurMetierController {
                 .map(ActeurReponse::de);
     }
 
-    @Operation(summary = "Lister les acteurs de l'entreprise")
+    @Operation(summary = "Lister les acteurs de l'application")
     @ApiResponse(responseCode = "200", description = "Liste des acteurs")
     @GetMapping
     public Flux<ActeurReponse> lister(@PathVariable UUID businessId) {
@@ -91,7 +91,7 @@ public class ActeurMetierController {
                 .map(ActeurReponse::de);
     }
 
-    @Operation(summary = "Détacher un acteur", description = "Supprime le rattachement acteur ↔ entreprise.")
+    @Operation(summary = "Détacher un acteur", description = "Supprime le rattachement acteur ↔ application.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Acteur détaché"),
             @ApiResponse(responseCode = "404", description = "Acteur introuvable")

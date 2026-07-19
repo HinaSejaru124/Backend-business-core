@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : callback / diagnostic d'opération — ajoute à trace_operation (créée dans operations.xml,
+      NE JAMAIS modifier ce fichier) de quoi répondre "pourquoi ça a échoué / quelle action prendre" côté
+      application cliente, sans refaire le moteur d'opérations. Préfixe d'IDs : callback-xxx.
+    -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         callback-001 — Diagnostic d'échec sur trace_operation (nullable, renseigné si COMPENSEE)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="callback-001-diagnostic-trace" author="feature-callback">
+        <addColumn tableName="trace_operation">
+            <column name="code_erreur" type="varchar(128)"/>
+            <column name="message_erreur" type="varchar(1024)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="trace_operation" columnName="code_erreur"/>
+            <dropColumn tableName="trace_operation" columnName="message_erreur"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

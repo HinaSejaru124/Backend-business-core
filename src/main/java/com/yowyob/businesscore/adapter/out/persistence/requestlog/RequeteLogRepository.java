@@ -31,6 +31,18 @@ public interface RequeteLogRepository extends ReactiveCrudRepository<RequeteLogE
 
     Mono<Long> countByTenantIdAndCategorie(UUID tenantId, String categorie);
 
+    /** Agrégat dashboard/admin : nombre d'erreurs (statut &gt;= 400) et temps de réponse moyen, sur une fenêtre. */
+    record StatsRow(Long nbErreurs, Double dureeMoyenneMs) {
+    }
+
+    @Query("""
+            SELECT COUNT(*) FILTER (WHERE statut_http >= 400) AS nb_erreurs,
+                   AVG(duree_ms) AS duree_moyenne_ms
+            FROM requete_log
+            WHERE tenant_id = :tenantId AND cree_le >= :depuis
+            """)
+    Mono<StatsRow> statsParTenant(UUID tenantId, Instant depuis);
+
     /**
      * Requêtes filtrées (onglet Track). Tous les filtres sont optionnels (null = pas de filtre) :
      * catégorie, méthode HTTP, borne de date (période), et classe de statut via {@code erreurFlag}

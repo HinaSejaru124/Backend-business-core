@@ -136,7 +136,7 @@ public class BusinessTypeController {
                 .map(VersionTypeResponse::depuis);
     }
 
-    @Operation(summary = "Publier une version", description = "Rend la version utilisable pour instancier des entreprises.",
+    @Operation(summary = "Publier une version", description = "Rend la version utilisable pour instancier des applications.",
             tags = {"Contenu de version"})
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Version publiée"),

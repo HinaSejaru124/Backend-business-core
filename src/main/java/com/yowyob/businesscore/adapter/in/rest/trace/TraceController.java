@@ -30,7 +30,7 @@ public class TraceController {
     }
 
     @Operation(summary = "Lister les traces d'opération",
-            description = "Historique des exécutions (synchrones et différées) pour l'entreprise.")
+            description = "Historique des exécutions (synchrones et différées) pour l'application.")
     @ApiResponse(responseCode = "200", description = "Liste des traces")
     @GetMapping("/businesses/{businessId}/traces")
     public Flux<OperationTraceResponse> lister(@PathVariable UUID businessId) {

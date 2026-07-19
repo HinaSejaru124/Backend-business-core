@@ -144,7 +144,7 @@ public class GestionActeurService {
     public Mono<ActeurMetier> rattacher(RattacherActeurCommande commande) {
         Mono<Entreprise> entreprise = lireEntreprise.parId(commande.businessId())
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + commande.businessId())));
+                        "Application introuvable : " + commande.businessId())));
 
         Mono<RoleMetier> role = depot.roleParId(commande.roleMetierId())
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
@@ -193,7 +193,7 @@ public class GestionActeurService {
     public Mono<ActeurMetier> inscrire(InscrireActeurCommande commande) {
         Mono<Entreprise> entreprise = lireEntreprise.parId(commande.businessId())
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + commande.businessId())));
+                        "Application introuvable : " + commande.businessId())));
         Mono<RoleMetier> role = depot.roleParId(commande.roleMetierId())
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                         "Rôle métier introuvable : " + commande.roleMetierId())));
@@ -255,7 +255,7 @@ public class GestionActeurService {
                 .flatMap(dejaRattache -> {
                     if (dejaRattache) {
                         return Mono.error(ProblemException.conflict(
-                                "Cet acteur est déjà rattaché activement à cette entreprise.")
+                                "Cet acteur est déjà rattaché activement à cette application.")
                                 .violatedRule("ACTEUR_DEJA_RATTACHE"));
                     }
                     return rattacherAOrganisation.rattacher(entreprise.organizationId(), acteurKernelId)
@@ -284,7 +284,7 @@ public class GestionActeurService {
                 .switchIfEmpty(Mono.error(ProblemException.notFound("Acteur introuvable : " + actorId)))
                 .filter(a -> a.entrepriseId().equals(businessId))
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Acteur " + actorId + " non rattaché à l'entreprise " + businessId)));
+                        "Acteur " + actorId + " non rattaché à l'application " + businessId)));
     }
 
     /**
@@ -314,7 +314,7 @@ public class GestionActeurService {
                                 return depot.enregistrerActeur(existant.detacher(Instant.now()))
                                         .then(lireEntreprise.parId(commande.businessId())
                                                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                                                        "Entreprise introuvable : " + commande.businessId()))))
+                                                        "Application introuvable : " + commande.businessId()))))
                                         .flatMap(entreprise -> {
                                             Mono<Void> roleKernel = nouveau.categorie() == CategorieActeur.OPERATEUR
                                                     ? appliquerRoleTechnique.appliquer(

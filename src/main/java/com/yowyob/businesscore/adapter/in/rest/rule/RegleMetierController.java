@@ -107,11 +107,11 @@ public class RegleMetierController {
     }
 
     @Operation(summary = "Créer une règle locale",
-            description = "Déclare une règle spécifique à une entreprise (portée ENTREPRISE).",
-            tags = {"Entreprises"})
+            description = "Déclare une règle spécifique à une application (portée ENTREPRISE).",
+            tags = {"Applications"})
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Règle locale créée"),
-            @ApiResponse(responseCode = "404", description = "Entreprise introuvable")
+            @ApiResponse(responseCode = "404", description = "Application introuvable")
     })
     @PostMapping("/businesses/{businessId}/rules")
     @ResponseStatus(HttpStatus.CREATED)
@@ -125,14 +125,14 @@ public class RegleMetierController {
                 .map(RegleMetierResponse::de);
     }
 
-    @Operation(summary = "Lister les règles locales", tags = {"Entreprises"})
-    @ApiResponse(responseCode = "200", description = "Liste des règles de l'entreprise")
+    @Operation(summary = "Lister les règles locales", tags = {"Applications"})
+    @ApiResponse(responseCode = "200", description = "Liste des règles de l'application")
     @GetMapping("/businesses/{businessId}/rules")
     public Flux<RegleMetierResponse> listerReglesLocales(@PathVariable UUID businessId) {
         return gestion.listerParEntreprise(businessId).map(RegleMetierResponse::de);
     }
 
-    @Operation(summary = "Consulter une règle locale", tags = {"Entreprises"})
+    @Operation(summary = "Consulter une règle locale", tags = {"Applications"})
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "La règle locale"),
             @ApiResponse(responseCode = "404", description = "Règle introuvable")
@@ -143,7 +143,7 @@ public class RegleMetierController {
         return gestion.trouverLocale(businessId, ruleId).map(RegleMetierResponse::de);
     }
 
-    @Operation(summary = "Modifier une règle locale", tags = {"Entreprises"})
+    @Operation(summary = "Modifier une règle locale", tags = {"Applications"})
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Règle locale mise à jour"),
             @ApiResponse(responseCode = "404", description = "Règle introuvable")
@@ -157,7 +157,7 @@ public class RegleMetierController {
                 .map(RegleMetierResponse::de);
     }
 
-    @Operation(summary = "Supprimer une règle locale", tags = {"Entreprises"})
+    @Operation(summary = "Supprimer une règle locale", tags = {"Applications"})
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Règle locale supprimée"),
             @ApiResponse(responseCode = "404", description = "Règle introuvable")
@@ -181,14 +181,15 @@ public class RegleMetierController {
             List<String> rolesAutorisesADeroger
     ) {}
 
-    @Schema(description = "Règle métier (portée TYPE ou ENTREPRISE)")
+    @Schema(description = "Règle métier (portée TYPE ou ENTREPRISE — cette dernière au niveau Application)")
     public record RegleMetierResponse(
             @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
             @Schema(example = "AVANT_OPERATION") String declencheur,
             @Schema(example = "montant > 1000") String condition,
             @Schema(example = "BLOQUER") String effet,
             List<String> rolesAutorisesADeroger,
-            @Schema(description = "TYPE ou ENTREPRISE", example = "TYPE") String portee
+            @Schema(description = "TYPE ou ENTREPRISE (portée Application) — valeur inchangée pour compatibilité",
+                    example = "TYPE") String portee
     ) {
         public static RegleMetierResponse de(RegleMetier r) {
             return new RegleMetierResponse(

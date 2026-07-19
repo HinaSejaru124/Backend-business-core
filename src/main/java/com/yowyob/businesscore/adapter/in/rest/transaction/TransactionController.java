@@ -31,7 +31,7 @@ public class TransactionController {
     }
 
     @Operation(summary = "Lister les transactions",
-            description = "Historique paginé des transactions kernel de l'entreprise (lecture à la demande).")
+            description = "Historique paginé des transactions kernel de l'application (lecture à la demande).")
     @ApiResponse(responseCode = "200", description = "Page de transactions")
     @GetMapping("/businesses/{businessId}/transactions")
     public Mono<Page<TransactionResponse>> lister(

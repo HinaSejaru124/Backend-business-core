@@ -13,7 +13,7 @@ public record MeResponse(
         @Schema(description = "Permissions dérivées du JWT") List<String> permissions,
         @Schema(description = "Présence de `organizations:write`") boolean owner,
         @Schema(description = "Identifiant développeur BC stable — public, ne change jamais, "
-                + "distinct des clés API (secrètes, scopées à une entreprise)")
+                + "distinct des clés API (secrètes, scopées à une application)")
         UUID developerId,
         String email,
         @Schema(example = "FREE") String plan

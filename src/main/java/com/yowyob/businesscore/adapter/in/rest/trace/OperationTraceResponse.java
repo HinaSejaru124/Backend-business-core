@@ -12,7 +12,10 @@ public record OperationTraceResponse(
         @Schema(example = "vente") String operationNom,
         @Schema(description = "Clé d'idempotence fournie à l'exécution") String cleIdempotence,
         UUID transactionKernelId,
-        @Schema(example = "COMPLETEE", allowableValues = {"EN_COURS", "COMPLETEE", "ECHEC"}) String statut,
+        @Schema(example = "COMPLETEE", allowableValues = {"EN_COURS", "COMPLETEE", "COMPENSEE"}) String statut,
+        @Schema(description = "Règle/cause violée si le statut est COMPENSEE (ex. violatedRule de l'erreur)")
+        String codeErreur,
+        @Schema(description = "Message diagnostique si le statut est COMPENSEE") String messageErreur,
         Instant creeLe,
         Instant resoluLe
 ) {
@@ -24,6 +27,8 @@ public record OperationTraceResponse(
                 trace.cleIdempotence(),
                 trace.transactionKernelId(),
                 trace.statut().name(),
+                trace.codeErreur(),
+                trace.messageErreur(),
                 trace.creeLe(),
                 trace.resoluLe());
     }

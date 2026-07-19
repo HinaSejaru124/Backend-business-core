@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
 
-@Schema(description = "Entreprise (instance de métier)")
+@Schema(description = "Application (instance de métier)")
 public record EntrepriseResponse(
         @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
         @Schema(example = "Boutique Alpha") String nom,

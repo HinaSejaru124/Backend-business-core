@@ -27,10 +27,10 @@ import java.util.UUID;
  * sur la version de Type épinglée (voir {@code BusinessTypeController} pour le niveau TYPE).
  * Impossible de surcharger un paramètre verrouillé au Type (409 {@code PARAMETRE_VERROUILLE}).
  */
-@Tag(name = "Configuration entreprise", description = "Surcharge locale des paramètres de configuration (brique 7)")
+@Tag(name = "Configuration application", description = "Surcharge locale des paramètres de configuration (brique 7)")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping("/v1/businesses/{businessId}/config")
+@RequestMapping({"/v1/businesses/{businessId}/config", "/v1/applications/{businessId}/config"})
 public class EntrepriseConfigController {
 
     private final EntrepriseService entrepriseService;
@@ -41,13 +41,13 @@ public class EntrepriseConfigController {
         this.configService = configService;
     }
 
-    @Operation(summary = "Lister la configuration surchargée de l'entreprise",
+    @Operation(summary = "Lister la configuration surchargée de l'application",
             description = "Uniquement les surcharges locales ; le défaut du Type se consulte via "
                     + "/v1/business-types/{typeId}/versions/{n}/config.")
     @ApiResponse(responseCode = "200", description = "Liste des surcharges")
     @GetMapping
     public Flux<ParametreConfigResponse> lister(
-            @Parameter(description = "Identifiant de l'entreprise") @PathVariable UUID businessId) {
+            @Parameter(description = "Identifiant de l'application") @PathVariable UUID businessId) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> entrepriseService.trouver(businessId, ctx))
                 .flatMapMany(entreprise -> configService.listerParEntreprise(entreprise.id()))
@@ -55,16 +55,16 @@ public class EntrepriseConfigController {
     }
 
     @Operation(summary = "Surcharger un paramètre de configuration",
-            description = "Remplace la valeur effective pour cette entreprise. Le paramètre doit déjà "
+            description = "Remplace la valeur effective pour cette application. Le paramètre doit déjà "
                     + "exister au niveau Type et ne pas y être verrouillé.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paramètre surchargé"),
-            @ApiResponse(responseCode = "404", description = "Entreprise introuvable, ou paramètre absent au niveau Type"),
+            @ApiResponse(responseCode = "404", description = "Application introuvable, ou paramètre absent au niveau Type"),
             @ApiResponse(responseCode = "409", description = "Paramètre verrouillé par le Type (PARAMETRE_VERROUILLE)")
     })
     @PutMapping("/{cle}")
     public Mono<ParametreConfigResponse> surcharger(
-            @Parameter(description = "Identifiant de l'entreprise") @PathVariable UUID businessId,
+            @Parameter(description = "Identifiant de l'application") @PathVariable UUID businessId,
             @Parameter(description = "Clé du paramètre") @PathVariable String cle,
             @Valid @RequestBody SurchargerParametreRequest req) {
         return BusinessContextHolder.currentContext()

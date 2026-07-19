@@ -9,6 +9,6 @@ public record DefinirParametreRequest(
         @NotBlank(message = "cle est obligatoire") String cle,
         @Schema(description = "Valeur", example = "XOF")
         @NotBlank(message = "valeur est obligatoire") String valeur,
-        @Schema(description = "Non modifiable par les entreprises", example = "true")
+        @Schema(description = "Non modifiable par les applications", example = "true")
         boolean verrouille
 ) {}

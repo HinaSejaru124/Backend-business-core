@@ -16,6 +16,13 @@ public interface PersisterEntreprise {
     /** Résout le business actor puis crée l'organisation ; renvoie les deux références. */
     Mono<OrganisationProvisionnee> creerOrganisation(String nom);
 
+    /**
+     * Résout (ou onboarde) le business actor courant, sans créer d'organisation — utilisé quand une
+     * Application se rattache à une organisation kernel déjà existante ({@code organizationId} fourni
+     * à la création), au lieu du provisionnement complet ({@link #creerOrganisation}).
+     */
+    Mono<UUID> resoudreBusinessActorCourant(String nom);
+
     Mono<UUID> creerAgence(UUID organizationId, String nom);
 
     /** Agence principale d'une organisation : GET /api/organizations/{orgId}/agencies (siège, sinon 1ʳᵉ). */

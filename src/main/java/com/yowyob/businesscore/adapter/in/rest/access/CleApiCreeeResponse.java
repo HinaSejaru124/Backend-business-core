@@ -12,7 +12,7 @@ public record CleApiCreeeResponse(
                 + "identifiant développeur stable, voir GET /v1/auth/me — il ne change pas d'une clé à l'autre.")
         String apiKey,
         @Schema(example = "Prod") String name,
-        @Schema(description = "Entreprise à laquelle cette clé est scopée") UUID entrepriseId
+        @Schema(description = "Application à laquelle cette clé est scopée") UUID entrepriseId
 ) {
 
     public static CleApiCreeeResponse depuis(CleApiCreee cle) {

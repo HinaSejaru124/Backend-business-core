@@ -76,7 +76,7 @@ public class OperationController {
     }
 
     @Operation(summary = "Lister les opérations disponibles",
-            description = "Opérations de la version épinglée à l'entreprise.")
+            description = "Opérations de la version épinglée à l'application.")
     @ApiResponse(responseCode = "200", description = "Liste des opérations")
     @GetMapping("/businesses/{businessId}/operations")
     public Flux<OperationResponse> lister(@PathVariable UUID businessId) {

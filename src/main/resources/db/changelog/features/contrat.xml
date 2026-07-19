@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : entreprise_contrat — paramètres de communication (contrat technique) d'une Entreprise
+      (application cliente) : clé publique, URLs de callback/succès/erreur/annulation.
+      Relation 1:1 avec entreprise (PK = entreprise_id). Préfixe d'IDs : contrat-xxx.
+      NE JAMAIS modifier _socle.xml ni enterprise.xml. Table tenant-owned -> tenant_id + RLS.
+    -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         contrat-001 — Table entreprise_contrat
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="contrat-001-entreprise-contrat" author="feature-contrat">
+        <createTable tableName="entreprise_contrat">
+            <column name="entreprise_id" type="uuid">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Isolation tenant (RLS) -->
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="cle_publique" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="callback_url" type="varchar(2048)"/>
+            <column name="success_url" type="varchar(2048)"/>
+            <column name="error_url" type="varchar(2048)"/>
+            <column name="cancel_url" type="varchar(2048)"/>
+
+            <column name="mis_a_jour_le" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="entreprise_contrat"
+                baseColumnNames="entreprise_id"
+                referencedTableName="entreprise"
+                referencedColumnNames="id"
+                constraintName="fk_contrat_entreprise"/>
+
+        <createIndex tableName="entreprise_contrat" indexName="idx_contrat_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS entreprise_contrat;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         contrat-002 — RLS sur entreprise_contrat (Barrière 3, copie exacte du snippet socle)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="contrat-002-rls-entreprise-contrat" author="feature-contrat">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE entreprise_contrat ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE entreprise_contrat FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON entreprise_contrat
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON entreprise_contrat;
+                ALTER TABLE entreprise_contrat NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE entreprise_contrat DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

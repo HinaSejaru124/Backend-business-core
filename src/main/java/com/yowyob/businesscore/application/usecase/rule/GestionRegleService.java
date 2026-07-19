@@ -84,7 +84,7 @@ public class GestionRegleService {
             Effet effet, List<String> rolesAutorisesADeroger, BusinessContext ctx) {
         return lireEntreprise.parId(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMap(entreprise -> depot.sauvegarder(new RegleMetier(
                         UUID.randomUUID(), ctx.tenantId(),
                         null, entrepriseId,
@@ -102,7 +102,7 @@ public class GestionRegleService {
     public Flux<RegleMetier> listerParEntreprise(UUID entrepriseId) {
         return lireEntreprise.parId(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMapMany(e -> depot.listerParEntreprise(entrepriseId));
     }
 
@@ -123,7 +123,7 @@ public class GestionRegleService {
                 .switchIfEmpty(Mono.error(ProblemException.notFound("Règle introuvable : " + ruleId)))
                 .filter(r -> entrepriseId.equals(r.getEntrepriseId()))
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Règle " + ruleId + " absente de cette entreprise")));
+                        "Règle " + ruleId + " absente de cette application")));
     }
 
     public Mono<RegleMetier> modifierDeType(

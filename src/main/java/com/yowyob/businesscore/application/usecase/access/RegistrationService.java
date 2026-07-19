@@ -62,7 +62,7 @@ public class RegistrationService implements RegistrationUseCase {
                         })
                         .map(account -> new ApiKeyEmise(plan,
                                 "Compte créé. Vérifiez votre email, connectez-vous via POST /v1/auth/login, "
-                                        + "créez une entreprise puis une clé API pour cette entreprise."))));
+                                        + "créez une application puis une clé API pour cette application."))));
     }
 
     private static UUID parseUuid(String valeur) {

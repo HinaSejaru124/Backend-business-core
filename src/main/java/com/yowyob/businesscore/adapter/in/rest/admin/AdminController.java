@@ -57,17 +57,25 @@ public class AdminController {
     }
 
     @Operation(summary = "Lister les développeurs",
-            description = "Tous les développeurs avec plan, statut, entreprises, clés actives et % de consommation.")
+            description = "Tous les développeurs avec plan, statut, applications, clés actives et % de consommation.")
     @GetMapping("/developers")
     public Mono<List<AdminService.DeveloperRow>> developpeurs() {
         return adminAccess.exigerAdmin().then(adminService.developpeurs().collectList());
     }
 
     @Operation(summary = "Détail d'un développeur",
-            description = "Entreprises créées et clés API (statut) du développeur.")
+            description = "Applications créées et clés API (statut) du développeur.")
     @GetMapping("/developers/{id}")
     public Mono<AdminService.DeveloperDetail> detail(@PathVariable UUID id) {
         return adminAccess.exigerAdmin().then(adminService.detail(id));
+    }
+
+    @Operation(summary = "Lister toutes les applications de la plateforme",
+            description = "Vue globale (tous développeurs confondus) des applications enregistrées : "
+                    + "nom, version, cycle de vie, callback configuré, développeur propriétaire.")
+    @GetMapping("/applications")
+    public Mono<List<AdminService.ApplicationRow>> applications() {
+        return adminAccess.exigerAdmin().then(adminService.applications().collectList());
     }
 
     @Operation(summary = "Track des requêtes facturables d'un développeur",

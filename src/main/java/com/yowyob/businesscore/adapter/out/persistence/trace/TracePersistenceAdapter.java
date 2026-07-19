@@ -52,13 +52,15 @@ public class TracePersistenceAdapter implements PersisterTrace {
         return TraceOperationEntity.nouveau(
                 t.id(), t.tenantId(), t.entrepriseId(), t.operationId(), t.operationNom(),
                 t.cleIdempotence(), t.transactionKernelId(), t.statut().name(),
-                t.resultatRegles(), t.creeLe(), t.resoluLe());
+                t.resultatRegles(), t.codeErreur(), t.messageErreur(), t.creeLe(), t.resoluLe());
     }
 
     private TraceOperationEntity appliquer(TraceOperationEntity e, TraceOperation t) {
         e.setTransactionKernelId(t.transactionKernelId());
         e.setStatut(t.statut().name());
         e.setResultatRegles(t.resultatRegles());
+        e.setCodeErreur(t.codeErreur());
+        e.setMessageErreur(t.messageErreur());
         e.setResoluLe(t.resoluLe());
         return e;
     }
@@ -67,6 +69,6 @@ public class TracePersistenceAdapter implements PersisterTrace {
         return new TraceOperation(
                 e.getId(), e.getTenantId(), e.getEntrepriseId(), e.getOperationId(), e.getOperationNom(),
                 e.getCleIdempotence(), e.getTransactionKernelId(), StatutTrace.valueOf(e.getStatut()),
-                e.getResultatRegles(), e.getCreeLe(), e.getResoluLe());
+                e.getResultatRegles(), e.getCodeErreur(), e.getMessageErreur(), e.getCreeLe(), e.getResoluLe());
     }
 }

@@ -13,7 +13,7 @@ public record CleApiResponse(
         @Schema(example = "ACTIVE", allowableValues = {"ACTIVE", "REVOKED"}) String status,
         Instant createdAt,
         Instant lastUsedAt,
-        @Schema(description = "Entreprise à laquelle cette clé est scopée") UUID entrepriseId
+        @Schema(description = "Application à laquelle cette clé est scopée") UUID entrepriseId
 ) {
 
     public static CleApiResponse depuis(ApiKeyEntity e) {

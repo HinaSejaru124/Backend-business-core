@@ -18,7 +18,7 @@ import java.util.List;
 
 /**
  * Tableau de bord développeur — exclusivement JWT (cf. {@code SecurityConfig}). Statistiques agrégées
- * et publiques uniquement (nombre d'entreprises, de clés actives, usage) : jamais de secret ni de
+ * et publiques uniquement (nombre d'applications, de clés actives, usage) : jamais de secret ni de
  * détail de clé individuelle, voir {@code /v1/businesses/{id}/api-keys} pour la gestion d'une clé.
  */
 @Tag(name = "Accès", description = "Tableau de bord développeur")
@@ -37,7 +37,7 @@ public class DashboardController {
     }
 
     @Operation(summary = "Tableau de bord développeur",
-            description = "Synthèse d'usage sur 30 jours et compteurs publics (entreprises, clés actives).")
+            description = "Synthèse d'usage sur 30 jours et compteurs publics (applications, clés actives).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Données du tableau de bord"),
             @ApiResponse(responseCode = "404", description = "Compte développeur introuvable")

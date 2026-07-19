@@ -80,6 +80,11 @@ public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
     }
 
     @Override
+    public Mono<UUID> resoudreBusinessActorCourant(String nom) {
+        return resoudreBusinessActor(nom);
+    }
+
+    @Override
     public Mono<UUID> creerAgence(UUID organizationId, String nom) {
         String code = nom == null ? "AGENCE"
                 : nom.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "")

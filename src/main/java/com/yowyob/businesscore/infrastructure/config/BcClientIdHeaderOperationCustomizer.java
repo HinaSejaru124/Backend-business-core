@@ -51,10 +51,10 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
         assurerBearerSecurity(operation);
         addHeaderIfAbsent(operation, CLIENT_ID_HEADER,
                 "Identifiant développeur stable (voir GET /v1/auth/me) — ne change jamais, quelle que "
-                        + "soit l'entreprise ciblée.",
+                        + "soit l'application ciblée.",
                 "00000000-0000-0000-0000-000000000000", false);
         addHeaderIfAbsent(operation, API_KEY_HEADER,
-                "Secret de la clé de l'entreprise ciblée. À utiliser avec X-BC-Client-Id.",
+                "Secret de la clé de l'application ciblée. À utiliser avec X-BC-Client-Id.",
                 null, false);
         addHeaderIfAbsent(operation, ON_BEHALF_HEADER,
                 "Acteur métier asserté par le backend du développeur (UUID, optionnel).",
@@ -67,10 +67,10 @@ public class BcClientIdHeaderOperationCustomizer implements OperationCustomizer 
         retirerBearerSecurity(operation);
         addHeaderIfAbsent(operation, CLIENT_ID_HEADER,
                 "Identifiant développeur stable (voir GET /v1/auth/me) — ne change jamais, quelle que "
-                        + "soit l'entreprise ciblée.",
+                        + "soit l'application ciblée.",
                 "00000000-0000-0000-0000-000000000000", true);
         addHeaderIfAbsent(operation, API_KEY_HEADER,
-                "Secret de la clé de l'entreprise ciblée. À utiliser avec X-BC-Client-Id.",
+                "Secret de la clé de l'application ciblée. À utiliser avec X-BC-Client-Id.",
                 null, true);
         return operation;
     }
