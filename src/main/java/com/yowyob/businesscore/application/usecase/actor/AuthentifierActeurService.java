@@ -65,7 +65,7 @@ public class AuthentifierActeurService {
                 .filter(acteur -> acteur.estActif() && acteurKernelId.equals(acteur.acteurKernelId()))
                 .next()
                 .switchIfEmpty(Mono.error(ProblemException.forbidden(
-                        "Cet utilisateur n'est pas rattaché à cette entreprise.")
+                        "Cet utilisateur n'est pas rattaché à cette application.")
                         .violatedRule("ACTEUR_NON_RATTACHE")));
     }
 

@@ -43,6 +43,12 @@ public class TraceOperationEntity implements Persistable<UUID> {
     @Column("resultat_regles")
     private String resultatRegles;
 
+    @Column("code_erreur")
+    private String codeErreur;
+
+    @Column("message_erreur")
+    private String messageErreur;
+
     @Column("cree_le")
     private Instant creeLe;
 
@@ -58,6 +64,7 @@ public class TraceOperationEntity implements Persistable<UUID> {
     public static TraceOperationEntity nouveau(UUID id, UUID tenantId, UUID entrepriseId, UUID operationId,
                                                String operationNom, String cleIdempotence,
                                                UUID transactionKernelId, String statut, String resultatRegles,
+                                               String codeErreur, String messageErreur,
                                                Instant creeLe, Instant resoluLe) {
         TraceOperationEntity e = new TraceOperationEntity();
         e.id = id;
@@ -69,6 +76,8 @@ public class TraceOperationEntity implements Persistable<UUID> {
         e.transactionKernelId = transactionKernelId;
         e.statut = statut;
         e.resultatRegles = resultatRegles;
+        e.codeErreur = codeErreur;
+        e.messageErreur = messageErreur;
         e.creeLe = creeLe;
         e.resoluLe = resoluLe;
         e.nouveau = true;
@@ -117,6 +126,14 @@ public class TraceOperationEntity implements Persistable<UUID> {
         return resultatRegles;
     }
 
+    public String getCodeErreur() {
+        return codeErreur;
+    }
+
+    public String getMessageErreur() {
+        return messageErreur;
+    }
+
     public Instant getCreeLe() {
         return creeLe;
     }
@@ -159,6 +176,14 @@ public class TraceOperationEntity implements Persistable<UUID> {
 
     public void setResultatRegles(String resultatRegles) {
         this.resultatRegles = resultatRegles;
+    }
+
+    public void setCodeErreur(String codeErreur) {
+        this.codeErreur = codeErreur;
+    }
+
+    public void setMessageErreur(String messageErreur) {
+        this.messageErreur = messageErreur;
     }
 
     public void setCreeLe(Instant creeLe) {

@@ -51,7 +51,7 @@ public class ResolveurContexteKernelService implements ResolveurContexteKernel {
     @Override
     public Mono<ContexteKernel> resoudre(UUID businessId) {
         return lireEntreprise.parId(businessId)
-                .switchIfEmpty(Mono.error(ProblemException.notFound("Entreprise introuvable : " + businessId)))
+                .switchIfEmpty(Mono.error(ProblemException.notFound("Application introuvable : " + businessId)))
                 .flatMap(entreprise -> Mono.zip(
                                 resoudreAgence(entreprise),
                                 devise(entreprise),

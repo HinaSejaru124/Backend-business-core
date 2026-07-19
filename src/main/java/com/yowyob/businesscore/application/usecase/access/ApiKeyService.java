@@ -54,14 +54,14 @@ public class ApiKeyService {
     public Mono<CleApiCreee> creer(UUID developerId, UUID entrepriseId, String name) {
         if (entrepriseId == null) {
             return Mono.error(ProblemException.badRequest(
-                    "entrepriseId est obligatoire : toute clé API est scopée à une entreprise."));
+                    "entrepriseId est obligatoire : toute clé API est scopée à une application."));
         }
         return verifierEntrepriseDuTenant(developerId, entrepriseId)
                 .then(repository.countByEntrepriseIdAndStatus(entrepriseId, ApiKeyEntity.STATUT_ACTIVE))
                 .flatMap(actives -> {
                     if (actives > 0) {
                         return Mono.error(ProblemException.conflict(
-                                "Cette entreprise a déjà une clé active. "
+                                "Cette application a déjà une clé active. "
                                         + "Révoquez-la avant d'en créer une nouvelle.")
                                 .violatedRule("CLE_ACTIVE_EXISTANTE"));
                     }
@@ -78,10 +78,10 @@ public class ApiKeyService {
         return developerRepository.findById(developerId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound("Développeur introuvable")))
                 .flatMap(developer -> entrepriseRepository.findById(entrepriseId)
-                        .switchIfEmpty(Mono.error(ProblemException.notFound("Entreprise introuvable : " + entrepriseId)))
+                        .switchIfEmpty(Mono.error(ProblemException.notFound("Application introuvable : " + entrepriseId)))
                         .flatMap(entreprise -> {
                             if (!entreprise.getTenantId().equals(developer.getKernelTenantId())) {
-                                return Mono.error(ProblemException.notFound("Entreprise introuvable : " + entrepriseId));
+                                return Mono.error(ProblemException.notFound("Application introuvable : " + entrepriseId));
                             }
                             return Mono.empty();
                         }))
@@ -125,7 +125,7 @@ public class ApiKeyService {
     private Mono<ApiKeyEntity> chargerActive(UUID entrepriseId) {
         return repository.findByEntrepriseIdAndStatus(entrepriseId, ApiKeyEntity.STATUT_ACTIVE).next()
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Aucune clé active pour cette entreprise : " + entrepriseId)));
+                        "Aucune clé active pour cette application : " + entrepriseId)));
     }
 
     private static String jeton(int octets) {

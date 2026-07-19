@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Feature : entreprise_profil — fiche produit d'une Application (Entreprise) : description, logo,
+      couleur, support, site web, environnement. Distinct du contrat technique (entreprise_contrat).
+      Relation 1:1 avec entreprise (PK = entreprise_id). Préfixe d'IDs : profil-xxx.
+      NE JAMAIS modifier _socle.xml ni enterprise.xml. Table tenant-owned -> tenant_id + RLS.
+    -->
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         profil-001 — Table entreprise_profil
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="profil-001-entreprise-profil" author="feature-profil">
+        <createTable tableName="entreprise_profil">
+            <column name="entreprise_id" type="uuid">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Isolation tenant (RLS) -->
+            <column name="tenant_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="description" type="varchar(2000)"/>
+            <column name="logo_url" type="varchar(2048)"/>
+            <column name="couleur" type="varchar(7)"/>
+            <column name="support_email" type="varchar(255)"/>
+            <column name="site_web_url" type="varchar(2048)"/>
+
+            <column name="environnement" type="varchar(16)" defaultValue="DEVELOPPEMENT">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="mis_a_jour_le" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="entreprise_profil"
+                baseColumnNames="entreprise_id"
+                referencedTableName="entreprise"
+                referencedColumnNames="id"
+                constraintName="fk_profil_entreprise"/>
+
+        <createIndex tableName="entreprise_profil" indexName="idx_profil_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP TABLE IF EXISTS entreprise_profil;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         profil-002 — RLS sur entreprise_profil (Barrière 3, copie exacte du snippet socle)
+    ════════════════════════════════════════════════════════════════════ -->
+    <changeSet id="profil-002-rls-entreprise-profil" author="feature-profil">
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE entreprise_profil ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE entreprise_profil FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_isolation ON entreprise_profil
+                USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid)
+                WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
+        </sql>
+        <rollback>
+            <sql>
+                DROP POLICY IF EXISTS tenant_isolation ON entreprise_profil;
+                ALTER TABLE entreprise_profil NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE entreprise_profil DISABLE ROW LEVEL SECURITY;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

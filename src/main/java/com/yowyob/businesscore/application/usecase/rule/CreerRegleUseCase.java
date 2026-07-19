@@ -82,7 +82,7 @@ public class CreerRegleUseCase {
 
         return lireEntreprise.parId(entrepriseId)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Entreprise introuvable : " + entrepriseId)))
+                        "Application introuvable : " + entrepriseId)))
                 .flatMap(entreprise -> {
                     RegleMetier regle = new RegleMetier(
                             UUID.randomUUID(), tenantId,

@@ -3,7 +3,11 @@ package com.yowyob.businesscore.application.usecase.enterprise;
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.enterprise.Entreprise;
+import com.yowyob.businesscore.domain.enterprise.EntrepriseContrat;
+import com.yowyob.businesscore.domain.enterprise.EntrepriseProfil;
 import com.yowyob.businesscore.domain.enterprise.spi.DepotEntreprise;
+import com.yowyob.businesscore.domain.enterprise.spi.DepotEntrepriseContrat;
+import com.yowyob.businesscore.domain.enterprise.spi.DepotEntrepriseProfil;
 import com.yowyob.businesscore.domain.port.out.JournaliserChangementSync;
 import com.yowyob.businesscore.domain.port.out.JournaliserChangementSync.OperationSync;
 import com.yowyob.businesscore.domain.port.out.JournaliserChangementSync.TypeEntiteSync;
@@ -14,6 +18,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -30,15 +35,21 @@ public class EntrepriseService {
     private final PersisterVersionType persisterVersionType;
     private final PersisterEntreprise persisterEntreprise;
     private final JournaliserChangementSync journaliserSync;
+    private final DepotEntrepriseContrat depotEntrepriseContrat;
+    private final DepotEntrepriseProfil depotEntrepriseProfil;
 
     public EntrepriseService(DepotEntreprise depotEntreprise,
                              PersisterVersionType persisterVersionType,
                              PersisterEntreprise persisterEntreprise,
-                             JournaliserChangementSync journaliserSync) {
+                             JournaliserChangementSync journaliserSync,
+                             DepotEntrepriseContrat depotEntrepriseContrat,
+                             DepotEntrepriseProfil depotEntrepriseProfil) {
         this.depotEntreprise = depotEntreprise;
         this.persisterVersionType = persisterVersionType;
         this.persisterEntreprise = persisterEntreprise;
         this.journaliserSync = journaliserSync;
+        this.depotEntrepriseContrat = depotEntrepriseContrat;
+        this.depotEntrepriseProfil = depotEntrepriseProfil;
     }
 
     /** Journalise un changement d'entreprise pour la synchronisation pull des backends terminaux. */
@@ -48,19 +59,46 @@ public class EntrepriseService {
                 .thenReturn(entreprise);
     }
 
+    /** Comportement par défaut inchangé : aucune organisation existante fournie → provisionnement complet. */
     public Mono<Entreprise> creer(UUID typeId, int numeroVersion, String nom, BusinessContext ctx) {
+        return creer(typeId, numeroVersion, nom, null, ctx);
+    }
+
+    /**
+     * Crée une Application. Si {@code organizationId} est fourni, l'Application se rattache à cette
+     * organisation kernel <b>existante</b> (aucun {@code POST /api/organizations}) — seul le business
+     * actor courant est résolu et l'agence principale de l'organisation est retrouvée. Si absent,
+     * comportement inchangé : provisionnement complet d'une nouvelle organisation ({@link #provisionnerOrganisation}).
+     *
+     * <p>Préparation en vue de la vision cible « Organisation (Kernel) → Applications (Business Core) » :
+     * le Kernel n'exposant à ce jour aucun mécanisme pour qu'un second développeur rejoigne une
+     * organisation existante, ce paramètre reste utilisable uniquement par le développeur propriétaire
+     * de l'organisation ciblée (aucune vérification de propriété supplémentaire n'est ajoutée ici tant
+     * que ce point n'est pas tranché côté kernel/prof).
+     */
+    public Mono<Entreprise> creer(UUID typeId, int numeroVersion, String nom, UUID organizationId, BusinessContext ctx) {
         return persisterVersionType.trouverParTypeEtNumero(typeId, numeroVersion)
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                         "Version " + numeroVersion + " introuvable pour le type " + typeId)))
                 .flatMap(version -> {
                     version.verifierAppartenance(ctx.tenantId());
-                    return provisionnerOrganisation(nom).flatMap(refs -> {
+                    Mono<RefsKernel> refsMono = organizationId == null
+                            ? provisionnerOrganisation(nom)
+                            : rattacherOrganisationExistante(organizationId, nom);
+                    return refsMono.flatMap(refs -> {
                         Entreprise entreprise = Entreprise.creer(
                                         ctx.tenantId(), version.typeMetierId(), version.id(),
                                         version.numero(), refs.organizationId(), nom)
                                 .avecReferencesKernel(
                                         refs.businessActorId(), refs.organizationId(), refs.agencyId());
                         return depotEntreprise.sauvegarder(entreprise)
+                                .flatMap(saved -> depotEntrepriseContrat
+                                        .sauvegarder(EntrepriseContrat.vierge(
+                                                saved.id(), saved.tenantId(), Instant.now()))
+                                        .thenReturn(saved))
+                                .flatMap(saved -> depotEntrepriseProfil
+                                        .sauvegarder(EntrepriseProfil.vierge(saved.id(), saved.tenantId(), Instant.now()))
+                                        .thenReturn(saved))
                                 .flatMap(saved -> journaliser(saved, OperationSync.CREATE));
                     });
                 });
@@ -89,6 +127,18 @@ public class EntrepriseService {
                                 prov.businessActorId(), prov.organizationId(), agencyId)));
     }
 
+    /**
+     * Rattache une Application à une organisation kernel déjà existante : ni création, ni approbation,
+     * ni souscription de service (déjà faites lors de la création initiale de l'organisation) — juste
+     * la résolution du business actor courant et de l'agence principale existante.
+     */
+    private Mono<RefsKernel> rattacherOrganisationExistante(UUID organizationId, String nom) {
+        return persisterEntreprise.resoudreBusinessActorCourant(nom)
+                .flatMap(businessActorId -> persisterEntreprise.trouverAgencePrincipale(organizationId)
+                        .map(agencyId -> new RefsKernel(businessActorId, organizationId, agencyId))
+                        .switchIfEmpty(Mono.just(new RefsKernel(businessActorId, organizationId, null))));
+    }
+
     /** Références kernel à mémoriser dans l'entité Entreprise. */
     private record RefsKernel(UUID businessActorId, UUID organizationId, UUID agencyId) {
     }
@@ -99,7 +149,7 @@ public class EntrepriseService {
 
     public Mono<Entreprise> trouver(UUID id, BusinessContext ctx) {
         return depotEntreprise.trouverParId(id)
-                .switchIfEmpty(Mono.error(ProblemException.notFound("Entreprise introuvable : " + id)))
+                .switchIfEmpty(Mono.error(ProblemException.notFound("Application introuvable : " + id)))
                 .doOnNext(entreprise -> entreprise.verifierAppartenance(ctx.tenantId()));
     }
 
@@ -122,7 +172,7 @@ public class EntrepriseService {
         return trouver(id, ctx).flatMap(entreprise -> {
             if (entreprise.organizationId() == null) {
                 return Mono.error(ProblemException.unprocessable(
-                        "L'entreprise n'a pas d'organisation kernel à approuver."));
+                        "L'application n'a pas d'organisation kernel à approuver."));
             }
             return persisterEntreprise.approuverOrganisation(entreprise.organizationId(), reason)
                     .then(depotEntreprise.sauvegarder(entreprise.changerCycleVie(CycleVie.ACTIVE)))

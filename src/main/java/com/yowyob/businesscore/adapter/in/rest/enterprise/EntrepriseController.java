@@ -26,15 +26,22 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 /**
- * Gestion des entreprises — JWT uniquement (cf. {@code SecurityConfig}), à l'exception de
- * {@code GET /me} qui est le point d'entrée réservé aux backends terminaux (clé Business Core) : ces
- * routes de gestion appellent le kernel au nom d'un développeur et sont destinées au front Business
- * Core, jamais consommées directement par un backend métier tiers.
+ * Gestion des applications (entreprises) — JWT uniquement (cf. {@code SecurityConfig}), à l'exception de
+ * {@code GET /v1/businesses/me} qui est le point d'entrée réservé aux backends terminaux (clé Business
+ * Core) : ces routes de gestion appellent le kernel au nom d'un développeur et sont destinées au front
+ * Business Core, jamais consommées directement par un backend métier tiers.
+ *
+ * <p>{@code /v1/applications} est un alias de façade de {@code /v1/businesses} (même controller, même
+ * comportement) — <b>sauf</b> pour {@code /me} : {@code ROUTES_INTEGRATION_TERMINAL}
+ * ({@code SecurityConfig}) ne liste que {@code /v1/businesses/me} pour l'authentification par clé API ;
+ * {@code /v1/applications/me} exige donc un JWT, contrairement à son équivalent {@code /v1/businesses/me}.
+ * Cette route runtime n'a volontairement pas été dupliquée dans la liste blanche (périmètre de cette
+ * passe limité aux routes de gestion développeur, cf. document d'impact).
  */
-@Tag(name = "Entreprises", description = "Instances de métier épinglées à une version de Type")
+@Tag(name = "Applications", description = "Instances de métier épinglées à une version de Type")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping("/v1/businesses")
+@RequestMapping({"/v1/businesses", "/v1/applications"})
 public class EntrepriseController {
 
     private final EntrepriseService entrepriseService;
@@ -43,12 +50,14 @@ public class EntrepriseController {
         this.entrepriseService = entrepriseService;
     }
 
-    @Operation(summary = "Créer une entreprise",
+    @Operation(summary = "Créer une application",
             description = """
-                    Instancie un Type Métier à une version donnée. Provisionne automatiquement l'organisation
-                    kernel (actor → org → approve → services → agence principale).""")
+                    Instancie un Type Métier à une version donnée. Si `organizationId` est fourni, l'application
+                    se rattache à cette organisation kernel existante (aucune organisation créée). Sinon,
+                    provisionne automatiquement une nouvelle organisation kernel (actor → org → approve →
+                    services → agence principale).""")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Entreprise créée"),
+            @ApiResponse(responseCode = "201", description = "Application créée"),
             @ApiResponse(responseCode = "404", description = "Version de type introuvable"),
             @ApiResponse(responseCode = "422", description = "Données invalides")
     })
@@ -57,12 +66,12 @@ public class EntrepriseController {
     public Mono<EntrepriseResponse> creer(@Valid @RequestBody CreerEntrepriseRequest requete) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> entrepriseService.creer(
-                        requete.typeId(), requete.versionNumber(), requete.nom(), ctx))
+                        requete.typeId(), requete.versionNumber(), requete.nom(), requete.organizationId(), ctx))
                 .map(EntrepriseResponse::depuis);
     }
 
-    @Operation(summary = "Lister les entreprises", description = "Retourne toutes les entreprises du tenant courant.")
-    @ApiResponse(responseCode = "200", description = "Liste des entreprises")
+    @Operation(summary = "Lister les applications", description = "Retourne toutes les applications du tenant courant.")
+    @ApiResponse(responseCode = "200", description = "Liste des applications")
     @GetMapping
     public Flux<EntrepriseResponse> lister() {
         return BusinessContextHolder.currentContext()
@@ -70,14 +79,14 @@ public class EntrepriseController {
                 .map(EntrepriseResponse::depuis);
     }
 
-    @Operation(summary = "Résoudre l'entreprise de la clé courante",
+    @Operation(summary = "Résoudre l'application de la clé courante",
             description = """
-                    Réservé aux backends terminaux (clé Business Core scopée) : renvoie l'entreprise
+                    Réservé aux backends terminaux (clé Business Core scopée) : renvoie l'application
                     représentée par la clé, sans que le terminal ait besoin de connaître ni transmettre
                     son businessId. Premier appel typique après réception des identifiants.""")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "L'entreprise de la clé"),
-            @ApiResponse(responseCode = "403", description = "Clé non scopée à une entreprise")
+            @ApiResponse(responseCode = "200", description = "L'application de la clé"),
+            @ApiResponse(responseCode = "403", description = "Clé non scopée à une application")
     })
     @GetMapping("/me")
     public Mono<EntrepriseResponse> moi() {
@@ -85,31 +94,31 @@ public class EntrepriseController {
                 .flatMap(ctx -> {
                     if (ctx.businessId() == null) {
                         return Mono.error(ProblemException.forbidden(
-                                "Cette route nécessite une clé API scopée à une entreprise."));
+                                "Cette route nécessite une clé API scopée à une application."));
                     }
                     return entrepriseService.trouver(ctx.businessId(), ctx);
                 })
                 .map(EntrepriseResponse::depuis);
     }
 
-    @Operation(summary = "Consulter une entreprise")
+    @Operation(summary = "Consulter une application")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "L'entreprise"),
-            @ApiResponse(responseCode = "404", description = "Entreprise introuvable")
+            @ApiResponse(responseCode = "200", description = "L'application"),
+            @ApiResponse(responseCode = "404", description = "Application introuvable")
     })
     @GetMapping("/{businessId}")
     public Mono<EntrepriseResponse> trouver(
-            @Parameter(description = "Identifiant de l'entreprise") @PathVariable UUID businessId) {
+            @Parameter(description = "Identifiant de l'application") @PathVariable UUID businessId) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> entrepriseService.trouver(businessId, ctx))
                 .map(EntrepriseResponse::depuis);
     }
 
-    @Operation(summary = "Modifier une entreprise",
+    @Operation(summary = "Modifier une application",
             description = "Met à jour les métadonnées locales (nom). Pas de rename de l'organisation kernel.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Entreprise mise à jour"),
-            @ApiResponse(responseCode = "404", description = "Entreprise introuvable")
+            @ApiResponse(responseCode = "200", description = "Application mise à jour"),
+            @ApiResponse(responseCode = "404", description = "Application introuvable")
     })
     @PutMapping("/{businessId}")
     public Mono<EntrepriseResponse> modifier(@PathVariable UUID businessId,
@@ -119,11 +128,11 @@ public class EntrepriseController {
                 .map(EntrepriseResponse::depuis);
     }
 
-    @Operation(summary = "Archiver une entreprise",
+    @Operation(summary = "Archiver une application",
             description = "Passe le cycle de vie en FERMEE (local + kernel `close`). Pas de suppression dure.")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Entreprise archivée"),
-            @ApiResponse(responseCode = "404", description = "Entreprise introuvable")
+            @ApiResponse(responseCode = "204", description = "Application archivée"),
+            @ApiResponse(responseCode = "404", description = "Application introuvable")
     })
     @DeleteMapping("/{businessId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -138,8 +147,8 @@ public class EntrepriseController {
                     Distinct de `PUT .../lifecycle` avec ACTIVE (qui appelle `reopen`).
                     """)
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Entreprise approuvée (cycleVie ACTIVE)"),
-            @ApiResponse(responseCode = "404", description = "Entreprise introuvable"),
+            @ApiResponse(responseCode = "200", description = "Application approuvée (cycleVie ACTIVE)"),
+            @ApiResponse(responseCode = "404", description = "Application introuvable"),
             @ApiResponse(responseCode = "422", description = "Pas d'organisation kernel à approuver")
     })
     @PostMapping("/{businessId}/approve")
@@ -155,7 +164,7 @@ public class EntrepriseController {
             description = "Suspend, ferme ou rouvre l'organisation kernel (`suspend` / `close` / `reopen`).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cycle de vie mis à jour"),
-            @ApiResponse(responseCode = "404", description = "Entreprise introuvable")
+            @ApiResponse(responseCode = "404", description = "Application introuvable")
     })
     @PutMapping("/{businessId}/lifecycle")
     public Mono<EntrepriseResponse> changerCycleVie(@PathVariable UUID businessId,

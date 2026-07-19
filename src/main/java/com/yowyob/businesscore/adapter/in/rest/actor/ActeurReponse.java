@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 
-@Schema(description = "Acteur métier rattaché à une entreprise")
+@Schema(description = "Acteur métier rattaché à une application")
 public record ActeurReponse(
         @Schema(example = "00000000-0000-0000-0000-000000000000") UUID id,
         UUID entrepriseId,

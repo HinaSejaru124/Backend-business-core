@@ -56,10 +56,10 @@ public record Entreprise(
                 organizationId, businessActorId, agencyId, nom, nouveau);
     }
 
-    /** Renomme l'entreprise (métadonnée locale ; pas de sync kernel dans cette version). */
+    /** Renomme l'application (métadonnée locale ; pas de sync kernel dans cette version). */
     public Entreprise renommer(String nouveauNom) {
         if (nouveauNom == null || nouveauNom.isBlank()) {
-            throw ProblemException.badRequest("Le nom de l'entreprise est obligatoire.");
+            throw ProblemException.badRequest("Le nom de l'application est obligatoire.");
         }
         return new Entreprise(id, tenantId, typeMetierId, versionTypeId, numeroVersion,
                 organizationId, businessActorId, agencyId, nouveauNom.trim(), cycleVie);
@@ -79,15 +79,15 @@ public record Entreprise(
 
     public void verifierAppartenance(UUID autreTenantId) {
         if (!tenantId.equals(autreTenantId)) {
-            throw ProblemException.forbidden("Cette entreprise n'appartient pas à votre tenant.");
+            throw ProblemException.forbidden("Cette application n'appartient pas à votre tenant.");
         }
     }
 
-    /** Une opération ne peut s'exécuter que sur une entreprise active. */
+    /** Une opération ne peut s'exécuter que sur une application active. */
     public void verifierOperable() {
         if (cycleVie != CycleVie.ACTIVE) {
             throw ProblemException.conflict(
-                    "L'entreprise n'est pas active (cycle de vie : " + cycleVie + ").")
+                    "L'application n'est pas active (cycle de vie : " + cycleVie + ").")
                     .violatedRule("ENTREPRISE_NON_ACTIVE");
         }
     }

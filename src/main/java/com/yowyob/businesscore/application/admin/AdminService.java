@@ -4,6 +4,8 @@ import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyEntity;
 import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyRepository;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
+import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseContratEntity;
+import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseContratRepository;
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseEntity;
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseRepository;
 import com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogEntity;
@@ -41,9 +43,12 @@ import java.util.UUID;
 @Service
 public class AdminService {
 
+    private static final int FENETRE_STATS_JOURS = 30;
+
     private final DeveloperAccountRepository developerRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final EntrepriseRepository entrepriseRepository;
+    private final EntrepriseContratRepository entrepriseContratRepository;
     private final RequeteLogRepository requeteLogRepository;
     private final QuotaService quotaService;
     private final PlanCatalogue catalogue;
@@ -52,6 +57,7 @@ public class AdminService {
     public AdminService(DeveloperAccountRepository developerRepository,
                         ApiKeyRepository apiKeyRepository,
                         EntrepriseRepository entrepriseRepository,
+                        EntrepriseContratRepository entrepriseContratRepository,
                         RequeteLogRepository requeteLogRepository,
                         QuotaService quotaService,
                         PlanCatalogue catalogue,
@@ -59,6 +65,7 @@ public class AdminService {
         this.developerRepository = developerRepository;
         this.apiKeyRepository = apiKeyRepository;
         this.entrepriseRepository = entrepriseRepository;
+        this.entrepriseContratRepository = entrepriseContratRepository;
         this.requeteLogRepository = requeteLogRepository;
         this.quotaService = quotaService;
         this.catalogue = catalogue;
@@ -70,6 +77,7 @@ public class AdminService {
     public record Overview(long nbDeveloppeurs, long nbDeveloppeursBloques,
                            long nbClesActives, long nbClesRevoquees,
                            long nbEntreprises, long requetesBusinessCore, long requetesKernelCore,
+                           long nbErreursMois,
                            List<PlanCount> repartitionPlans) {
     }
 
@@ -77,18 +85,23 @@ public class AdminService {
     }
 
     public record DeveloperRow(UUID id, String email, String plan, String status, Instant createdAt,
-                               long nbEntreprises, long nbClesActives,
-                               long consoMois, long quota, boolean illimite, double pctConso) {
+                               long nbApplications, long nbClesActives,
+                               long consoMois, long quota, boolean illimite, double pctConso,
+                               long nbErreursMois, Double tempsReponseMoyenMs) {
     }
 
-    public record EntrepriseRow(UUID id, String nom, int numeroVersion, String cycleVie) {
+    public record ApplicationDuDeveloperRow(UUID id, String nom, int numeroVersion, String cycleVie, String callbackUrl) {
     }
 
-    public record CleRow(UUID id, String nom, String status, UUID entrepriseId,
+    public record ApplicationRow(UUID id, String nom, int numeroVersion, String cycleVie, String callbackUrl,
+                                 UUID developerId, String developerEmail) {
+    }
+
+    public record CleRow(UUID id, String nom, String status, UUID applicationId,
                          Instant createdAt, Instant lastUsedAt) {
     }
 
-    public record DeveloperDetail(DeveloperRow resume, List<EntrepriseRow> entreprises, List<CleRow> cles) {
+    public record DeveloperDetail(DeveloperRow resume, List<ApplicationDuDeveloperRow> applications, List<CleRow> cles) {
     }
 
     public record RequeteRow(UUID id, String categorie, String methode, String endpoint,
@@ -127,7 +140,9 @@ public class AdminService {
             List<PlanCount> repartition = parPlan.entrySet().stream()
                     .map(e -> new PlanCount(e.getKey(), e.getValue())).toList();
 
-            // Agrégats cloisonnés (entreprises + requêtes par catégorie) : sommés par tenant réel.
+            Instant depuisErreurs = Instant.now().minus(FENETRE_STATS_JOURS, java.time.temporal.ChronoUnit.DAYS);
+
+            // Agrégats cloisonnés (entreprises + requêtes par catégorie + erreurs) : sommés par tenant réel.
             Flux<long[]> parDev = Flux.fromIterable(developpeurs)
                     .filter(d -> d.getKernelTenantId() != null)
                     .flatMap(d -> {
@@ -140,18 +155,24 @@ public class AdminService {
                         Mono<Long> nbKnl = dansTenant(tenant,
                                 requeteLogRepository.countByTenantIdAndCategorie(tenant, "KNL_CORE"))
                                 .defaultIfEmpty(0L);
-                        return Mono.zip(nbEnt, nbBc, nbKnl)
-                                .map(z -> new long[]{z.getT1(), z.getT2(), z.getT3()});
+                        Mono<Long> nbErreurs = dansTenant(tenant,
+                                requeteLogRepository.statsParTenant(tenant, depuisErreurs)
+                                        .map(RequeteLogRepository.StatsRow::nbErreurs))
+                                .defaultIfEmpty(0L);
+                        return Mono.zip(nbEnt, nbBc, nbKnl, nbErreurs)
+                                .map(z -> new long[]{z.getT1(), z.getT2(), z.getT3(),
+                                        z.getT4() != null ? z.getT4() : 0L});
                     });
 
-            return parDev.reduce(new long[]{0L, 0L, 0L}, (acc, v) -> {
+            return parDev.reduce(new long[]{0L, 0L, 0L, 0L}, (acc, v) -> {
                 acc[0] += v[0];
                 acc[1] += v[1];
                 acc[2] += v[2];
+                acc[3] += v[3];
                 return acc;
             }).map(sum -> new Overview(
                     developpeurs.size(), bloques, actives, revoquees,
-                    sum[0], sum[1], sum[2], repartition));
+                    sum[0], sum[1], sum[2], sum[3], repartition));
         });
     }
 
@@ -170,16 +191,44 @@ public class AdminService {
         Mono<Long> nbClesActives = apiKeyRepository
                 .countByDeveloperIdAndStatus(dev.getId(), ApiKeyEntity.STATUT_ACTIVE).defaultIfEmpty(0L);
         Mono<QuotaService.EtatQuota> quota = quotaService.etat(dev.getId(), dev.getPlan());
+        Mono<RequeteLogRepository.StatsRow> stats = tenant == null
+                ? Mono.just(new RequeteLogRepository.StatsRow(0L, null))
+                : dansTenant(tenant, requeteLogRepository.statsParTenant(
+                        tenant, Instant.now().minus(FENETRE_STATS_JOURS, java.time.temporal.ChronoUnit.DAYS)))
+                        .defaultIfEmpty(new RequeteLogRepository.StatsRow(0L, null));
 
-        return Mono.zip(nbEnt, nbClesActives, quota).map(t -> {
+        return Mono.zip(nbEnt, nbClesActives, quota, stats).map(t -> {
             QuotaService.EtatQuota q = t.getT3();
+            RequeteLogRepository.StatsRow s = t.getT4();
             double pct = q.illimite() || q.quota() <= 0 ? 0.0
                     : Math.min(100.0, (double) q.utilise() / (double) q.quota() * 100.0);
             return new DeveloperRow(
                     dev.getId(), dev.getEmail(), catalogue.normaliser(dev.getPlan()), dev.getStatus(),
                     dev.getCreatedAt(), t.getT1(), t.getT2(),
-                    q.utilise(), q.illimite() ? -1 : q.quota(), q.illimite(), pct);
+                    q.utilise(), q.illimite() ? -1 : q.quota(), q.illimite(), pct,
+                    s.nbErreurs() != null ? s.nbErreurs() : 0L, s.dureeMoyenneMs());
         });
+    }
+
+    // ─── Vue globale des applications de la plateforme ──────────────────────────
+
+    /** Toutes les applications (entreprises) enregistrées sur la plateforme, tous développeurs confondus. */
+    public Flux<ApplicationRow> applications() {
+        return developerRepository.findAll()
+                .filter(dev -> dev.getKernelTenantId() != null)
+                .flatMap(dev -> {
+                    UUID tenant = dev.getKernelTenantId();
+                    return dansTenant(tenant, entrepriseRepository.findAll()
+                            .flatMap(e -> entrepriseContratRepository.findById(e.getId())
+                                    .map(EntrepriseContratEntity::getCallbackUrl)
+                                    .defaultIfEmpty("")
+                                    .map(callbackUrl -> new ApplicationRow(e.getId(), e.getNom(),
+                                            e.getNumeroVersion(), e.getCycleVie(),
+                                            callbackUrl.isEmpty() ? null : callbackUrl,
+                                            dev.getId(), dev.getEmail())))
+                            .collectList())
+                            .flatMapMany(Flux::fromIterable);
+                });
     }
 
     // ─── Détail d'un développeur ────────────────────────────────────────────────
@@ -189,15 +238,20 @@ public class AdminService {
                 .switchIfEmpty(Mono.error(ProblemException.notFound("Développeur introuvable : " + developerId)))
                 .flatMap(dev -> {
                     UUID tenant = dev.getKernelTenantId();
-                    Mono<List<EntrepriseRow>> entreprises = tenant == null ? Mono.just(List.of())
+                    Mono<List<ApplicationDuDeveloperRow>> applications = tenant == null ? Mono.just(List.of())
                             : dansTenant(tenant, entrepriseRepository.findAll()
-                                    .map(e -> new EntrepriseRow(e.getId(), e.getNom(), e.getNumeroVersion(), e.getCycleVie()))
+                                    .flatMap(e -> entrepriseContratRepository.findById(e.getId())
+                                            .map(EntrepriseContratEntity::getCallbackUrl)
+                                            .defaultIfEmpty("")
+                                            .map(callbackUrl -> new ApplicationDuDeveloperRow(e.getId(), e.getNom(),
+                                                    e.getNumeroVersion(), e.getCycleVie(),
+                                                    callbackUrl.isEmpty() ? null : callbackUrl)))
                                     .collectList());
                     Mono<List<CleRow>> cles = apiKeyRepository.findByDeveloperId(developerId)
                             .map(c -> new CleRow(c.getId(), c.getName(), c.getStatus(), c.getEntrepriseId(),
                                     c.getCreatedAt(), c.getLastUsedAt()))
                             .collectList();
-                    return Mono.zip(ligneDeveloppeur(dev), entreprises, cles)
+                    return Mono.zip(ligneDeveloppeur(dev), applications, cles)
                             .map(t -> new DeveloperDetail(t.getT1(), t.getT2(), t.getT3()));
                 });
     }

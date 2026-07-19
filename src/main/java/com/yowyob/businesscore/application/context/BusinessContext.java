@@ -54,7 +54,7 @@ public record BusinessContext(
      */
     public void verifierAcces(UUID cibleBusinessId) {
         if (businessId != null && !businessId.equals(cibleBusinessId)) {
-            throw ProblemException.forbidden("Cette clé API est scopée à une autre entreprise.");
+            throw ProblemException.forbidden("Cette clé API est scopée à une autre application.");
         }
     }
 }

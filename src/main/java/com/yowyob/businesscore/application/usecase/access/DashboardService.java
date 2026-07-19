@@ -7,6 +7,7 @@ import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyUsageDailyRe
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseRepository;
+import com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogRepository;
 import com.yowyob.businesscore.adapter.out.persistence.trace.TraceOperationRepository;
 import com.yowyob.businesscore.application.billing.PlanCatalogue;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class DashboardService {
     private final EntrepriseRepository entrepriseRepository;
     private final TraceOperationRepository traceRepository;
     private final DeveloperAccountRepository developerRepository;
+    private final RequeteLogRepository requeteLogRepository;
     private final PlanCatalogue catalogue;
 
     public DashboardService(ApiKeyRepository apiKeyRepository,
@@ -53,6 +55,7 @@ public class DashboardService {
                             EntrepriseRepository entrepriseRepository,
                             TraceOperationRepository traceRepository,
                             DeveloperAccountRepository developerRepository,
+                            RequeteLogRepository requeteLogRepository,
                             PlanCatalogue catalogue) {
         this.apiKeyRepository = apiKeyRepository;
         this.usageRepository = usageRepository;
@@ -60,6 +63,7 @@ public class DashboardService {
         this.entrepriseRepository = entrepriseRepository;
         this.traceRepository = traceRepository;
         this.developerRepository = developerRepository;
+        this.requeteLogRepository = requeteLogRepository;
         this.catalogue = catalogue;
     }
 
@@ -88,6 +92,7 @@ public class DashboardService {
             List<PointJour> sparkline,
             long nombreEntreprises,
             long nombreClesActives,
+            Double tempsReponseMoyenMs,
             List<TopOperation> topOperations,
             List<TopEntreprise> topEntreprises,
             List<ActiviteItem> activiteRecente) {
@@ -162,6 +167,12 @@ public class DashboardService {
                 .activiteRecente(tenantId, ACTIVITE_LIMITE)
                 .map(r -> new ActiviteItem(r.entrepriseId(), r.entrepriseNom(), r.operationNom(), r.statut(), r.creeLe()))
                 .collectList();
+        // Temps de réponse moyen (bonus d'affichage) : une panne sur cet agrégat ne doit jamais casser
+        // le dashboard, cf. même principe que le compteur Redis live plus bas.
+        Mono<Double> tempsReponseMoyenMs = requeteLogRepository.statsParTenant(tenantId, depuisTrace)
+                .map(RequeteLogRepository.StatsRow::dureeMoyenneMs)
+                .onErrorResume(ex -> Mono.empty())
+                .defaultIfEmpty(null);
 
         return Mono.zip(
                 entrepriseRepository.countByTenantId(tenantId).defaultIfEmpty(0L),
@@ -170,18 +181,20 @@ public class DashboardService {
                 apiKeyRepository.findByDeveloperIdAndStatus(developerId, ApiKeyEntity.STATUT_ACTIVE)
                         .map(ApiKeyEntity::getId).collectList(),
                 topOperations, topEntreprises, activiteRecente
-        ).flatMap(t -> usageEtAssemblage(plan, t.getT1(), t.getT2(), t.getT3(), t.getT4(), t.getT5(), t.getT6()));
+        ).flatMap(t -> tempsReponseMoyenMs.flatMap(temps ->
+                usageEtAssemblage(plan, t.getT1(), t.getT2(), t.getT3(), temps, t.getT4(), t.getT5(), t.getT6())));
     }
 
     private Mono<DashboardData> usageEtAssemblage(String plan,
                                                   long nombreEntreprises, long nombreClesActives, List<UUID> ids,
+                                                  Double tempsReponseMoyenMs,
                                                   List<TopOperation> topOperations, List<TopEntreprise> topEntreprises,
                                                   List<ActiviteItem> activiteRecente) {
         LocalDate today = LocalDate.now();
         LocalDate depuis = today.minusDays(FENETRE_JOURS - 1L);
 
         if (ids.isEmpty()) {
-            return Mono.just(assembler(plan, nombreEntreprises, nombreClesActives,
+            return Mono.just(assembler(plan, nombreEntreprises, nombreClesActives, tempsReponseMoyenMs,
                     today, depuis, Map.of(), new long[]{0L, 0L},
                     topOperations, topEntreprises, activiteRecente));
         }
@@ -203,13 +216,13 @@ public class DashboardService {
                 });
 
         return Mono.zip(histo, live)
-                .map(t -> assembler(plan, nombreEntreprises, nombreClesActives,
+                .map(t -> assembler(plan, nombreEntreprises, nombreClesActives, tempsReponseMoyenMs,
                         today, depuis, t.getT1(), t.getT2(),
                         topOperations, topEntreprises, activiteRecente));
     }
 
     private DashboardData assembler(String plan,
-                                    long nombreEntreprises, long nombreClesActives,
+                                    long nombreEntreprises, long nombreClesActives, Double tempsReponseMoyenMs,
                                     LocalDate today, LocalDate depuis,
                                     Map<LocalDate, Long> histo, long[] live,
                                     List<TopOperation> topOperations, List<TopEntreprise> topEntreprises,
@@ -240,7 +253,7 @@ public class DashboardService {
         return new DashboardData(
                 planNorm, quotaAffiche, restant, bloque,
                 ceMois, totalAujourdhui, erreursAujourdhui, tauxErreur, sparkline,
-                nombreEntreprises, nombreClesActives,
+                nombreEntreprises, nombreClesActives, tempsReponseMoyenMs,
                 topOperations, topEntreprises, activiteRecente);
     }
 }

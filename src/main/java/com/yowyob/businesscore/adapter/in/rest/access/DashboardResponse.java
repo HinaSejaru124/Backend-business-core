@@ -19,12 +19,14 @@ public record DashboardResponse(
         @Schema(example = "3") long erreursAujourdhui,
         @Schema(description = "Taux d'erreur (0-1)", example = "0.034") double tauxErreur,
         List<PointJour> sparkline,
-        @Schema(description = "Nombre d'entreprises du tenant", example = "3") long nombreEntreprises,
-        @Schema(description = "Nombre de clés API actives, tous business confondus", example = "5")
+        @Schema(description = "Nombre d'applications du tenant", example = "3") long nombreApplications,
+        @Schema(description = "Nombre de clés API actives, toutes applications confondues", example = "5")
         long nombreClesActives,
+        @Schema(description = "Temps de réponse moyen en ms sur 30 jours (null si aucune requête)", example = "128.4")
+        Double tempsReponseMoyenMs,
         @Schema(description = "Opérations les plus exécutées sur 30 jours") List<TopOperation> topOperations,
-        @Schema(description = "Entreprises les plus actives sur 30 jours") List<TopEntreprise> topEntreprises,
-        @Schema(description = "Dernières exécutions d'opération, toutes entreprises confondues")
+        @Schema(description = "Applications les plus actives sur 30 jours") List<TopApplication> topApplications,
+        @Schema(description = "Dernières exécutions d'opération, toutes applications confondues")
         List<ActiviteItem> activiteRecente
 ) {
 
@@ -42,9 +44,9 @@ public record DashboardResponse(
     ) {
     }
 
-    @Schema(description = "Entreprise et son nombre d'exécutions")
-    public record TopEntreprise(
-            UUID entrepriseId,
+    @Schema(description = "Application et son nombre d'exécutions")
+    public record TopApplication(
+            UUID applicationId,
             @Schema(example = "Pharmacie Centrale") String nom,
             @Schema(example = "3000") long total
     ) {
@@ -52,8 +54,8 @@ public record DashboardResponse(
 
     @Schema(description = "Élément de l'activité récente")
     public record ActiviteItem(
-            UUID entrepriseId,
-            @Schema(example = "Pharmacie Centrale") String entrepriseNom,
+            UUID applicationId,
+            @Schema(example = "Pharmacie Centrale") String applicationNom,
             @Schema(example = "vente") String operationNom,
             @Schema(example = "COMPLETEE") String statut,
             Instant creeLe
@@ -67,8 +69,8 @@ public record DashboardResponse(
         List<TopOperation> topOperations = data.topOperations().stream()
                 .map(t -> new TopOperation(t.nom(), t.total()))
                 .toList();
-        List<TopEntreprise> topEntreprises = data.topEntreprises().stream()
-                .map(t -> new TopEntreprise(t.entrepriseId(), t.nom(), t.total()))
+        List<TopApplication> topApplications = data.topEntreprises().stream()
+                .map(t -> new TopApplication(t.entrepriseId(), t.nom(), t.total()))
                 .toList();
         List<ActiviteItem> activiteRecente = data.activiteRecente().stream()
                 .map(a -> new ActiviteItem(a.entrepriseId(), a.entrepriseNom(), a.operationNom(), a.statut(), a.creeLe()))
@@ -85,8 +87,9 @@ public record DashboardResponse(
                 sparkline,
                 data.nombreEntreprises(),
                 data.nombreClesActives(),
+                data.tempsReponseMoyenMs(),
                 topOperations,
-                topEntreprises,
+                topApplications,
                 activiteRecente);
     }
 }

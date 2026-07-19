@@ -27,15 +27,15 @@ public class SyncController {
         this.syncService = syncService;
     }
 
-    @Operation(summary = "Récupérer les changements de l'entreprise depuis une version",
+    @Operation(summary = "Récupérer les changements de l'application depuis une version",
             description = """
-                    Réservé à une clé API scopée à une entreprise (`X-BC-Client-Id`/`X-BC-Api-Key` émis avec
-                    `entrepriseId`) : l'entreprise ciblée est déduite de la clé, jamais d'un paramètre client.
+                    Réservé à une clé API scopée à une application (`X-BC-Client-Id`/`X-BC-Api-Key` émis avec
+                    `entrepriseId`) : l'application ciblée est déduite de la clé, jamais d'un paramètre client.
                     `since=0` (ou absent) rejoue tout le journal depuis le début (équivalent d'un snapshot
                     initial). Le terminal doit repasser `versionCourante` en `since` à l'appel suivant.""")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Changements depuis `since`"),
-            @ApiResponse(responseCode = "403", description = "Clé non scopée à une entreprise")
+            @ApiResponse(responseCode = "403", description = "Clé non scopée à une application")
     })
     @GetMapping
     public Mono<SyncResponse> consulter(
@@ -47,7 +47,7 @@ public class SyncController {
                 .flatMap(ctx -> {
                     if (ctx.businessId() == null) {
                         return Mono.error(ProblemException.forbidden(
-                                "Ce endpoint nécessite une clé API scopée à une entreprise "
+                                "Ce endpoint nécessite une clé API scopée à une application "
                                         + "(POST /v1/api-keys avec entrepriseId)."));
                     }
                     return syncService.consulter(ctx.businessId(), since, limit);

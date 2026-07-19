@@ -51,11 +51,21 @@ class TraceOperationTest {
     @DisplayName("compenser → COMPENSEE, mémorise la transaction annulée")
     void compenser_compensee() {
         TraceOperation trace = TraceOperation.demarrer(TENANT, ENTREPRISE, OPERATION, "vente", "cle-1", T0)
-                .compenser(TX, null, T1);
+                .compenser(TX, null, null, null, T1);
 
         assertThat(trace.statut()).isEqualTo(StatutTrace.COMPENSEE);
         assertThat(trace.transactionKernelId()).isEqualTo(TX);
         assertThat(trace.resoluLe()).isEqualTo(T1);
+    }
+
+    @Test
+    @DisplayName("compenser → mémorise le code et le message d'erreur pour l'application cliente")
+    void compenser_memorise_diagnostic() {
+        TraceOperation trace = TraceOperation.demarrer(TENANT, ENTREPRISE, OPERATION, "vente", "cle-1", T0)
+                .compenser(TX, null, "STOCK_INSUFFISANT", "Stock insuffisant pour l'offre X", T1);
+
+        assertThat(trace.codeErreur()).isEqualTo("STOCK_INSUFFISANT");
+        assertThat(trace.messageErreur()).isEqualTo("Stock insuffisant pour l'offre X");
     }
 
     @Test

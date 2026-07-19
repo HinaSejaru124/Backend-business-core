@@ -50,22 +50,22 @@ public class ActeurAuthController {
     @Operation(
             summary = "Inscription d'un acteur métier",
             description = """
-                    Un seul compte Yow, réutilisable dans N entreprises : tente d'abord une connexion avec
+                    Un seul compte Yow, réutilisable dans N applications : tente d'abord une connexion avec
                     les identifiants fournis (le compte existe peut-être déjà — développeur, ou déjà acteur
-                    d'une autre entreprise) ; ne crée un compte kernel (sign-up) que si la connexion échoue,
+                    d'une autre application) ; ne crée un compte kernel (sign-up) que si la connexion échoue,
                     c'est-à-dire pour une personne réellement nouvelle. Puis rattache (ou signale le
-                    rattachement déjà existant) au rôle métier demandé dans cette entreprise. Distincte de
+                    rattachement déjà existant) au rôle métier demandé dans cette application. Distincte de
                     `/v1/registration` (inscription développeur : provisionne un tenant, pas un rattachement
                     métier) et de `POST /v1/businesses/{id}/actors` (rattachement d'une identité déjà
                     connue, piloté par le développeur, sans création kernel). Réservée aux rôles OPERATEUR ;
                     un bénéficiaire n'a pas d'identifiants de connexion et reste rattaché par le développeur.
-                    Réservée au backend terminal de l'entreprise, identifié par sa clé Business Core
+                    Réservée au backend terminal de l'application, identifié par sa clé Business Core
                     (X-BC-Client-Id + X-BC-Api-Key).
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Acteur inscrit et rattaché"),
-            @ApiResponse(responseCode = "404", description = "Entreprise ou rôle introuvable"),
-            @ApiResponse(responseCode = "409", description = "Déjà rattaché activement à cette entreprise"),
+            @ApiResponse(responseCode = "404", description = "Application ou rôle introuvable"),
+            @ApiResponse(responseCode = "409", description = "Déjà rattaché activement à cette application"),
             @ApiResponse(responseCode = "422", description = "Rôle non OPERATEUR"),
             @ApiResponse(responseCode = "403", description = "Clé API absente/JWT utilisé"),
             @ApiResponse(responseCode = "502",
@@ -87,8 +87,8 @@ public class ActeurAuthController {
             summary = "Connexion d'un acteur métier",
             description = """
                     Authentifie l'acteur auprès du kernel (principal/mot de passe, jamais stockés) puis
-                    résout son rattachement à cette entreprise (rôle métier actif). Réservée au backend
-                    terminal de l'entreprise, identifié par sa propre clé Business Core (X-BC-Client-Id +
+                    résout son rattachement à cette application (rôle métier actif). Réservée au backend
+                    terminal de l'application, identifié par sa propre clé Business Core (X-BC-Client-Id +
                     X-BC-Api-Key) — un JWT développeur n'est volontairement pas accepté ici, pour qu'un seul
                     mode d'appel identifie sans ambiguïté qui déclenche une connexion acteur.
                     """)
@@ -115,7 +115,7 @@ public class ActeurAuthController {
     private void exigerCleEntreprise(BusinessContext ctx, UUID businessId) {
         if (ctx.businessId() == null) {
             throw ProblemException.forbidden(
-                    "Cette route n'accepte que la clé API de l'entreprise (X-BC-Client-Id + X-BC-Api-Key) "
+                    "Cette route n'accepte que la clé API de l'application (X-BC-Client-Id + X-BC-Api-Key) "
                             + "— pas de JWT développeur.");
         }
         ctx.verifierAcces(businessId);
@@ -125,7 +125,7 @@ public class ActeurAuthController {
             summary = "Contexte de l'acteur courant",
             description = """
                     Résout, à partir du JWT courant (claim kernel `actor`), l'acteur métier et le rôle actif
-                    de son porteur dans cette entreprise — l'équivalent de `/v1/auth/me` mais côté acteur.
+                    de son porteur dans cette application — l'équivalent de `/v1/auth/me` mais côté acteur.
                     """,
             security = {@SecurityRequirement(name = "bearerAuth")})
     @ApiResponses({
