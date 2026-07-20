@@ -8,7 +8,7 @@ import java.util.UUID;
 /**
  * Port de sortie — provisionnement et cycle de vie d'une organisation kernel.
  *
- * <p>Chaîne auto lors de {@code POST /v1/businesses} (sans {@code organizationId}) :
+ * <p>Chaîne auto lors de {@code POST /v1/applications} (sans {@code organizationId}) :
  * actor → organisation → approbation → services → agence.
  */
 public interface PersisterEntreprise {

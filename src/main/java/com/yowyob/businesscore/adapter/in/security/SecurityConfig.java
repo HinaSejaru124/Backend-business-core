@@ -33,12 +33,12 @@ import com.yowyob.businesscore.infrastructure.config.KernelProperties;
  * <p>Deux voies d'authentification, pour deux acteurs différents :
  * <ul>
  *   <li>JWT (Bearer) — voie principale, couvre <b>toutes</b> les routes protégées : gestion de la
- *       plateforme (types métier, entreprises, clés API, dashboard...). Consommée par le développeur
+ *       plateforme (types métier, applications, clés API, dashboard...). Consommée par le développeur
  *       humain via le front Business Core.</li>
  *   <li>Clé Business Core (en-têtes {@code X-BC-*}) — repli scopé aux routes d'usage <b>runtime</b>
- *       d'une entreprise, consommées par le backend terminal qui la représente (ex. PharmAPI) :
+ *       d'une application, consommées par le backend terminal qui la représente (ex. PharmAPI) :
  *       synchronisation ({@code /v1/sync}), exécution/consultation d'opérations, traces, transactions.
- *       Jamais la création/gestion d'entreprises, de clés ou de types métier — ça, c'est le développeur
+ *       Jamais la création/gestion d'applications, de clés ou de types métier — ça, c'est le développeur
  *       qui le fait, via JWT.</li>
  * </ul>
  * En succès, {@link BusinessContextWebFilter} propage le BusinessContext dans le Reactor Context.
@@ -64,18 +64,18 @@ private static final String[] ROUTES_PUBLIQUES = {
 };
 
     /**
-     * Surface consommée par un backend terminal (usage runtime d'une entreprise) : synchronisation,
+     * Surface consommée par un backend terminal (usage runtime d'une application) : synchronisation,
      * opérations, traces, transactions. Tenue en phase avec {@link com.yowyob.businesscore.infrastructure.config.AuthRouteClassifier}
      * (qui documente cette même surface dans Swagger).
      */
     private static final String[] ROUTES_INTEGRATION_TERMINAL = {
             "/v1/sync", "/v1/sync/**",
-            "/v1/businesses/me",
-            "/v1/businesses/*/actors:login", "/v1/businesses/*/actors:register",
-            "/v1/businesses/*/operations", "/v1/businesses/*/operations/**",
-            "/v1/businesses/*/traces", "/v1/businesses/*/traces/**",
-            "/v1/businesses/*/transactions", "/v1/businesses/*/transactions/**",
-            "/v1/businesses/*/orders/**",
+            "/v1/applications/me",
+            "/v1/applications/*/actors:login", "/v1/applications/*/actors:register",
+            "/v1/applications/*/operations", "/v1/applications/*/operations/**",
+            "/v1/applications/*/traces", "/v1/applications/*/traces/**",
+            "/v1/applications/*/transactions", "/v1/applications/*/transactions/**",
+            "/v1/applications/*/orders/**",
             // Ingestion de télémétrie (requêtes propres de l'app) — clé API. Exclue du comptage facturable
             // dans UsageTrackingWebFilter : reporter sa télémétrie ne consomme pas le quota.
             "/v1/telemetry/**"
@@ -97,8 +97,8 @@ private static final String[] ROUTES_PUBLIQUES = {
             com.yowyob.businesscore.adapter.in.rest.error.ProblemResponseWriter problemResponseWriter) {
 
         // Authentification par clé Business Core (X-BC-*) — réservée aux routes d'usage runtime d'une
-        // entreprise (cf. ROUTES_INTEGRATION_TERMINAL). Tout le reste (gestion des types métier, des
-        // entreprises, des clés, du dashboard...) est exclusivement JWT : ces routes appellent le kernel
+        // application (cf. ROUTES_INTEGRATION_TERMINAL). Tout le reste (gestion des types métier, des
+        // applications, des clés, du dashboard...) est exclusivement JWT : ces routes appellent le kernel
         // au nom d'un utilisateur et sont consommées par le front Business Core, jamais par un terminal.
         AuthenticationWebFilter apiKeyFilter = new AuthenticationWebFilter(authenticationManager);
         apiKeyFilter.setServerAuthenticationConverter(converter);

@@ -21,7 +21,7 @@ import java.util.UUID;
  * Aucune clé API n'est émise ici : les clés sont désormais scopées à une entreprise, qui n'existe pas
  * encore au moment de l'inscription. Le dev vérifie son email, se connecte via {@code POST /v1/auth/login}
  * (JWT — son identifiant stable est exposé par {@code GET /v1/auth/me}), crée une entreprise via
- * {@code POST /v1/businesses}, puis émet une clé API pour cette entreprise via {@code POST /v1/api-keys}.
+ * {@code POST /v1/applications}, puis émet une clé API pour cette application via {@code POST /v1/api-keys}.
  */
 @Service
 public class RegistrationService implements RegistrationUseCase {

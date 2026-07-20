@@ -9,13 +9,13 @@ import java.util.Set;
  *
  * <ul>
  *   <li>{@link AuthSurface#PUBLIC} — sans auth</li>
- *   <li>{@link AuthSurface#API_INTEGRATION} — usage runtime d'une entreprise par son backend terminal
+ *   <li>{@link AuthSurface#API_INTEGRATION} — usage runtime d'une application par son backend terminal
  *       (synchronisation, opérations, traces, transactions) : Bearer (kernel) <b>ou</b> headers
  *       {@code X-BC-*}, documentés comme deux voies possibles</li>
  *   <li>{@link AuthSurface#API_CLE_SEULE} — même surface terminal, mais où le Bearer est délibérément
  *       <b>refusé</b> à l'application (un seul mode d'appel, sans ambiguïté) : pas de cadenas Swagger,
  *       seuls les headers {@code X-BC-*} sont documentés, marqués requis</li>
- *   <li>{@link AuthSurface#CONSOLE_JWT} — gestion de la plateforme (types métier, entreprises, clés,
+ *   <li>{@link AuthSurface#CONSOLE_JWT} — gestion de la plateforme (types métier, applications, clés,
  *       dashboard...), consommée par le front Business Core : Bearer uniquement</li>
  * </ul>
  */
@@ -38,17 +38,17 @@ public final class AuthRouteClassifier {
 
     /** Bearer refusé à l'application (cf. {@code ActeurAuthController.exigerCleEntreprise}) — exact only. */
     private static final Set<String> API_CLE_SEULE_EXACT = Set.of(
-            "/v1/businesses/{businessId}/actors:login",
-            "/v1/businesses/{businessId}/actors:register"
+            "/v1/applications/{businessId}/actors:login",
+            "/v1/applications/{businessId}/actors:register"
     );
 
     private static final Set<String> API_INTEGRATION_PREFIXES = Set.of(
             "/v1/sync",
-            "/v1/businesses/me",
-            "/v1/businesses/{businessId}/operations",
-            "/v1/businesses/{businessId}/traces",
-            "/v1/businesses/{businessId}/transactions",
-            "/v1/businesses/{businessId}/orders"
+            "/v1/applications/me",
+            "/v1/applications/{businessId}/operations",
+            "/v1/applications/{businessId}/traces",
+            "/v1/applications/{businessId}/transactions",
+            "/v1/applications/{businessId}/orders"
     );
 
     private AuthRouteClassifier() {

@@ -19,7 +19,7 @@ import java.util.List;
 /**
  * Tableau de bord développeur — exclusivement JWT (cf. {@code SecurityConfig}). Statistiques agrégées
  * et publiques uniquement (nombre d'applications, de clés actives, usage) : jamais de secret ni de
- * détail de clé individuelle, voir {@code /v1/businesses/{id}/api-keys} pour la gestion d'une clé.
+ * détail de clé individuelle, voir {@code /v1/applications/{id}/api-keys} pour la gestion d'une clé.
  */
 @Tag(name = "Accès", description = "Tableau de bord développeur")
 @SecurityRequirement(name = "bearerAuth")

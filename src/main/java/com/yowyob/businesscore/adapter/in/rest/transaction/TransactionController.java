@@ -33,7 +33,7 @@ public class TransactionController {
     @Operation(summary = "Lister les transactions",
             description = "Historique paginé des transactions kernel de l'application (lecture à la demande).")
     @ApiResponse(responseCode = "200", description = "Page de transactions")
-    @GetMapping("/businesses/{businessId}/transactions")
+    @GetMapping("/applications/{businessId}/transactions")
     public Mono<Page<TransactionResponse>> lister(
             @PathVariable UUID businessId,
             @Parameter(description = "Numéro de page (0-based)", example = "0")
@@ -54,7 +54,7 @@ public class TransactionController {
             @ApiResponse(responseCode = "200", description = "La transaction"),
             @ApiResponse(responseCode = "404", description = "Transaction introuvable")
     })
-    @GetMapping("/businesses/{businessId}/transactions/{billId}")
+    @GetMapping("/applications/{businessId}/transactions/{billId}")
     public Mono<TransactionResponse> trouver(@PathVariable UUID businessId, @PathVariable UUID billId) {
         return BusinessContextHolder.currentContext()
                 .doOnNext(ctx -> ctx.verifierAcces(businessId))
@@ -68,7 +68,7 @@ public class TransactionController {
             @ApiResponse(responseCode = "200", description = "La commande"),
             @ApiResponse(responseCode = "404", description = "Commande introuvable")
     })
-    @GetMapping("/businesses/{businessId}/orders/{orderId}")
+    @GetMapping("/applications/{businessId}/orders/{orderId}")
     public Mono<TransactionResponse> trouverCommande(@PathVariable UUID businessId,
                                                      @PathVariable UUID orderId) {
         return BusinessContextHolder.currentContext()

@@ -28,7 +28,7 @@ import java.util.UUID;
 @Tag(name = "Applications", description = "Instances de métier (niveau Application)")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping("/v1/businesses/{businessId}/actors")
+@RequestMapping("/v1/applications/{businessId}/actors")
 public class ActeurMetierController {
 
     private final GestionActeurService gestion;

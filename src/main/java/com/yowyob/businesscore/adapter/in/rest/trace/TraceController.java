@@ -32,7 +32,7 @@ public class TraceController {
     @Operation(summary = "Lister les traces d'opération",
             description = "Historique des exécutions (synchrones et différées) pour l'application.")
     @ApiResponse(responseCode = "200", description = "Liste des traces")
-    @GetMapping("/businesses/{businessId}/traces")
+    @GetMapping("/applications/{businessId}/traces")
     public Flux<OperationTraceResponse> lister(@PathVariable UUID businessId) {
         return BusinessContextHolder.currentContext()
                 .doOnNext(ctx -> ctx.verifierAcces(businessId))
@@ -46,7 +46,7 @@ public class TraceController {
             @ApiResponse(responseCode = "200", description = "État de la trace"),
             @ApiResponse(responseCode = "404", description = "Trace introuvable")
     })
-    @GetMapping("/businesses/{businessId}/traces/{traceId}")
+    @GetMapping("/applications/{businessId}/traces/{traceId}")
     public Mono<OperationTraceResponse> trouver(
             @PathVariable UUID businessId,
             @Parameter(description = "Identifiant de trace renvoyé par l'exécution")

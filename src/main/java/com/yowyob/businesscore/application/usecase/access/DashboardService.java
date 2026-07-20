@@ -27,7 +27,7 @@ import java.util.UUID;
  * Agrège les données du tableau de bord développeur : plan &amp; quota, usage global (30 jours),
  * compteurs publics (entreprises, clés actives) et activité métier (top opérations/entreprises,
  * activité récente — depuis {@code trace_operation}). Aucune donnée secrète n'est exposée ici —
- * pour la gestion d'une clé précise (créer/renommer/révoquer), voir {@code /v1/businesses/{id}/api-keys}.
+ * pour la gestion d'une clé précise (créer/renommer/révoquer), voir {@code /v1/applications/{id}/api-keys}.
  *
  * <p>L'historique (jours passés) vient de la base ({@code api_key_usage_daily}) ; le jour courant vient
  * des compteurs Redis (source live), ce qui évite tout double comptage avec le flush. Le quota mensuel

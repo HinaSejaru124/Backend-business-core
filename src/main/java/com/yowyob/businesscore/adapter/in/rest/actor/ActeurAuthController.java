@@ -56,7 +56,7 @@ public class ActeurAuthController {
                     c'est-à-dire pour une personne réellement nouvelle. Puis rattache (ou signale le
                     rattachement déjà existant) au rôle métier demandé dans cette application. Distincte de
                     `/v1/registration` (inscription développeur : provisionne un tenant, pas un rattachement
-                    métier) et de `POST /v1/businesses/{id}/actors` (rattachement d'une identité déjà
+                    métier) et de `POST /v1/applications/{id}/actors` (rattachement d'une identité déjà
                     connue, piloté par le développeur, sans création kernel). Réservée aux rôles OPERATEUR ;
                     un bénéficiaire n'a pas d'identifiants de connexion et reste rattaché par le développeur.
                     Réservée au backend terminal de l'application, identifié par sa clé Business Core
@@ -71,7 +71,7 @@ public class ActeurAuthController {
             @ApiResponse(responseCode = "502",
                     description = "Compte créé mais identité non confirmée (vérification d'email en attente ?)")
     })
-    @PostMapping("/v1/businesses/{businessId}/actors:register")
+    @PostMapping("/v1/applications/{businessId}/actors:register")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<ActeurReponse> register(@PathVariable UUID businessId,
                                         @Valid @RequestBody InscrireActeurRequete requete) {
@@ -97,7 +97,7 @@ public class ActeurAuthController {
             @ApiResponse(responseCode = "401", description = "Identifiants invalides"),
             @ApiResponse(responseCode = "403", description = "Clé API absente/JWT utilisé, ou acteur non rattaché")
     })
-    @PostMapping("/v1/businesses/{businessId}/actors:login")
+    @PostMapping("/v1/applications/{businessId}/actors:login")
     @ResponseStatus(HttpStatus.OK)
     public Mono<ActeurLoginResponse> login(@PathVariable UUID businessId,
                                            @Valid @RequestBody LoginRequest requete) {
@@ -132,7 +132,7 @@ public class ActeurAuthController {
             @ApiResponse(responseCode = "200", description = "Contexte métier résolu"),
             @ApiResponse(responseCode = "403", description = "Jeton sans identité acteur, ou acteur non rattaché")
     })
-    @GetMapping("/v1/businesses/{businessId}/actors/me")
+    @GetMapping("/v1/applications/{businessId}/actors/me")
     public Mono<ActeurContexteReponse> moi(@PathVariable UUID businessId) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> authentifierActeur.moi(businessId, ctx.actorId())

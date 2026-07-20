@@ -27,7 +27,7 @@ import java.util.UUID;
 @Tag(name = "Fiche produit application", description = "Informations générales déclarées par le développeur (branding, identité)")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping({"/v1/businesses/{businessId}/profile", "/v1/applications/{businessId}/profile"})
+@RequestMapping("/v1/applications/{businessId}/profile")
 public class EntrepriseProfilController {
 
     private final EntrepriseProfilService profilService;

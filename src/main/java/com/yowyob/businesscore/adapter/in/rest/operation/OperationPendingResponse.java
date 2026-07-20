@@ -8,7 +8,7 @@ import java.util.UUID;
 public record OperationPendingResponse(
         @Schema(example = "EN_COURS") String statut,
         @Schema(example = "00000000-0000-0000-0000-000000000000") UUID traceId,
-        @Schema(description = "URL de suivi", example = "/v1/businesses/{businessId}/traces/{traceId}")
+        @Schema(description = "URL de suivi", example = "/v1/applications/{businessId}/traces/{traceId}")
         String suivi
 ) {
 }

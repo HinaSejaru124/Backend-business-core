@@ -30,7 +30,7 @@ import java.util.UUID;
 @Tag(name = "Configuration application", description = "Surcharge locale des paramètres de configuration (brique 7)")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping({"/v1/businesses/{businessId}/config", "/v1/applications/{businessId}/config"})
+@RequestMapping("/v1/applications/{businessId}/config")
 public class EntrepriseConfigController {
 
     private final EntrepriseService entrepriseService;

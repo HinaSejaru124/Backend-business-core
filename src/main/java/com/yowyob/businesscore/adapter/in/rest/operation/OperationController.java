@@ -78,7 +78,7 @@ public class OperationController {
     @Operation(summary = "Lister les opérations disponibles",
             description = "Opérations de la version épinglée à l'application.")
     @ApiResponse(responseCode = "200", description = "Liste des opérations")
-    @GetMapping("/businesses/{businessId}/operations")
+    @GetMapping("/applications/{businessId}/operations")
     public Flux<OperationResponse> lister(@PathVariable UUID businessId) {
         return BusinessContextHolder.currentContext()
                 .doOnNext(ctx -> ctx.verifierAcces(businessId))
@@ -91,7 +91,7 @@ public class OperationController {
             @ApiResponse(responseCode = "200", description = "Détail de l'opération"),
             @ApiResponse(responseCode = "404", description = "Opération introuvable")
     })
-    @GetMapping("/businesses/{businessId}/operations/{name}")
+    @GetMapping("/applications/{businessId}/operations/{name}")
     public Mono<OperationResponse> trouver(@PathVariable UUID businessId,
                                              @Parameter(example = "vente") @PathVariable String name) {
         return BusinessContextHolder.currentContext()
@@ -112,7 +112,7 @@ public class OperationController {
             @ApiResponse(responseCode = "202", description = "Opération acceptée, en cours"),
             @ApiResponse(responseCode = "422", description = "Règle métier non respectée")
     })
-    @PostMapping("/businesses/{businessId}/operations/{name}:execute")
+    @PostMapping("/applications/{businessId}/operations/{name}:execute")
     public Mono<ResponseEntity<Object>> executer(@PathVariable UUID businessId,
                                                  @Parameter(example = "vente") @PathVariable String name,
                                                  @Parameter(description = "Clé d'idempotence")
@@ -128,7 +128,7 @@ public class OperationController {
 
     private ResponseEntity<Object> versReponse(UUID businessId, ResultatExecution resultat) {
         if (resultat.estDiffere()) {
-            String suivi = "/v1/businesses/" + businessId + "/traces/" + resultat.traceId();
+            String suivi = "/v1/applications/" + businessId + "/traces/" + resultat.traceId();
             return ResponseEntity.accepted()
                     .body(new OperationPendingResponse("EN_COURS", resultat.traceId(), suivi));
         }

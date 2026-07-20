@@ -44,8 +44,8 @@ class BcClientIdHeaderOperationCustomizerTest {
     }
 
     @Test
-    @DisplayName("POST /v1/businesses : pas de headers BC (gestion réservée au JWT)")
-    void businesses_sansHeadersBc() throws Exception {
+    @DisplayName("POST /v1/applications : pas de headers BC (gestion réservée au JWT)")
+    void applications_sansHeadersBc() throws Exception {
         Operation operation = customize(
                 new EntrepriseController(null),
                 EntrepriseController.class.getDeclaredMethod("creer", CreerEntrepriseRequest.class));

@@ -19,10 +19,10 @@ class OperationRoutePatternTest {
     @DisplayName("le motif {name}:execute matche et extrait le nom d'opération")
     void motif_execute_matche() {
         PathPatternParser parser = new PathPatternParser();
-        PathPattern pattern = parser.parse("/v1/businesses/{businessId}/operations/{name}:execute");
+        PathPattern pattern = parser.parse("/v1/applications/{businessId}/operations/{name}:execute");
 
         PathContainer chemin = PathContainer.parsePath(
-                "/v1/businesses/3f/operations/vente:execute");
+                "/v1/applications/3f/operations/vente:execute");
 
         assertThat(pattern.matches(chemin)).isTrue();
         PathPattern.PathMatchInfo info = pattern.matchAndExtract(chemin);

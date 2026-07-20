@@ -18,7 +18,7 @@ import java.util.UUID;
  * du principal/mot de passe au kernel, exactement comme pour un développeur ({@code AuthentificationService})
  * — aucune identité ni mot de passe n'est jamais stocké ici. Business Core répond à « que peux-tu faire
  * dans ce Business ? » : une fois le JWT obtenu, on résout l'{@link ActeurMetier} (et son
- * {@link RoleMetier}) déjà déclaré via {@code POST /v1/businesses/{id}/actors} — cette brique existe
+ * {@link RoleMetier}) déjà déclaré via {@code POST /v1/applications/{id}/actors} — cette brique existe
  * et n'est pas dupliquée ici, seulement consultée par {@code acteurKernelId}.
  *
  * <p>Un acteur kernel valide mais non rattaché à l'entreprise ciblée (jamais rattaché, ou détaché) est

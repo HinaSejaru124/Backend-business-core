@@ -26,22 +26,15 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 /**
- * Gestion des applications (entreprises) — JWT uniquement (cf. {@code SecurityConfig}), à l'exception de
- * {@code GET /v1/businesses/me} qui est le point d'entrée réservé aux backends terminaux (clé Business
+ * Gestion des applications — JWT uniquement (cf. {@code SecurityConfig}), à l'exception de
+ * {@code GET /v1/applications/me} qui est le point d'entrée réservé aux backends terminaux (clé Business
  * Core) : ces routes de gestion appellent le kernel au nom d'un développeur et sont destinées au front
  * Business Core, jamais consommées directement par un backend métier tiers.
- *
- * <p>{@code /v1/applications} est un alias de façade de {@code /v1/businesses} (même controller, même
- * comportement) — <b>sauf</b> pour {@code /me} : {@code ROUTES_INTEGRATION_TERMINAL}
- * ({@code SecurityConfig}) ne liste que {@code /v1/businesses/me} pour l'authentification par clé API ;
- * {@code /v1/applications/me} exige donc un JWT, contrairement à son équivalent {@code /v1/businesses/me}.
- * Cette route runtime n'a volontairement pas été dupliquée dans la liste blanche (périmètre de cette
- * passe limité aux routes de gestion développeur, cf. document d'impact).
  */
 @Tag(name = "Applications", description = "Instances de métier épinglées à une version de Type")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping({"/v1/businesses", "/v1/applications"})
+@RequestMapping("/v1/applications")
 public class EntrepriseController {
 
     private final EntrepriseService entrepriseService;

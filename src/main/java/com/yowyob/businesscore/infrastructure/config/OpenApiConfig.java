@@ -25,7 +25,7 @@ import org.springframework.context.annotation.Configuration;
                         - **JWT Bearer** (`Authorize`, via `POST /v1/auth/login`) : obligatoire sur toutes les
                           routes protégées qui appellent le kernel (applications, opérations, etc.).
                         - **Headers `X-BC-*`** (Try it out) : identifient la clé API du développeur sur les
-                          routes d'intégration (`/v1/business-types`, `/v1/businesses`, opérations…).
+                          routes d'intégration (`/v1/business-types`, `/v1/applications`, opérations…).
                           Recommandés pour le backend du dev (suivi d'usage, `X-BC-On-Behalf-Of`).
                         - **Console développeur** (`/v1/api-keys`, `/v1/dashboard`, `/v1/auth/me`) : JWT seul.
 

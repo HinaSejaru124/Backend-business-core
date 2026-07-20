@@ -113,7 +113,7 @@ public class RegleMetierController {
             @ApiResponse(responseCode = "201", description = "Règle locale créée"),
             @ApiResponse(responseCode = "404", description = "Application introuvable")
     })
-    @PostMapping("/businesses/{businessId}/rules")
+    @PostMapping("/applications/{businessId}/rules")
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<RegleMetierResponse> creerRegleLocale(
             @PathVariable UUID businessId,
@@ -127,7 +127,7 @@ public class RegleMetierController {
 
     @Operation(summary = "Lister les règles locales", tags = {"Applications"})
     @ApiResponse(responseCode = "200", description = "Liste des règles de l'application")
-    @GetMapping("/businesses/{businessId}/rules")
+    @GetMapping("/applications/{businessId}/rules")
     public Flux<RegleMetierResponse> listerReglesLocales(@PathVariable UUID businessId) {
         return gestion.listerParEntreprise(businessId).map(RegleMetierResponse::de);
     }
@@ -137,7 +137,7 @@ public class RegleMetierController {
             @ApiResponse(responseCode = "200", description = "La règle locale"),
             @ApiResponse(responseCode = "404", description = "Règle introuvable")
     })
-    @GetMapping("/businesses/{businessId}/rules/{ruleId}")
+    @GetMapping("/applications/{businessId}/rules/{ruleId}")
     public Mono<RegleMetierResponse> trouverRegleLocale(
             @PathVariable UUID businessId, @PathVariable UUID ruleId) {
         return gestion.trouverLocale(businessId, ruleId).map(RegleMetierResponse::de);
@@ -148,7 +148,7 @@ public class RegleMetierController {
             @ApiResponse(responseCode = "200", description = "Règle locale mise à jour"),
             @ApiResponse(responseCode = "404", description = "Règle introuvable")
     })
-    @PutMapping("/businesses/{businessId}/rules/{ruleId}")
+    @PutMapping("/applications/{businessId}/rules/{ruleId}")
     public Mono<RegleMetierResponse> modifierRegleLocale(
             @PathVariable UUID businessId, @PathVariable UUID ruleId,
             @Valid @RequestBody CreerRegleRequest body) {
@@ -162,7 +162,7 @@ public class RegleMetierController {
             @ApiResponse(responseCode = "204", description = "Règle locale supprimée"),
             @ApiResponse(responseCode = "404", description = "Règle introuvable")
     })
-    @DeleteMapping("/businesses/{businessId}/rules/{ruleId}")
+    @DeleteMapping("/applications/{businessId}/rules/{ruleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> supprimerRegleLocale(
             @PathVariable UUID businessId, @PathVariable UUID ruleId) {

@@ -25,7 +25,7 @@ import java.util.UUID;
 @Tag(name = "Contrat application", description = "Paramètres de communication déclarés entre l'application et Business Core")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping({"/v1/businesses/{businessId}/contract", "/v1/applications/{businessId}/contract"})
+@RequestMapping("/v1/applications/{businessId}/contract")
 public class EntrepriseContratController {
 
     private final EntrepriseContratService contratService;

@@ -15,7 +15,7 @@ class ApiKeyAuthenticationConverterTest {
     @DisplayName("Bearer présent → ne tente pas la clé BC (JWT prioritaire)")
     void bearer_prioritaire() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/v1/businesses")
+                MockServerHttpRequest.get("/v1/applications")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer eyJhbGciOiJSUzI1NiJ9.test")
                         .header(ApiKeyAuthenticationConverter.HEADER_CLIENT_ID, "bck_x")
                         .header(ApiKeyAuthenticationConverter.HEADER_API_KEY, "secret"));
@@ -27,7 +27,7 @@ class ApiKeyAuthenticationConverterTest {
     @DisplayName("clé BC seule → tente l'authentification par clé")
     void cle_bc_seule() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/v1/businesses")
+                MockServerHttpRequest.get("/v1/applications")
                         .header(ApiKeyAuthenticationConverter.HEADER_CLIENT_ID, "bck_x")
                         .header(ApiKeyAuthenticationConverter.HEADER_API_KEY, "secret"));
 

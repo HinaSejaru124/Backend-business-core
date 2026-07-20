@@ -37,7 +37,7 @@ import java.util.UUID;
 @Tag(name = "Applications", description = "Clé API d'une application (au plus une active)")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping({"/v1/businesses/{businessId}", "/v1/applications/{businessId}"})
+@RequestMapping("/v1/applications/{businessId}")
 public class BusinessApiKeyController {
 
     private final ApiKeyService apiKeyService;
