@@ -20,7 +20,7 @@ organisations[] (déjà dans la réponse de login — LoginResponse.organization
 Business Core
     │
     ▼
-POST /v1/applications (alias de /v1/businesses)
+POST /v1/applications
     organizationId optionnel
     │
     ├── organizationId fourni  → rattachement à l'organisation Kernel existante
@@ -38,11 +38,13 @@ Application
 
 ## 2. Ce qui a été renommé (façade uniquement)
 
-- **Endpoints** : `/v1/businesses/**` reste l'endpoint canonique ; `/v1/applications/**` a été ajouté
-  en alias sur les 6 controllers de **gestion développeur** (`EntrepriseController`,
-  `BusinessApiKeyController`, `EntrepriseContratController`, `EntrepriseConfigController`,
-  `EntrepriseProfilController`) via `@RequestMapping({"/v1/businesses", "/v1/applications"})`. Les deux
-  chemins pointent vers le même controller, donc un comportement strictement identique.
+- **Endpoints** : `/v1/businesses/**` a été **entièrement retiré** — `/v1/applications/**` est l'unique
+  chemin canonique, pour tous les controllers (gestion développeur ET routes runtime backend-terminal :
+  `operations`, `traces`, `transactions`, `actors:login`/`:register`, `orders`, `sync`). La liste blanche
+  de sécurité (`SecurityConfig.ROUTES_INTEGRATION_TERMINAL`) et le classifieur Swagger
+  (`AuthRouteClassifier`) ont été mis à jour en cohérence — aucun mélange de chemins ne subsiste. (Une
+  première passe avait laissé un alias double `/v1/businesses` + `/v1/applications` uniquement sur les
+  routes de gestion développeur ; ça créait un Swagger incohérent et a été corrigé.)
 - **Swagger** : tags (`@Tag`), résumés et descriptions d'opérations (`@Operation`), descriptions de
   schémas (`@Schema`) — "Entreprise(s)" → "Application(s)" partout où le mot désignait réellement une
   application cliente.
@@ -81,12 +83,12 @@ Application
 
 - **`EntrepriseProfil`** (fiche produit) : nouvelle table `entreprise_profil` (RLS conforme au socle),
   port `DepotEntrepriseProfil`, service `EntrepriseProfilService`, endpoints
-  `GET/PUT /v1/businesses/{id}/profile` (+ alias `/v1/applications/{id}/profile`). Champs : description,
+  `GET/PUT /v1/applications/{id}/profile`. Champs : description,
   logoUrl, couleur (validée `#RRGGBB`), supportEmail (validé par regex), siteWebUrl,
   `EnvironnementApplication` (DEVELOPPEMENT/TEST/PRODUCTION). Distincte du contrat technique
   (`EntrepriseContrat`, déjà livré en session précédente : callback/success/error/cancel URLs + clé
   publique) — deux responsabilités séparées, comme recommandé.
-- **`organizationId` optionnel sur `POST /v1/businesses`** (et son alias `/v1/applications`) : nouveau
+- **`organizationId` optionnel sur `POST /v1/applications`** : nouveau
   paramètre nullable dans `CreerEntrepriseRequest`. Fourni → `EntrepriseService.rattacherOrganisationExistante`
   résout uniquement le business actor courant (`PersisterEntreprise.resoudreBusinessActorCourant`,
   nouvelle méthode de port) et l'agence principale de l'organisation ciblée
@@ -110,7 +112,7 @@ Inspection exhaustive de `docs/kernel1-api.json` (spec OpenAPI réelle du Kernel
 | **Rejoindre une organisation existante (second développeur)** | **Non — aucun endpoint équivalent trouvé** dans tout le spec |
 | Concept "Application" (au sens développeur/organisation) | **Non — n'existe pas.** `ClientApplication` (`/api/client-applications`) désigne l'entité OAuth qui représente Business Core lui-même comme client machine du Kernel, pas l'application d'un développeur |
 
-**Conséquence directe** : le paramètre `organizationId` de `POST /v1/businesses` permet de préparer le
+**Conséquence directe** : le paramètre `organizationId` de `POST /v1/applications` permet de préparer le
 rattachement d'une Application à une organisation existante, mais **seulement pour le développeur qui a
 déjà accès à cette organisation** (aucune vérification de propriété supplémentaire n'a été ajoutée, car
 il n'y a rien côté Kernel à vérifier au-delà de ce qui existe déjà). Tant que le Kernel n'expose pas de
