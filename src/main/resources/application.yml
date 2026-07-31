@@ -81,6 +81,8 @@ businesscore:
   payment:
     client-id: ${BC_PAYMENT_CLIENT_ID:business-core}
     provider: ${BC_PAYMENT_PROVIDER:MYCOOLPAY}
+    # Fournisseur utilisé quand le développeur règle par carte (la passerelle expose MYCOOLPAY et STRIPE).
+    provider-carte: ${BC_PAYMENT_PROVIDER_CARTE:STRIPE}
     method: ${BC_PAYMENT_METHOD:MOBILE_MONEY}
     currency: ${BC_PAYMENT_CURRENCY:XAF}
     service-code-prefix: ${BC_PAYMENT_SERVICE_CODE_PREFIX:PLAN_UPGRADE_}

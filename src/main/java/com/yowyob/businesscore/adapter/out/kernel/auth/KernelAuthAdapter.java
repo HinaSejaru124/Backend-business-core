@@ -292,7 +292,7 @@ private Mono<ResultatLogin> versResultat(Map<?, ?> corps) {
                 corps.put("password", password);
                 corps.put("firstName", firstName);
                 corps.put("lastName", lastName);
-                corps.put("username", principal);     // username = email par défaut
+                corps.put("username", identifiantDepuisEmail(principal));
                 // corps.put("accountType", "BUSINESS");
                 // corps.put("businessType", "RETAIL"); 
         return kernelWebClient.post()
@@ -324,6 +324,32 @@ private Mono<ResultatLogin> versResultat(Map<?, ?> corps) {
     }
 
     
+    /**
+     * Construit le nom d'utilisateur transmis à l'inscription.
+     *
+     * <p>Le kernel <b>refuse</b> un {@code username} contenant une adresse e-mail : envoyer l'e-mail
+     * complet renvoyait systématiquement {@code 400 Validation failure}, rendant toute création de
+     * compte impossible (vérifié le 31/07/2026 — même charge utile avec la seule partie locale :
+     * {@code 201 Created}). On dérive donc un identifiant alphanumérique de la partie locale, suffixé
+     * pour éviter les collisions entre deux adresses de domaines différents (jean@a.com / jean@b.com).
+     */
+    static String identifiantDepuisEmail(String email) {
+        String base = email == null ? "" : email;
+        int arobase = base.indexOf('@');
+        if (arobase > 0) {
+            base = base.substring(0, arobase);
+        }
+        base = base.replaceAll("[^A-Za-z0-9]", "").toLowerCase(java.util.Locale.ROOT);
+        if (base.isBlank()) {
+            base = "dev";
+        }
+        if (base.length() > 24) {
+            base = base.substring(0, 24);
+        }
+        String suffixe = Integer.toHexString(java.util.Objects.hashCode(email) & 0xFFFFF);
+        return base + suffixe;
+    }
+
     private SignUpResult versSignUpResult(Map<?, ?> corps) {
         Object charge = corps.containsKey("data") ? corps.get("data") : corps;
         Map<?, ?> data = charge instanceof Map<?, ?> m ? m : Map.of();

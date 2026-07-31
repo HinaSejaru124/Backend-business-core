@@ -22,6 +22,18 @@ services:
       BC_ENCRYPTION_KEY: ${BC_ENCRYPTION_KEY}
       BC_CORS_ORIGINS: ${BC_CORS_ORIGINS:-*}
       BC_ADMIN_EMAILS: ${BC_ADMIN_EMAILS:-}
+      # Paiement (changement de forfait). BC_PAYMENT_CALLBACK_BASE_URL DOIT être une URL publique :
+      # la passerelle rejette explicitement toute adresse locale ou privée
+      # (« callbackUrl must not target a local or private host »). Sans cette ligne, la variable posée
+      # dans le .env du serveur n'atteignait pas le conteneur et le défaut localhost s'appliquait,
+      # rendant tout changement de forfait impossible en production.
+      BC_PAYMENT_CALLBACK_BASE_URL: ${BC_PAYMENT_CALLBACK_BASE_URL:-}
+      BC_PAYMENT_CLIENT_ID: ${BC_PAYMENT_CLIENT_ID:-business-core}
+      BC_PAYMENT_PROVIDER: ${BC_PAYMENT_PROVIDER:-MYCOOLPAY}
+      BC_PAYMENT_PROVIDER_CARTE: ${BC_PAYMENT_PROVIDER_CARTE:-STRIPE}
+      BC_PAYMENT_METHOD: ${BC_PAYMENT_METHOD:-MOBILE_MONEY}
+      BC_PAYMENT_CURRENCY: ${BC_PAYMENT_CURRENCY:-XAF}
+      BC_PAYMENT_SERVICE_CODE_PREFIX: ${BC_PAYMENT_SERVICE_CODE_PREFIX:-PLAN_UPGRADE_}
     volumes:
       - bc-pgdata:/var/lib/postgresql/data
       - bc-kafkadata:/var/lib/kafka/data
