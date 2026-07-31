@@ -27,7 +27,9 @@ public record DashboardResponse(
         @Schema(description = "Opérations les plus exécutées sur 30 jours") List<TopOperation> topOperations,
         @Schema(description = "Applications les plus actives sur 30 jours") List<TopApplication> topApplications,
         @Schema(description = "Dernières exécutions d'opération, toutes applications confondues")
-        List<ActiviteItem> activiteRecente
+        List<ActiviteItem> activiteRecente,
+        @Schema(description = "Nombre de clés API révoquées, toutes applications confondues", example = "2")
+        long nombreClesRevoquees
 ) {
 
     @Schema(description = "Point de la courbe d'usage")
@@ -90,6 +92,7 @@ public record DashboardResponse(
                 data.tempsReponseMoyenMs(),
                 topOperations,
                 topApplications,
-                activiteRecente);
+                activiteRecente,
+                data.nombreClesRevoquees());
     }
 }

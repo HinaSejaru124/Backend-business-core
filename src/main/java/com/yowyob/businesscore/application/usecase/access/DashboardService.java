@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -95,14 +96,33 @@ public class DashboardService {
             Double tempsReponseMoyenMs,
             List<TopOperation> topOperations,
             List<TopEntreprise> topEntreprises,
-            List<ActiviteItem> activiteRecente) {
+            List<ActiviteItem> activiteRecente,
+            /** Clés révoquées du développeur — indicateur du tableau de bord. */
+            long nombreClesRevoquees) {
+
+        /**
+         * Copie enrichie du nombre de clés révoquées. Ce compteur est agrégé à part (une simple requête
+         * de comptage) plutôt que passé à travers toute la chaîne d'assemblage : cela évite de modifier
+         * une demi-douzaine de signatures internes pour une donnée indépendante du reste.
+         */
+        DashboardData avecClesRevoquees(long revoquees) {
+            return new DashboardData(plan, quotaMensuel, requetesRestantes, bloque, requetesCeMois,
+                    requetesAujourdhui, erreursAujourdhui, tauxErreur, sparkline, nombreEntreprises,
+                    nombreClesActives, tempsReponseMoyenMs, topOperations, topEntreprises,
+                    activiteRecente, revoquees);
+        }
     }
 
     public Mono<DashboardData> pour(UUID developerId, UUID tenantId) {
+        Mono<Long> clesRevoquees = apiKeyRepository
+                .countByDeveloperIdAndStatus(developerId, ApiKeyEntity.STATUT_REVOKED)
+                .defaultIfEmpty(0L);
+
         return developerRepository.findById(developerId)
                 .map(DeveloperAccountEntity::getPlan)
                 .defaultIfEmpty(PlanCatalogue.PLAN_DEFAUT)
-                .flatMap(plan -> donnees(developerId, tenantId, plan));
+                .flatMap(plan -> donnees(developerId, tenantId, plan))
+                .zipWith(clesRevoquees, DashboardData::avecClesRevoquees);
     }
 
     /**
@@ -168,11 +188,14 @@ public class DashboardService {
                 .map(r -> new ActiviteItem(r.entrepriseId(), r.entrepriseNom(), r.operationNom(), r.statut(), r.creeLe()))
                 .collectList();
         // Temps de réponse moyen (bonus d'affichage) : une panne sur cet agrégat ne doit jamais casser
-        // le dashboard, cf. même principe que le compteur Redis live plus bas.
-        Mono<Double> tempsReponseMoyenMs = requeteLogRepository.statsParTenant(tenantId, depuisTrace)
-                .map(RequeteLogRepository.StatsRow::dureeMoyenneMs)
+        // le dashboard, cf. même principe que le compteur Redis live plus bas. On porte la valeur dans un
+        // Optional : Reactor interdit un null dans un Mono (aussi bien un onNext(null) que
+        // defaultIfEmpty(null)) — c'est ce qui provoquait une NullPointerException systématique ici, donc
+        // un 500 sur tout le dashboard quand la moyenne était nulle (aucune requête sur la fenêtre) ou vide.
+        Mono<Optional<Double>> tempsReponseMoyenMs = requeteLogRepository.statsParTenant(tenantId, depuisTrace)
+                .map(row -> Optional.ofNullable(row.dureeMoyenneMs()))
                 .onErrorResume(ex -> Mono.empty())
-                .defaultIfEmpty(null);
+                .defaultIfEmpty(Optional.empty());
 
         return Mono.zip(
                 entrepriseRepository.countByTenantId(tenantId).defaultIfEmpty(0L),
@@ -182,7 +205,7 @@ public class DashboardService {
                         .map(ApiKeyEntity::getId).collectList(),
                 topOperations, topEntreprises, activiteRecente
         ).flatMap(t -> tempsReponseMoyenMs.flatMap(temps ->
-                usageEtAssemblage(plan, t.getT1(), t.getT2(), t.getT3(), temps, t.getT4(), t.getT5(), t.getT6())));
+                usageEtAssemblage(plan, t.getT1(), t.getT2(), t.getT3(), temps.orElse(null), t.getT4(), t.getT5(), t.getT6())));
     }
 
     private Mono<DashboardData> usageEtAssemblage(String plan,
@@ -254,6 +277,6 @@ public class DashboardService {
                 planNorm, quotaAffiche, restant, bloque,
                 ceMois, totalAujourdhui, erreursAujourdhui, tauxErreur, sparkline,
                 nombreEntreprises, nombreClesActives, tempsReponseMoyenMs,
-                topOperations, topEntreprises, activiteRecente);
+                topOperations, topEntreprises, activiteRecente, 0L);
     }
 }

@@ -31,4 +31,5 @@
     <include file="db/changelog/features/contrat.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/features/callback.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/features/profil.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/features/enterprise-datafix-devs-existants.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

@@ -44,6 +44,14 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
 
     private String plan;
 
+    /** Organisation kernel de l'entreprise du développeur — clé stable, une seule par développeur. */
+    @Column("entreprise_organization_id")
+    private UUID entrepriseOrganizationId;
+
+    /** Nom affiché de l'entreprise (navbar, console). */
+    @Column("entreprise_nom")
+    private String entrepriseNom;
+
     private String status;
 
     @Column("created_at")
@@ -106,6 +114,14 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
         return plan;
     }
 
+    public UUID getEntrepriseOrganizationId() {
+        return entrepriseOrganizationId;
+    }
+
+    public String getEntrepriseNom() {
+        return entrepriseNom;
+    }
+
     public String getStatus() {
         return status;
     }
@@ -140,6 +156,14 @@ public class DeveloperAccountEntity implements Persistable<UUID> {
 
     public void setPlan(String plan) {
         this.plan = plan;
+    }
+
+    public void setEntrepriseOrganizationId(UUID entrepriseOrganizationId) {
+        this.entrepriseOrganizationId = entrepriseOrganizationId;
+    }
+
+    public void setEntrepriseNom(String entrepriseNom) {
+        this.entrepriseNom = entrepriseNom;
     }
 
     public void setStatus(String status) {

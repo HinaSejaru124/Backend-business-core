@@ -52,15 +52,16 @@ public class TelemetryController {
     @PostMapping("/requests")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public Mono<Void> ingerer(@Valid @RequestBody LotRequetes lot) {
-        return BusinessContextHolder.currentTenantId()
-                .flatMap(opt -> opt.map(Mono::just).orElseGet(Mono::empty))
-                .doOnNext(tenant -> {
+        return BusinessContextHolder.currentContext()
+                .doOnNext(ctx -> {
                     for (RequeteRapportee r : lot.requetes()) {
                         if (r == null || r.methode() == null || r.endpoint() == null) {
                             continue;
                         }
+                        // Requêtes propres de l'app (télémétrie) : attribuées à l'application (businessId de
+                        // la clé API), catégorie APP, jamais facturables.
                         requeteLogWriter.enregistrerAsync(
-                                tenant, CATEGORIE_APP,
+                                ctx.tenantId(), ctx.businessId(), CATEGORIE_APP,
                                 r.methode(), r.endpoint(),
                                 r.statutHttp() != null ? r.statutHttp() : 0,
                                 r.dureeMs() != null ? r.dureeMs() : 0L,

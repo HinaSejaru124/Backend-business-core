@@ -46,7 +46,8 @@ public class PlanPricingStore implements ApplicationRunner {
         try {
             repository.findAll()
                     .doOnNext(e -> cache.put(normaliser(e.getCode()),
-                            new PlanDef(e.getQuotaMensuel(), e.getPrixMensuel(), e.getDevise())))
+                            new PlanDef(e.getQuotaMensuel(), e.getPrixMensuel(), e.getDevise(),
+                                    e.getApplicationsMax(), e.getLibelle())))
                     .then()
                     .block();
         } catch (RuntimeException ex) {
@@ -61,14 +62,23 @@ public class PlanPricingStore implements ApplicationRunner {
     }
 
     /** Définit/écrase la tarification d'un plan : met à jour la mémoire ET persiste en base. */
-    public Mono<Void> definir(String code, long quotaMensuel, long prixMensuel, String devise) {
+    public Mono<Void> definir(String code, long quotaMensuel, long prixMensuel, String devise,
+                              long applicationsMax, String libelle) {
         String norm = normaliser(code);
         String dev = (devise == null || devise.isBlank()) ? "XAF" : devise.trim().toUpperCase(Locale.ROOT);
-        cache.put(norm, new PlanDef(quotaMensuel, prixMensuel, dev));
+        String lib = (libelle == null || libelle.isBlank()) ? null : libelle.trim();
+        cache.put(norm, new PlanDef(quotaMensuel, prixMensuel, dev, applicationsMax, lib));
         return repository.existsById(norm)
                 .flatMap(existe -> repository.save(
-                        PlanPricingEntity.de(norm, quotaMensuel, prixMensuel, dev, !existe)))
+                        PlanPricingEntity.de(norm, quotaMensuel, prixMensuel, dev, applicationsMax, lib, !existe)))
                 .then();
+    }
+
+    /** Supprime définitivement un forfait : retire de la mémoire ET de la base. */
+    public Mono<Void> supprimer(String code) {
+        String norm = normaliser(code);
+        cache.remove(norm);
+        return repository.deleteById(norm).then();
     }
 
     private static String normaliser(String code) {

@@ -2,8 +2,12 @@ package com.yowyob.businesscore.application.usecase.auth;
 
 import org.springframework.stereotype.Service;
 
+import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
+import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.security.JwtClaims;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import com.yowyob.businesscore.domain.port.out.AuthentifierUtilisateur;
 import com.yowyob.businesscore.domain.port.out.ResultatLogin;
 import com.yowyob.businesscore.domain.port.out.SignUpResult;
@@ -58,7 +62,29 @@ public class AuthentificationService {
                 .switchIfEmpty(Mono.defer(() -> kernelUserId == null
                         ? Mono.empty()
                         : developerRepository.findByKernelUserId(kernelUserId)))
+                // Aucun compte local : on le crée DÈS la connexion avec l'e-mail du principal. Le JWT kernel
+                // ne porte pas toujours l'e-mail (ex. compte créé par username, cas de l'admin) ; sans ceci
+                // le compte serait provisionné plus tard avec un e-mail vide → l'accès admin (basé sur
+                // l'e-mail) échouerait à la 1re connexion. Garantit le bon comportement même en déploiement neuf.
+                .switchIfEmpty(Mono.defer(() -> {
+                    if (kernelUserId == null && tenantFinal == null) {
+                        return Mono.empty();
+                    }
+                    DeveloperAccountEntity nouveau = DeveloperAccountEntity.nouveau(
+                            UUID.randomUUID(), email, tenantFinal, kernelUserId, null, null, "FREE");
+                    return developerRepository.save(nouveau)
+                            .onErrorResume(DataIntegrityViolationException.class, ex -> kernelUserId == null
+                                    ? Mono.empty()
+                                    : developerRepository.findByKernelUserId(kernelUserId));
+                }))
                 .flatMap(account -> {
+                    // Blocage effectif : un développeur suspendu par l'administrateur ne peut plus se
+                    // connecter du tout (ni console, ni API), et reçoit un feedback explicite.
+                    if ("SUSPENDED".equalsIgnoreCase(account.getStatus())) {
+                        return Mono.error(new ProblemException(HttpStatus.FORBIDDEN, "Compte bloqué",
+                                "Votre compte a été bloqué par l'administrateur de Business Core. "
+                                        + "Contactez le support pour toute réclamation."));
+                    }
                     boolean changed = false;
                     if (tenantFinal != null && !tenantFinal.equals(account.getKernelTenantId())) {
                         account.setKernelTenantId(tenantFinal);

@@ -14,11 +14,6 @@ public record CreerEntrepriseRequest(
         @Schema(description = "Numéro de version épinglée", example = "1")
         @NotNull @Positive Integer versionNumber,
         @Schema(description = "Nom affiché de l'application", example = "Boutique Alpha")
-        @NotBlank String nom,
-        @Schema(description = """
-                Organisation kernel existante à laquelle rattacher l'application (aucune organisation
-                n'est créée). Absent = comportement par défaut : une nouvelle organisation kernel est
-                provisionnée automatiquement.""")
-        UUID organizationId
+        @NotBlank String nom
 ) {
 }

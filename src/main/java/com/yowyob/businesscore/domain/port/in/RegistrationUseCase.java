@@ -12,5 +12,5 @@ public interface RegistrationUseCase {
 
     Mono<ApiKeyEmise> inscrire(String firstName, String lastName,
                                String email, String password,
-                               String planCode);
+                               String entreprise);
 }

@@ -179,16 +179,12 @@ private Mono<ResultatLogin> essayerContexte(List<?> contexts, int index, String 
     Map<?, ?> contexte = (Map<?, ?>) contexts.get(index);
     String contextId = texte(contexte.get("contextId"));
 
-    // Récupère l'organizationId si disponible
-    List<?> orgs = contexte.get("organizations") instanceof List<?> l ? l : List.of();
-    String organizationId = orgs.isEmpty() ? null
-            : texte(((Map<?, ?>) orgs.get(0)).get("organizationId"));
-
-    // Étape 2 — select-context → JWT final
+    // Étape 2 — select-context → JWT final. On sélectionne par CONTEXTE seul : le kernel refuse
+    // désormais un organizationId explicite (« organization not accessible in this context », 400) et
+    // choisit lui-même l'organisation du contexte. Envoyer l'org ferait échouer chaque connexion.
     Map<String, Object> selectBody = new java.util.HashMap<>();
     selectBody.put("selectionToken", selectionToken);
     selectBody.put("contextId", contextId);
-    if (organizationId != null) selectBody.put("organizationId", organizationId);
 
     return kernelWebClient.post()
             .uri("/api/auth/select-context")
@@ -199,7 +195,9 @@ private Mono<ResultatLogin> essayerContexte(List<?> contexts, int index, String 
             })
             .bodyValue(selectBody)
             .retrieve()
-            .onStatus(status -> status.value() == 401 || status.value() == 403,
+            // 400/401/403 = ce contexte est refusé : on le traduit en erreur métier (non retentée) pour
+            // basculer sur le contexte suivant plutôt que d'épuiser les retries et renvoyer un 503.
+            .onStatus(status -> status.value() == 400 || status.value() == 401 || status.value() == 403,
                     reponse -> reponse.bodyToMono(Map.class).defaultIfEmpty(Map.of()).flatMap(corps ->
                             Mono.error(erreurSelectContexte(corps))))
             .bodyToMono(Map.class)

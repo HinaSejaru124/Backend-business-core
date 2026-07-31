@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Rattrapage ponctuel pour les développeurs créés AVANT le thème « Entreprise » (une organisation
+      kernel unique par développeur). Chacun de ces comptes de test n'a jamais eu de nom d'entreprise ;
+      sans ce data-fix, ils tomberaient dans le flux « CHOIX_REQUIS »/« NOM_REQUIS » au prochain login
+      (cf. EnterpriseSelectionService) — acceptable en soi, mais on préfère les rattacher explicitement
+      pour ne pas perturber les scénarios de démonstration déjà en place.
+
+      techlan500@gmail.com (le compte de test principal) possède 4 applications réelles, chacune sur sa
+      propre organisation kernel héritée de l'ancien modèle « une org par application ». On fixe son
+      entreprise sur « Pharmacie Test Compte2 E » (organizationId b785cdd9-e680-4351-b631-44724c6c4b13,
+      vérifié réel côté kernel, gouvernance APPROVED) : c'est celle utilisée en conditions réelles par
+      PharmaCore — aucun risque de casser son intégration. Les 3 autres applications de ce développeur
+      restent inchangées et pleinement fonctionnelles (leur organizationId propre est stocké sur l'entité
+      Entreprise, indépendamment de developer_account) ; seule la PROCHAINE application qu'il créera
+      utilisera l'entreprise ci-dessous.
+
+      Les 3 autres développeurs de test n'ont AUCUNE application ni organisation kernel à ce jour : on ne
+      fixe que le libellé (entreprise_nom), l'organisation kernel réelle sera provisionnée automatiquement
+      à leur prochaine connexion (GET /v1/enterprise/status), exactement comme un nouveau développeur.
+    -->
+    <changeSet id="enterprise-datafix-001-devs-existants" author="claude">
+        <update tableName="developer_account">
+            <column name="entreprise_nom" value="TechFast Technologies"/>
+            <column name="entreprise_organization_id" value="b785cdd9-e680-4351-b631-44724c6c4b13"/>
+            <where>email = 'techlan500@gmail.com'</where>
+        </update>
+        <update tableName="developer_account">
+            <column name="entreprise_nom" value="Kivu Digital Solutions"/>
+            <where>email = 'techlan50@gmail.com'</where>
+        </update>
+        <update tableName="developer_account">
+            <column name="entreprise_nom" value="Sahel Software Works"/>
+            <where>email = 'pharmacore.test@yowyob-demo.com'</where>
+        </update>
+        <update tableName="developer_account">
+            <column name="entreprise_nom" value="Baobab IT Consulting"/>
+            <where>email = 'verify.develop2.test@yowyob-demo.com'</where>
+        </update>
+        <rollback>
+            <update tableName="developer_account">
+                <column name="entreprise_nom" valueComputed="NULL"/>
+                <column name="entreprise_organization_id" valueComputed="NULL"/>
+                <where>email IN ('techlan500@gmail.com', 'techlan50@gmail.com',
+                    'pharmacore.test@yowyob-demo.com', 'verify.develop2.test@yowyob-demo.com')</where>
+            </update>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

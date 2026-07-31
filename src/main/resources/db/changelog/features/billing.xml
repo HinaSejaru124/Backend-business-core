@@ -66,4 +66,27 @@
         </createTable>
     </changeSet>
 
+    <!--
+      billing-003 : métrique hybride — nombre maximal d'applications autorisées par forfait.
+      -1 (défaut) = illimité. Fixé par l'administrateur ; appliqué à la création d'application.
+    -->
+    <changeSet id="billing-003-plan-pricing-apps-max" author="billing">
+        <addColumn tableName="plan_pricing">
+            <column name="applications_max" type="bigint" defaultValueNumeric="-1">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!--
+      billing-004 : libellé (nom affiché) d'un forfait, librement modifiable par l'administrateur. Le
+      `code` reste la clé technique stable référencée par les développeurs ; le libellé n'est qu'un nom
+      d'affichage (null => on affiche le code). Permet aussi de nommer un forfait créé de toutes pièces.
+    -->
+    <changeSet id="billing-004-plan-pricing-libelle" author="billing">
+        <addColumn tableName="plan_pricing">
+            <column name="libelle" type="varchar(64)"/>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

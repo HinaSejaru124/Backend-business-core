@@ -2,10 +2,8 @@ package com.yowyob.businesscore.application.usecase.offer;
 
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.application.saga.FournisseurDeCapaciteDispatcher;
-import com.yowyob.businesscore.domain.businesstype.VersionType;
 import com.yowyob.businesscore.domain.offer.spi.DepotOffre;
 import com.yowyob.businesscore.domain.offer.spi.DepotProduitEntreprise;
-import com.yowyob.businesscore.domain.port.out.PersisterVersionType;
 import com.yowyob.businesscore.domain.shared.FormePrix;
 import com.yowyob.businesscore.domain.shared.TypeCapacite;
 import org.junit.jupiter.api.Test;
@@ -25,17 +23,8 @@ class GestionOffreServiceTest {
     private final DepotOffre depot = mock(DepotOffre.class);
     private final DepotProduitEntreprise depotProduit = mock(DepotProduitEntreprise.class);
     private final FournisseurDeCapaciteDispatcher capacites = mock(FournisseurDeCapaciteDispatcher.class);
-    private final PersisterVersionType persisterVersionType = mock(PersisterVersionType.class);
     private final GestionOffreService service =
-            new GestionOffreService(depot, depotProduit, capacites, persisterVersionType);
-
-    private VersionType versionModifiable() {
-        return VersionType.creer(UUID.randomUUID(), UUID.randomUUID(), 1);
-    }
-
-    {
-        when(persisterVersionType.trouverParId(any())).thenAnswer(inv -> Mono.just(versionModifiable()));
-    }
+            new GestionOffreService(depot, depotProduit, capacites);
 
     @Test
     void declarer_offre_stockable_active_la_strategie_correspondante() {
@@ -85,22 +74,19 @@ class GestionOffreServiceTest {
     }
 
     @Test
-    void declarer_offre_sur_version_publiee_est_rejete_RG03() {
-        UUID versionTypeId = UUID.randomUUID();
-        VersionType publiee = VersionType.creer(UUID.randomUUID(), UUID.randomUUID(), 1)
-                .publier(java.time.Instant.now());
-        when(persisterVersionType.trouverParId(versionTypeId)).thenReturn(Mono.just(publiee));
+    void declarer_offre_sur_version_publiee_est_autorise_catalogue_dynamique() {
+        // RG-03 ne s'applique pas aux offres : le catalogue reste modifiable même sur une version publiée.
+        when(depot.enregistrer(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        when(capacites.activer(any(), any(UUID.class))).thenReturn(Mono.empty());
 
         GestionOffreService.DeclarerOffreCommande cmd = new GestionOffreService.DeclarerOffreCommande(
-                versionTypeId, "Offre tardive", FormePrix.GRATUIT, null, Set.of());
+                UUID.randomUUID(), "Médicament ajouté après publication", FormePrix.FIXE,
+                new BigDecimal("100"), Set.of());
 
         StepVerifier.create(service.declarer(cmd))
-                .expectErrorSatisfies(e -> {
-                    assert e instanceof ProblemException;
-                    assert "RG-03".equals(((ProblemException) e).getExtensions().get("violatedRule"));
-                })
-                .verify();
+                .assertNext(offre -> { assert offre.nom().equals("Médicament ajouté après publication"); })
+                .verifyComplete();
 
-        verify(depot, never()).enregistrer(any());
+        verify(depot, times(1)).enregistrer(any());
     }
 }

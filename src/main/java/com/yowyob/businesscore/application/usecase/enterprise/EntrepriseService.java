@@ -1,5 +1,7 @@
 package com.yowyob.businesscore.application.usecase.enterprise;
 
+import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
+import com.yowyob.businesscore.application.billing.PlanCatalogue;
 import com.yowyob.businesscore.application.context.BusinessContext;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.enterprise.Entreprise;
@@ -37,19 +39,52 @@ public class EntrepriseService {
     private final JournaliserChangementSync journaliserSync;
     private final DepotEntrepriseContrat depotEntrepriseContrat;
     private final DepotEntrepriseProfil depotEntrepriseProfil;
+    private final DeveloperAccountRepository developerRepository;
+    private final PlanCatalogue catalogue;
+    private final OrganisationProvisioningService organisationProvisioningService;
 
     public EntrepriseService(DepotEntreprise depotEntreprise,
                              PersisterVersionType persisterVersionType,
                              PersisterEntreprise persisterEntreprise,
                              JournaliserChangementSync journaliserSync,
                              DepotEntrepriseContrat depotEntrepriseContrat,
-                             DepotEntrepriseProfil depotEntrepriseProfil) {
+                             DepotEntrepriseProfil depotEntrepriseProfil,
+                             DeveloperAccountRepository developerRepository,
+                             PlanCatalogue catalogue,
+                             OrganisationProvisioningService organisationProvisioningService) {
         this.depotEntreprise = depotEntreprise;
         this.persisterVersionType = persisterVersionType;
         this.persisterEntreprise = persisterEntreprise;
         this.journaliserSync = journaliserSync;
         this.depotEntrepriseContrat = depotEntrepriseContrat;
         this.depotEntrepriseProfil = depotEntrepriseProfil;
+        this.developerRepository = developerRepository;
+        this.catalogue = catalogue;
+        this.organisationProvisioningService = organisationProvisioningService;
+    }
+
+    /**
+     * Applique la limite d'applications du forfait du développeur (métrique hybride, fixée par l'admin).
+     * {@code applicationsMax < 0} = illimité. <b>Fail-open</b> : si le compte/plan n'est pas résoluble,
+     * on n'empêche jamais la création (aucun blocage sur une donnée manquante).
+     */
+    private Mono<Void> verifierLimiteApplications(BusinessContext ctx) {
+        return developerRepository.findByKernelTenantId(ctx.tenantId())
+                .flatMap(dev -> {
+                    long max = catalogue.applicationsMax(dev.getPlan());
+                    if (max < 0) {
+                        return Mono.empty();
+                    }
+                    return depotEntreprise.listerParTenant(ctx.tenantId()).count()
+                            .flatMap(n -> n >= max
+                                    ? Mono.error(ProblemException.unprocessable(
+                                            "Limite d'applications atteinte pour le forfait "
+                                                    + catalogue.normaliser(dev.getPlan()) + " (" + max
+                                                    + " maximum). Passez à un forfait supérieur pour en créer davantage.")
+                                            .violatedRule("LIMITE_APPLICATIONS"))
+                                    : Mono.empty());
+                })
+                .then();
     }
 
     /** Journalise un changement d'entreprise pour la synchronisation pull des backends terminaux. */
@@ -59,88 +94,53 @@ public class EntrepriseService {
                 .thenReturn(entreprise);
     }
 
-    /** Comportement par défaut inchangé : aucune organisation existante fournie → provisionnement complet. */
-    public Mono<Entreprise> creer(UUID typeId, int numeroVersion, String nom, BusinessContext ctx) {
-        return creer(typeId, numeroVersion, nom, null, ctx);
-    }
-
     /**
-     * Crée une Application. Si {@code organizationId} est fourni, l'Application se rattache à cette
-     * organisation kernel <b>existante</b> (aucun {@code POST /api/organizations}) — seul le business
-     * actor courant est résolu et l'agence principale de l'organisation est retrouvée. Si absent,
-     * comportement inchangé : provisionnement complet d'une nouvelle organisation ({@link #provisionnerOrganisation}).
+     * Crée une Application (logiciel) au sein de l'entreprise du développeur.
      *
-     * <p>Préparation en vue de la vision cible « Organisation (Kernel) → Applications (Business Core) » :
-     * le Kernel n'exposant à ce jour aucun mécanisme pour qu'un second développeur rejoigne une
-     * organisation existante, ce paramètre reste utilisable uniquement par le développeur propriétaire
-     * de l'organisation ciblée (aucune vérification de propriété supplémentaire n'est ajoutée ici tant
-     * que ce point n'est pas tranché côté kernel/prof).
+     * <p>Thème strict de la plateforme : un développeur travaille pour <b>une seule</b> entreprise
+     * (= une organisation kernel), à l'intérieur de laquelle il crée ses applications — jamais une
+     * organisation par application. L'organisation cible n'est donc plus fournie par l'appelant : elle
+     * est résolue depuis {@code developer_account.entreprise_organization_id} (fixée une fois pour
+     * toutes via {@code POST /v1/enterprise/provision} ou {@code /select}). Aucune entreprise choisie
+     * → 422 explicite (le développeur doit d'abord passer par la sélection).
      */
-    public Mono<Entreprise> creer(UUID typeId, int numeroVersion, String nom, UUID organizationId, BusinessContext ctx) {
-        return persisterVersionType.trouverParTypeEtNumero(typeId, numeroVersion)
-                .switchIfEmpty(Mono.error(ProblemException.notFound(
-                        "Version " + numeroVersion + " introuvable pour le type " + typeId)))
-                .flatMap(version -> {
-                    version.verifierAppartenance(ctx.tenantId());
-                    Mono<RefsKernel> refsMono = organizationId == null
-                            ? provisionnerOrganisation(nom)
-                            : rattacherOrganisationExistante(organizationId, nom);
-                    return refsMono.flatMap(refs -> {
-                        Entreprise entreprise = Entreprise.creer(
-                                        ctx.tenantId(), version.typeMetierId(), version.id(),
-                                        version.numero(), refs.organizationId(), nom)
-                                .avecReferencesKernel(
-                                        refs.businessActorId(), refs.organizationId(), refs.agencyId());
-                        return depotEntreprise.sauvegarder(entreprise)
-                                .flatMap(saved -> depotEntrepriseContrat
-                                        .sauvegarder(EntrepriseContrat.vierge(
-                                                saved.id(), saved.tenantId(), Instant.now()))
-                                        .thenReturn(saved))
-                                .flatMap(saved -> depotEntrepriseProfil
-                                        .sauvegarder(EntrepriseProfil.vierge(saved.id(), saved.tenantId(), Instant.now()))
-                                        .thenReturn(saved))
-                                .flatMap(saved -> journaliser(saved, OperationSync.CREATE));
-                    });
-                });
+    public Mono<Entreprise> creer(UUID typeId, int numeroVersion, String nom, BusinessContext ctx) {
+        return verifierLimiteApplications(ctx).then(resoudreOrganisationDuDeveloppeur(ctx)
+                .flatMap(organizationId -> persisterVersionType.trouverParTypeEtNumero(typeId, numeroVersion)
+                        .switchIfEmpty(Mono.error(ProblemException.notFound(
+                                "Version " + numeroVersion + " introuvable pour le type " + typeId)))
+                        .flatMap(version -> {
+                            version.verifierAppartenance(ctx.tenantId());
+                            return organisationProvisioningService.rattacherExistante(organizationId, nom)
+                                    .flatMap(refs -> {
+                                        Entreprise entreprise = Entreprise.creer(
+                                                        ctx.tenantId(), version.typeMetierId(), version.id(),
+                                                        version.numero(), refs.organizationId(), nom)
+                                                .avecReferencesKernel(
+                                                        refs.businessActorId(), refs.organizationId(), refs.agencyId());
+                                        return depotEntreprise.sauvegarder(entreprise)
+                                                .flatMap(saved -> depotEntrepriseContrat
+                                                        .sauvegarder(EntrepriseContrat.vierge(
+                                                                saved.id(), saved.tenantId(), Instant.now()))
+                                                        .thenReturn(saved))
+                                                .flatMap(saved -> depotEntrepriseProfil
+                                                        .sauvegarder(EntrepriseProfil.vierge(saved.id(), saved.tenantId(), Instant.now()))
+                                                        .thenReturn(saved))
+                                                .flatMap(saved -> journaliser(saved, OperationSync.CREATE));
+                                    });
+                        })));
     }
 
-    /**
-     * Provisionne l'organisation kernel de l'entreprise. Chaîne imposée par la gouvernance :
-     * <ol>
-     *   <li>Résoudre le business actor (onboarding ou profil existant),</li>
-     *   <li>Créer l'organisation,</li>
-     *   <li>Approuver l'organisation ({@code POST .../approve}),</li>
-     *   <li>Souscrire les services kernel,</li>
-     *   <li>Créer l'agence principale.</li>
-     * </ol>
-     */
-    private static final String MOTIF_APPROBATION_AUTO = "Approbation initiale";
-
-    private Mono<RefsKernel> provisionnerOrganisation(String nom) {
-        return persisterEntreprise.creerOrganisation(nom)
-                .flatMap(prov -> persisterEntreprise
-                        .approuverOrganisation(prov.organizationId(), MOTIF_APPROBATION_AUTO)
-                        .then(persisterEntreprise.souscrireServices(prov.organizationId()))
-                        .then(persisterEntreprise.creerAgence(
-                                prov.organizationId(), nom + " — agence principale"))
-                        .map(agencyId -> new RefsKernel(
-                                prov.businessActorId(), prov.organizationId(), agencyId)));
-    }
-
-    /**
-     * Rattache une Application à une organisation kernel déjà existante : ni création, ni approbation,
-     * ni souscription de service (déjà faites lors de la création initiale de l'organisation) — juste
-     * la résolution du business actor courant et de l'agence principale existante.
-     */
-    private Mono<RefsKernel> rattacherOrganisationExistante(UUID organizationId, String nom) {
-        return persisterEntreprise.resoudreBusinessActorCourant(nom)
-                .flatMap(businessActorId -> persisterEntreprise.trouverAgencePrincipale(organizationId)
-                        .map(agencyId -> new RefsKernel(businessActorId, organizationId, agencyId))
-                        .switchIfEmpty(Mono.just(new RefsKernel(businessActorId, organizationId, null))));
-    }
-
-    /** Références kernel à mémoriser dans l'entité Entreprise. */
-    private record RefsKernel(UUID businessActorId, UUID organizationId, UUID agencyId) {
+    /** Résout l'organisation kernel de l'entreprise du développeur courant ; erreur explicite si absente. */
+    private Mono<UUID> resoudreOrganisationDuDeveloppeur(BusinessContext ctx) {
+        return developerRepository.findByKernelTenantId(ctx.tenantId())
+                .switchIfEmpty(Mono.error(ProblemException.notFound("Compte développeur introuvable.")))
+                .flatMap(dev -> dev.getEntrepriseOrganizationId() != null
+                        ? Mono.just(dev.getEntrepriseOrganizationId())
+                        : Mono.error(ProblemException.unprocessable(
+                                "Aucune entreprise associée à votre compte. Choisissez ou créez votre entreprise "
+                                        + "(GET/POST /v1/enterprise) avant de créer une application.")
+                                .violatedRule("ENTREPRISE_NON_DEFINIE")));
     }
 
     public Flux<Entreprise> lister(BusinessContext ctx) {

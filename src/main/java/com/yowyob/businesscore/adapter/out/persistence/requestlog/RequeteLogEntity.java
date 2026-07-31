@@ -20,6 +20,10 @@ public class RequeteLogEntity {
     @Column("tenant_id")
     private UUID tenantId;
 
+    /** Application (entreprise) concernée quand résoluble ; null pour la gestion de la console (aucune app). */
+    @Column("entreprise_id")
+    private UUID entrepriseId;
+
     private String categorie;
 
     private String methode;
@@ -41,10 +45,12 @@ public class RequeteLogEntity {
     public RequeteLogEntity() {
     }
 
-    public static RequeteLogEntity nouvelle(UUID tenantId, String categorie, String methode, String endpoint,
-                                            int statutHttp, long dureeMs, boolean facturable, Instant creeLe) {
+    public static RequeteLogEntity nouvelle(UUID tenantId, UUID entrepriseId, String categorie, String methode,
+                                            String endpoint, int statutHttp, long dureeMs, boolean facturable,
+                                            Instant creeLe) {
         RequeteLogEntity e = new RequeteLogEntity();
         e.tenantId = tenantId;
+        e.entrepriseId = entrepriseId;
         e.categorie = categorie;
         e.methode = methode;
         e.endpoint = endpoint;
@@ -61,6 +67,10 @@ public class RequeteLogEntity {
 
     public UUID getTenantId() {
         return tenantId;
+    }
+
+    public UUID getEntrepriseId() {
+        return entrepriseId;
     }
 
     public String getCategorie() {

@@ -16,10 +16,14 @@ public record MeResponse(
                 + "distinct des clés API (secrètes, scopées à une application)")
         UUID developerId,
         String email,
-        @Schema(example = "FREE") String plan
+        @Schema(example = "FREE") String plan,
+        @Schema(description = "Nom de l'entreprise du développeur (navbar) ; null tant qu'elle n'est pas "
+                + "encore choisie — cf. GET /v1/enterprise/status", example = "Techfast Technologies")
+        String entrepriseNom
 ) {
 
-    public static MeResponse depuis(BusinessContext ctx, UUID developerId, String email, String plan) {
+    public static MeResponse depuis(BusinessContext ctx, UUID developerId, String email, String plan,
+                                    String entrepriseNom) {
         return new MeResponse(
                 ctx.tenantId(),
                 ctx.actorId(),
@@ -27,6 +31,7 @@ public record MeResponse(
                 ctx.hasRole("organizations:write"),
                 developerId,
                 email,
-                plan);
+                plan,
+                entrepriseNom);
     }
 }

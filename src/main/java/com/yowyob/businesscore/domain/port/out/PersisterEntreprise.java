@@ -3,6 +3,7 @@ package com.yowyob.businesscore.domain.port.out;
 import com.yowyob.businesscore.domain.shared.CycleVie;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -42,4 +43,11 @@ public interface PersisterEntreprise {
 
     /** Souscrit les services kernel requis pour sales, billing, stock et comptabilité. */
     Mono<Void> souscrireServices(UUID organizationId);
+
+    /**
+     * Organisations kernel du tenant courant ({@code GET /api/organizations}) — sert à proposer à un
+     * développeur déjà existant le choix de son entreprise parmi les organisations qu'il possède déjà
+     * (thème « Entreprise » : une seule organisation par développeur, à choisir une fois pour toutes).
+     */
+    Mono<List<OrganisationAccessible>> listerOrganisations();
 }

@@ -58,7 +58,7 @@ class ApiKeyReactiveAuthenticationManagerTest {
         UUID keyId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
         UUID entrepriseId = UUID.randomUUID();
-        ApiKeyEntity cle = ApiKeyEntity.nouveau(keyId, developerId, entrepriseId, "hash", "Prod");
+        ApiKeyEntity cle = ApiKeyEntity.nouveau(keyId, developerId, entrepriseId, "hash", null, "Prod");
         DeveloperAccountEntity account = compte(developerId, tenantId);
 
         when(developerRepository.findById(developerId)).thenReturn(Mono.just(account));
@@ -120,7 +120,7 @@ class ApiKeyReactiveAuthenticationManagerTest {
     void auth_secret_invalide() {
         UUID developerId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
-        ApiKeyEntity cle = ApiKeyEntity.nouveau(UUID.randomUUID(), developerId, UUID.randomUUID(), "hash", "Prod");
+        ApiKeyEntity cle = ApiKeyEntity.nouveau(UUID.randomUUID(), developerId, UUID.randomUUID(), "hash", null, "Prod");
         DeveloperAccountEntity account = compte(developerId, tenantId);
 
         when(developerRepository.findById(developerId)).thenReturn(Mono.just(account));

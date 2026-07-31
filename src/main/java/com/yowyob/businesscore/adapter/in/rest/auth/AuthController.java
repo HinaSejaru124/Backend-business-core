@@ -74,7 +74,8 @@ public class AuthController {
     private Mono<MeResponse> avecIdentiteDeveloppeur(BusinessContext ctx) {
         return developpeurCourant.id()
                 .flatMap(developerRepository::findById)
-                .map(compte -> MeResponse.depuis(ctx, compte.getId(), compte.getEmail(), compte.getPlan()))
-                .defaultIfEmpty(MeResponse.depuis(ctx, null, null, null));
+                .map(compte -> MeResponse.depuis(ctx, compte.getId(), compte.getEmail(), compte.getPlan(),
+                        compte.getEntrepriseNom()))
+                .defaultIfEmpty(MeResponse.depuis(ctx, null, null, null, null));
     }
 }

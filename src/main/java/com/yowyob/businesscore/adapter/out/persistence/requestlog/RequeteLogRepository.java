@@ -52,7 +52,8 @@ public interface RequeteLogRepository extends ReactiveCrudRepository<RequeteLogE
     @Query("""
             SELECT * FROM requete_log
             WHERE tenant_id = :tenantId
-              AND (:categorie IS NULL OR categorie = :categorie)
+              AND (:applicationId IS NULL OR entreprise_id = :applicationId)
+              AND (:categorie IS NULL OR categorie = :categorie OR (:categorie = 'API' AND categorie <> 'APP'))
               AND (:methode IS NULL OR methode = :methode)
               AND (:depuis IS NULL OR cree_le >= :depuis)
               AND (:erreurFlag IS NULL
@@ -62,13 +63,15 @@ public interface RequeteLogRepository extends ReactiveCrudRepository<RequeteLogE
             ORDER BY cree_le DESC
             LIMIT :limite OFFSET :decalage
             """)
-    Flux<RequeteLogEntity> pageFiltree(UUID tenantId, String categorie, String methode, Instant depuis,
-                                       Integer erreurFlag, Integer facturableFlag, int limite, long decalage);
+    Flux<RequeteLogEntity> pageFiltree(UUID tenantId, UUID applicationId, String categorie, String methode,
+                                       Instant depuis, Integer erreurFlag, Integer facturableFlag,
+                                       int limite, long decalage);
 
     @Query("""
             SELECT COUNT(*) FROM requete_log
             WHERE tenant_id = :tenantId
-              AND (:categorie IS NULL OR categorie = :categorie)
+              AND (:applicationId IS NULL OR entreprise_id = :applicationId)
+              AND (:categorie IS NULL OR categorie = :categorie OR (:categorie = 'API' AND categorie <> 'APP'))
               AND (:methode IS NULL OR methode = :methode)
               AND (:depuis IS NULL OR cree_le >= :depuis)
               AND (:erreurFlag IS NULL
@@ -76,6 +79,41 @@ public interface RequeteLogRepository extends ReactiveCrudRepository<RequeteLogE
                    OR (:erreurFlag = 0 AND statut_http < 400))
               AND (:facturableFlag IS NULL OR facturable = (:facturableFlag = 1))
             """)
-    Mono<Long> countFiltree(UUID tenantId, String categorie, String methode, Instant depuis,
+    Mono<Long> countFiltree(UUID tenantId, UUID applicationId, String categorie, String methode, Instant depuis,
                             Integer erreurFlag, Integer facturableFlag);
+
+    // ─── Agrégats dashboard admin (séries temporelles + top applications) ────────
+
+    /** Une tranche temporelle : instant tronqué (heure/jour/mois) + compteurs réels. */
+    record SerieBucket(Instant bucket, Long total, Long facturables, Long erreurs) {
+    }
+
+    /**
+     * Série temporelle des requêtes d'un tenant, regroupée par {@code unite} (date_trunc :
+     * 'hour' | 'day' | 'month'), depuis une borne. Compteurs réels : total, facturables, erreurs.
+     */
+    @Query("""
+            SELECT date_trunc(:unite, cree_le) AS bucket,
+                   COUNT(*) AS total,
+                   COUNT(*) FILTER (WHERE facturable) AS facturables,
+                   COUNT(*) FILTER (WHERE statut_http >= 400) AS erreurs
+            FROM requete_log
+            WHERE tenant_id = :tenantId AND cree_le >= :depuis
+            GROUP BY 1
+            ORDER BY 1
+            """)
+    Flux<SerieBucket> serieParTenant(UUID tenantId, String unite, Instant depuis);
+
+    /** Nombre de requêtes par application (entreprise) d'un tenant, sur une fenêtre. */
+    record AppCount(UUID entrepriseId, Long total) {
+    }
+
+    @Query("""
+            SELECT entreprise_id AS entreprise_id, COUNT(*) AS total
+            FROM requete_log
+            WHERE tenant_id = :tenantId AND entreprise_id IS NOT NULL AND cree_le >= :depuis
+            GROUP BY entreprise_id
+            ORDER BY total DESC
+            """)
+    Flux<AppCount> topAppsParTenant(UUID tenantId, Instant depuis);
 }

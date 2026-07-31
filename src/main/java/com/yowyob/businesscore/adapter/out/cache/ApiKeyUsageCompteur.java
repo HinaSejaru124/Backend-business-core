@@ -68,6 +68,20 @@ public class ApiKeyUsageCompteur {
                 .map(t -> new UsageJournalier(apiKeyId, jour, t.getT1(), t.getT2()));
     }
 
+    /**
+     * Instantané d'un membre en attente, pour le flush.
+     *
+     * <p><b>Compteur absent ≠ compteur à zéro.</b> Les compteurs Redis expirent au bout de {@link #TTL},
+     * alors que le membre correspondant reste dans {@link #PENDING} (ensemble sans TTL). L'ancienne
+     * version appliquait {@code defaultIfEmpty(0L)} : passé trois jours, chaque flush relisait le membre
+     * périmé et réécrivait <b>0</b> par-dessus le total réel déjà stocké en base — l'upsert écrivant une
+     * valeur absolue, tout l'historique du dashboard finissait à zéro (constaté le 31/07/2026 : plus de
+     * 4 000 requêtes dans {@code requete_log} pour des agrégats entièrement nuls).
+     *
+     * <p>Désormais, un compteur absent signifie « déjà drainé, plus rien à écrire » : on retire le membre
+     * de l'ensemble (ce qui borne aussi sa croissance, il n'était jamais nettoyé) et on n'émet rien, donc
+     * la valeur en base est préservée.
+     */
     private Mono<UsageJournalier> lire(String membre) {
         int sep = membre.lastIndexOf('|');
         if (sep < 0) {
@@ -81,10 +95,21 @@ public class ApiKeyUsageCompteur {
         } catch (RuntimeException ex) {
             return redis.opsForSet().remove(PENDING, membre).then(Mono.empty());
         }
-        Mono<Long> total = redis.opsForValue().get(totalKey(apiKeyId, jour)).map(Long::parseLong).defaultIfEmpty(0L);
-        Mono<Long> errors = redis.opsForValue().get(errorsKey(apiKeyId, jour)).map(Long::parseLong).defaultIfEmpty(0L);
-        return Mono.zip(total, errors)
-                .map(t -> new UsageJournalier(apiKeyId, jour, t.getT1(), t.getT2()));
+        return redis.opsForValue().get(totalKey(apiKeyId, jour))
+                .flatMap(totalBrut -> redis.opsForValue().get(errorsKey(apiKeyId, jour))
+                        .defaultIfEmpty("0")
+                        .map(errorsBrut -> new UsageJournalier(
+                                apiKeyId, jour, parse(totalBrut), parse(errorsBrut))))
+                // Compteur expiré : on purge le membre et on n'écrit rien (l'historique reste intact).
+                .switchIfEmpty(redis.opsForSet().remove(PENDING, membre).then(Mono.empty()));
+    }
+
+    private static long parse(String valeur) {
+        try {
+            return Long.parseLong(valeur);
+        } catch (NumberFormatException ex) {
+            return 0L;
+        }
     }
 
     private static String totalKey(UUID apiKeyId, LocalDate jour) {

@@ -12,8 +12,8 @@ import java.util.UUID;
  * <b>asynchrone</b> — {@link #demanderPaiement} ouvre un ordre de paiement (statut {@code EN_ATTENTE} +
  * {@code urlPaiement}) et {@link #verifierStatut} interroge le kernel pour connaître l'issue réelle après
  * que le payeur a validé sur son téléphone. La logique métier ({@code PlanService}) n'active le plan que
- * sur un statut {@code CONFIRME}. {@code SimulationPaiementAdapter} reste disponible (non câblé) pour les
- * tests / un éventuel repli.
+ * sur un statut {@code CONFIRME}. Il n'existe qu'une seule implémentation : le paiement réel Kernel
+ * (aucune simulation) — toute transaction correspond à un débit mobile money effectif.
  */
 public interface PaiementPort {
 
@@ -26,8 +26,36 @@ public interface PaiementPort {
      */
     Mono<ResultatPaiement> verifierStatut(String reference);
 
+    /**
+     * Mode de règlement choisi par le développeur. La passerelle accepte les deux
+     * ({@code method} = MOBILE_MONEY | CARD, avec le {@code provider} correspondant) : s'en tenir au
+     * mobile money excluait sans raison les développeurs payant par carte.
+     */
+    enum ModePaiement {
+        /** Orange / MTN Money : exige le numéro du payeur. */
+        MOBILE_MONEY,
+        /** Carte bancaire : le porteur saisit sa carte sur la page sécurisée de la passerelle. */
+        CARD;
+
+        public static ModePaiement depuis(String valeur) {
+            if (valeur == null || valeur.isBlank()) {
+                return MOBILE_MONEY;
+            }
+            try {
+                return valueOf(valeur.trim().toUpperCase(java.util.Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                return MOBILE_MONEY;
+            }
+        }
+
+        public boolean exigePayerReference() {
+            return this == MOBILE_MONEY;
+        }
+    }
+
+    /** {@code payerReference} n'est renseigné que pour le mobile money (numéro du payeur). */
     record DemandePaiement(UUID developerId, String planActuel, String planCible, long montant, String devise,
-                           String payerReference) {
+                           String payerReference, ModePaiement mode) {
     }
 
     /**

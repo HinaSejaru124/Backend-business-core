@@ -60,6 +60,11 @@ public class PlanCatalogue {
         return definition(plan).prixMensuel();
     }
 
+    /** Nombre maximal d'applications autorisées par le plan ; &lt; 0 = illimité. */
+    public long applicationsMax(String plan) {
+        return definition(plan).applicationsMax();
+    }
+
     public String devise(String plan) {
         return definition(plan).devise();
     }

@@ -14,4 +14,18 @@
                              constraintName="uq_developer_account_kernel_user_id"/>
     </changeSet>
 
+    <!--
+      Entreprise (= organisation kernel) du développeur — thème strict : un développeur travaille pour
+      UNE SEULE entreprise, à l'intérieur de laquelle il crée ses applications (logiciels). `entreprise_
+      organization_id` est la clé stable côté kernel (organizations.id) ; `entreprise_nom` est le libellé
+      affiché (navbar, console). Nullable : les développeurs déjà existants n'ont pas encore choisi leur
+      entreprise parmi leurs organisations existantes (écran de sélection au prochain login).
+    -->
+    <changeSet id="auth-dev-002-entreprise" author="dev">
+        <addColumn tableName="developer_account">
+            <column name="entreprise_organization_id" type="uuid"/>
+            <column name="entreprise_nom" type="varchar(120)"/>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

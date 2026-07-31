@@ -66,7 +66,8 @@ public class PlanController {
     public Mono<UpgradeResponse> upgrade(@Valid @RequestBody UpgradePlanRequest requete) {
         return developpeurCourant.id()
                 .flatMap(developerId -> planService.changer(developerId, requete.targetPlan(),
-                        requete.payerReference()))
+                        requete.payerReference(),
+                        requete.paymentMethod()))
                 .map(UpgradeResponse::depuis);
     }
 

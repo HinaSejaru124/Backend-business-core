@@ -7,6 +7,7 @@ import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccoun
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseEntity;
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseRepository;
 import com.yowyob.businesscore.application.error.ProblemException;
+import com.yowyob.businesscore.infrastructure.security.SecretCipher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,9 +36,10 @@ class ApiKeyServiceTest {
     @Mock DeveloperAccountRepository developerRepository;
 
     private final PasswordEncoder encoder = new BCryptPasswordEncoder();
+    private final SecretCipher cipher = new SecretCipher("test-encryption-key-for-unit-tests");
 
     private ApiKeyService service() {
-        return new ApiKeyService(repository, entrepriseRepository, developerRepository, encoder);
+        return new ApiKeyService(repository, entrepriseRepository, developerRepository, encoder, cipher);
     }
 
     private static EntrepriseEntity entrepriseAvecTenant(UUID id, UUID tenantId) {
@@ -107,7 +109,7 @@ class ApiKeyServiceTest {
         UUID dev = UUID.randomUUID();
         UUID entrepriseId = UUID.randomUUID();
         UUID keyId = UUID.randomUUID();
-        ApiKeyEntity cle = ApiKeyEntity.nouveau(keyId, dev, entrepriseId, "hash", "Prod");
+        ApiKeyEntity cle = ApiKeyEntity.nouveau(keyId, dev, entrepriseId, "hash", null, "Prod");
         when(repository.findByEntrepriseIdAndStatus(entrepriseId, ApiKeyEntity.STATUT_ACTIVE))
                 .thenReturn(Flux.just(cle));
         when(repository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
@@ -137,7 +139,7 @@ class ApiKeyServiceTest {
     void marquer_utilisee() {
         ApiKeyService service = service();
         UUID keyId = UUID.randomUUID();
-        ApiKeyEntity cle = ApiKeyEntity.nouveau(keyId, UUID.randomUUID(), UUID.randomUUID(), "hash", "Prod");
+        ApiKeyEntity cle = ApiKeyEntity.nouveau(keyId, UUID.randomUUID(), UUID.randomUUID(), "hash", null, "Prod");
         when(repository.findById(keyId)).thenReturn(Mono.just(cle));
         when(repository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
@@ -154,7 +156,7 @@ class ApiKeyServiceTest {
         UUID dev = UUID.randomUUID();
         UUID entrepriseId = UUID.randomUUID();
         when(repository.findByEntrepriseIdAndStatus(entrepriseId, ApiKeyEntity.STATUT_ACTIVE))
-                .thenReturn(Flux.just(ApiKeyEntity.nouveau(UUID.randomUUID(), dev, entrepriseId, "h", "A")));
+                .thenReturn(Flux.just(ApiKeyEntity.nouveau(UUID.randomUUID(), dev, entrepriseId, "h", null, "A")));
 
         StepVerifier.create(service.trouverActive(entrepriseId))
                 .assertNext(cle -> assertThat(cle.getEntrepriseId()).isEqualTo(entrepriseId))

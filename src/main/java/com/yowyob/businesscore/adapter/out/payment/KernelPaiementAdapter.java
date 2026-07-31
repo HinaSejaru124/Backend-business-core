@@ -53,9 +53,17 @@ public class KernelPaiementAdapter implements PaiementPort {
         corps.put("idempotencyKey", UUID.randomUUID().toString());
         corps.put("amount", demande.montant());
         corps.put("currency", demande.devise());
-        corps.put("provider", properties.provider());
-        corps.put("method", properties.method());
-        corps.put("payerReference", demande.payerReference());
+        // La passerelle accepte method=MOBILE_MONEY|CARD avec le provider correspondant
+        // (MYCOOLPAY pour le mobile money, STRIPE pour la carte). La configuration ne fixe plus que le
+        // couple par défaut : c'est le choix du développeur qui décide, sinon la carte serait envoyée
+        // au fournisseur mobile money et systématiquement refusée.
+        boolean carte = demande.mode() == PaiementPort.ModePaiement.CARD;
+        corps.put("provider", carte ? properties.providerCarte() : properties.provider());
+        corps.put("method", carte ? "CARD" : properties.method());
+        // Le numéro du payeur n'existe qu'en mobile money ; on n'envoie pas un champ vide en carte.
+        if (demande.payerReference() != null && !demande.payerReference().isBlank()) {
+            corps.put("payerReference", demande.payerReference());
+        }
         corps.put("description", "Upgrade plan " + demande.planCible() + " (Business Core)");
         corps.put("callbackUrl", properties.callbackBaseUrl());
 

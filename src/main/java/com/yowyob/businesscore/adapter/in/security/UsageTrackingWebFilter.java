@@ -82,8 +82,10 @@ public class UsageTrackingWebFilter implements WebFilter {
 
         Object principal = token.getPrincipal();
         if (principal instanceof BusinessContext ctx) {
+            // Clé API scopée à une application : la requête est attribuée à cette application (businessId),
+            // toujours facturable (consommation runtime de l'API par l'app du développeur).
             requeteLogWriter.enregistrerAsync(
-                    ctx.tenantId(), CATEGORIE_BUSINESS_CORE,
+                    ctx.tenantId(), ctx.businessId(), CATEGORIE_BUSINESS_CORE,
                     exchange.getRequest().getMethod().name(),
                     exchange.getRequest().getPath().value(),
                     statut != null ? statut.value() : 0,

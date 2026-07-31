@@ -46,7 +46,7 @@ public class RegistrationController {
                 request.lastName(),
                 request.email(),
                 request.password(),
-                request.planCode()
+                request.entreprise()
         ).map(InscriptionResponse::depuis);
     }
 }

@@ -15,6 +15,7 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Journal détaillé des requêtes (console développeur, onglet Track) — consultation exclusivement JWT.
@@ -43,7 +44,8 @@ public class RequeteLogController {
                     + "période (JOUR / SEMAINE / MOIS), statut (OK / ERREUR), facturable. Paginé, anti-chronologique.")
     @GetMapping
     public Mono<RequeteLogPageResponse> lister(
-            @Parameter(description = "KNL_CORE, BUSINESS_CORE ou APP — omis pour toutes") @RequestParam(required = false) String categorie,
+            @Parameter(description = "Identifiant de l'application — omis pour toutes les applications") @RequestParam(required = false) String applicationId,
+            @Parameter(description = "API (tout ce qui consomme Business Core) ou APP (requêtes propres de l'app) — omis pour toutes") @RequestParam(required = false) String categorie,
             @Parameter(description = "Méthode HTTP exacte (GET, POST, …)") @RequestParam(required = false) String methode,
             @Parameter(description = "JOUR, SEMAINE ou MOIS — omis pour tout l'historique") @RequestParam(required = false) String periode,
             @Parameter(description = "OK (succès <400) ou ERREUR (>=400)") @RequestParam(required = false) String statut,
@@ -54,6 +56,7 @@ public class RequeteLogController {
         int pageEffective = Math.max(0, page);
         long decalage = (long) pageEffective * tailleEffective;
 
+        UUID appId = parseUuid(applicationId);
         String cat = vide(categorie) ? null : categorie.trim().toUpperCase(Locale.ROOT);
         String meth = vide(methode) ? null : methode.trim().toUpperCase(Locale.ROOT);
         Instant depuis = bornePeriode(periode);
@@ -62,13 +65,24 @@ public class RequeteLogController {
 
         return BusinessContextHolder.currentContext().flatMap(ctx -> {
             var items = repository
-                    .pageFiltree(ctx.tenantId(), cat, meth, depuis, erreurFlag, facturableFlag, tailleEffective, decalage)
+                    .pageFiltree(ctx.tenantId(), appId, cat, meth, depuis, erreurFlag, facturableFlag, tailleEffective, decalage)
                     .map(RequeteLogResponse::depuis)
                     .collectList();
-            var total = repository.countFiltree(ctx.tenantId(), cat, meth, depuis, erreurFlag, facturableFlag);
+            var total = repository.countFiltree(ctx.tenantId(), appId, cat, meth, depuis, erreurFlag, facturableFlag);
             return Mono.zip(items, total)
                     .map(t -> new RequeteLogPageResponse(t.getT1(), t.getT2(), pageEffective, tailleEffective));
         });
+    }
+
+    private static UUID parseUuid(String v) {
+        if (vide(v)) {
+            return null;
+        }
+        try {
+            return UUID.fromString(v.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private static boolean vide(String s) {

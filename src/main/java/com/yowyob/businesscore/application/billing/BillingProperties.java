@@ -16,16 +16,33 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "businesscore.billing")
 public record BillingProperties(Map<String, PlanDef> plans) {
 
-    /** Définition d'un plan. {@code quotaMensuel < 0} => illimité. */
-    public record PlanDef(long quotaMensuel, long prixMensuel, String devise) {
+    /**
+     * Définition d'un plan. {@code quotaMensuel < 0} => requêtes illimitées ;
+     * {@code applicationsMax < 0} => nombre d'applications illimité.
+     */
+    public record PlanDef(long quotaMensuel, long prixMensuel, String devise, long applicationsMax, String libelle) {
         public PlanDef {
             if (devise == null || devise.isBlank()) {
                 devise = "XAF";
             }
         }
 
+        /** Constructeur de compatibilité : applications illimitées, sans libellé. */
+        public PlanDef(long quotaMensuel, long prixMensuel, String devise) {
+            this(quotaMensuel, prixMensuel, devise, -1, null);
+        }
+
+        /** Constructeur de compatibilité : sans libellé. */
+        public PlanDef(long quotaMensuel, long prixMensuel, String devise, long applicationsMax) {
+            this(quotaMensuel, prixMensuel, devise, applicationsMax, null);
+        }
+
         public boolean illimite() {
             return quotaMensuel < 0;
+        }
+
+        public boolean illimiteApplications() {
+            return applicationsMax < 0;
         }
     }
 

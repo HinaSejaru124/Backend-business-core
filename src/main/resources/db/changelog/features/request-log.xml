@@ -115,4 +115,26 @@
         </rollback>
     </changeSet>
 
+    <!--
+      rlog-005 : rattache chaque requête journalisée à l'APPLICATION (entreprise) concernée, quand elle
+      est résoluble (clé API scopée à une application, route /v1/applications/{id}/..., ou en-tête
+      X-BC-Application-Id posé par le backend du développeur). Nullable : les requêtes de gestion de la
+      console (le dev qui navigue son espace) n'appartiennent à aucune application. Permet le sélecteur
+      d'application de l'onglet Audit et une facturation attribuée à l'application.
+    -->
+    <changeSet id="rlog-005-entreprise-id" author="dev-audit">
+        <addColumn tableName="requete_log">
+            <column name="entreprise_id" type="uuid"/>
+        </addColumn>
+        <createIndex tableName="requete_log" indexName="idx_requete_log_tenant_appli_date">
+            <column name="tenant_id"/>
+            <column name="entreprise_id"/>
+            <column name="cree_le" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="requete_log" indexName="idx_requete_log_tenant_appli_date"/>
+            <dropColumn tableName="requete_log" columnName="entreprise_id"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

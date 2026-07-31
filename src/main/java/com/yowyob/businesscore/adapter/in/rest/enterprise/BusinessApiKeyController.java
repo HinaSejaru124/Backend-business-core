@@ -84,7 +84,7 @@ public class BusinessApiKeyController {
                 .then(apiKeyService.trouverActive(businessId))
                 .switchIfEmpty(Mono.error(ProblemException.notFound(
                         "Aucune clé active pour cette application : " + businessId)))
-                .map(CleApiResponse::depuis);
+                .map(cle -> CleApiResponse.depuis(cle, apiKeyService.secretClair(cle)));
     }
 
     @Operation(summary = "Renommer la clé active de cette application")

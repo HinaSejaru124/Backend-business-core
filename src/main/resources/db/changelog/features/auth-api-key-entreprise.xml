@@ -91,4 +91,15 @@
         </rollback>
     </changeSet>
 
+    <!--
+      akbe-006 : secret de la clé CHIFFRÉ au repos (AES-GCM), en plus du hachage. Permet de ré-afficher
+      la clé à son propriétaire dans la console. Le hachage reste la source de vérité pour l'authentification.
+      Colonne nullable : les clés créées avant cette fonctionnalité n'ont pas de secret récupérable.
+    -->
+    <changeSet id="akbe-006-key-secret-enc" author="claude">
+        <addColumn tableName="api_key">
+            <column name="key_secret_enc" type="varchar(512)"/>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

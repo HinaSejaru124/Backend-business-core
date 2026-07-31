@@ -36,13 +36,14 @@ public class RequeteLogWriter {
         this.repository = repository;
     }
 
-    public void enregistrerAsync(UUID tenantId, String categorie, String methode, String endpoint,
+    public void enregistrerAsync(UUID tenantId, UUID applicationId, String categorie, String methode, String endpoint,
                                  int statutHttp, long dureeMs, boolean facturable) {
         if (tenantId == null) {
             return;
         }
         RequeteLogEntity entity = RequeteLogEntity.nouvelle(
-                tenantId, categorie, methode, tronquer(endpoint), statutHttp, dureeMs, facturable, Instant.now());
+                tenantId, applicationId, categorie, methode, tronquer(endpoint), statutHttp, dureeMs, facturable,
+                Instant.now());
         BusinessContext ctxMinimal = new BusinessContext(tenantId, null, null, null, null, null);
         repository.save(entity)
                 .contextWrite(ctx -> BusinessContextHolder.withContext(ctx, ctxMinimal))

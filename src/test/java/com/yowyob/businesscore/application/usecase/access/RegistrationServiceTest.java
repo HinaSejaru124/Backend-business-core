@@ -44,7 +44,7 @@ class RegistrationServiceTest {
             return Mono.just(e);
         });
 
-        StepVerifier.create(service.inscrire("Ada", "Lovelace", "dev@example.com", "MotDePasse1!", "FREE"))
+        StepVerifier.create(service.inscrire("Ada", "Lovelace", "dev@example.com", "MotDePasse1!", "Techfast Technologies"))
                 .assertNext(emise -> {
                     assertThat(emise.plan()).isEqualTo("FREE");
                     assertThat(emise.message()).isNotBlank();
@@ -55,6 +55,31 @@ class RegistrationServiceTest {
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getKernelTenantId()).isEqualTo(tenantId);
         assertThat(captor.getValue().getEmail()).isEqualTo("dev@example.com");
+        assertThat(captor.getValue().getEntrepriseNom()).isEqualTo("Techfast Technologies");
+    }
+
+    @Test
+    @DisplayName("tout nouveau compte démarre sur le plan gratuit — un plan payant ne s'obtient que par paiement")
+    void inscrit_force_le_plan_gratuit() {
+        RegistrationService service = new RegistrationService(repository, authentifier);
+        when(repository.findByEmail(any())).thenReturn(Mono.empty());
+        when(authentifier.signUp(any(), any(), any(), any()))
+                .thenReturn(Mono.just(new SignUpResult("id", null, "PENDING", "ok")));
+        when(repository.save(any())).thenAnswer(inv -> {
+            DeveloperAccountEntity e = inv.getArgument(0);
+            e.setId(UUID.randomUUID());
+            return Mono.just(e);
+        });
+
+        StepVerifier.create(service.inscrire("Ada", "Lovelace", "neuf@example.com", "MotDePasse1!", "Techfast"))
+                .assertNext(emise -> assertThat(emise.plan()).isEqualTo("FREE"))
+                .verifyComplete();
+
+        // Le plan persisté doit être le plan gratuit : l'inscription n'accepte plus de plan choisi par
+        // le client (régression historique — PRO/ENTERPRISE s'obtenaient sans payer).
+        ArgumentCaptor<DeveloperAccountEntity> captor = ArgumentCaptor.forClass(DeveloperAccountEntity.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getPlan()).isEqualTo("FREE");
     }
 
     @Test
@@ -70,7 +95,7 @@ class RegistrationServiceTest {
             return Mono.just(e);
         });
 
-        StepVerifier.create(service.inscrire("A", "B", "a@b.co", "pw", null))
+        StepVerifier.create(service.inscrire("A", "B", "a@b.co", "pw", "Entreprise Test"))
                 .expectNextCount(1)
                 .verifyComplete();
 
@@ -88,7 +113,7 @@ class RegistrationServiceTest {
                         UUID.randomUUID(), "existant@example.com", UUID.randomUUID(),
                         "kid", null, null, "FREE")));
 
-        StepVerifier.create(service.inscrire("Ada", "Lovelace", "existant@example.com", "MotDePasse1!", "FREE"))
+        StepVerifier.create(service.inscrire("Ada", "Lovelace", "existant@example.com", "MotDePasse1!", "Techfast Technologies"))
                 .expectErrorSatisfies(ex -> {
                     assertThat(ex).isInstanceOf(ProblemException.class);
                     assertThat(((ProblemException) ex).getStatus().value()).isEqualTo(409);

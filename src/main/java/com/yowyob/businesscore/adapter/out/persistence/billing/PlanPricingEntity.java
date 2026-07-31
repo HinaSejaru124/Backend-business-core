@@ -26,6 +26,13 @@ public class PlanPricingEntity implements Persistable<String> {
 
     private String devise;
 
+    /** Nombre maximal d'applications autorisées ; -1 = illimité. */
+    @Column("applications_max")
+    private long applicationsMax;
+
+    /** Libellé (nom affiché) du forfait ; null = on affiche le code. */
+    private String libelle;
+
     @Column("maj_le")
     private Instant majLe;
 
@@ -35,12 +42,15 @@ public class PlanPricingEntity implements Persistable<String> {
     public PlanPricingEntity() {
     }
 
-    public static PlanPricingEntity de(String code, long quotaMensuel, long prixMensuel, String devise, boolean nouveau) {
+    public static PlanPricingEntity de(String code, long quotaMensuel, long prixMensuel, String devise,
+                                       long applicationsMax, String libelle, boolean nouveau) {
         PlanPricingEntity e = new PlanPricingEntity();
         e.code = code;
         e.quotaMensuel = quotaMensuel;
         e.prixMensuel = prixMensuel;
         e.devise = devise;
+        e.applicationsMax = applicationsMax;
+        e.libelle = libelle;
         e.majLe = Instant.now();
         e.nouveau = nouveau;
         return e;
@@ -70,6 +80,14 @@ public class PlanPricingEntity implements Persistable<String> {
 
     public String getDevise() {
         return devise;
+    }
+
+    public long getApplicationsMax() {
+        return applicationsMax;
+    }
+
+    public String getLibelle() {
+        return libelle;
     }
 
     public Instant getMajLe() {

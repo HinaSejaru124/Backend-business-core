@@ -5,6 +5,7 @@ import com.yowyob.businesscore.adapter.out.persistence.apikey.ApiKeyRepository;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
 import com.yowyob.businesscore.adapter.out.persistence.enterprise.EntrepriseRepository;
 import com.yowyob.businesscore.application.error.ProblemException;
+import com.yowyob.businesscore.infrastructure.security.SecretCipher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -32,15 +33,30 @@ public class ApiKeyService {
     private final EntrepriseRepository entrepriseRepository;
     private final DeveloperAccountRepository developerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SecretCipher secretCipher;
 
     public ApiKeyService(ApiKeyRepository repository,
                          EntrepriseRepository entrepriseRepository,
                          DeveloperAccountRepository developerRepository,
-                         PasswordEncoder passwordEncoder) {
+                         PasswordEncoder passwordEncoder,
+                         SecretCipher secretCipher) {
         this.repository = repository;
         this.entrepriseRepository = entrepriseRepository;
         this.developerRepository = developerRepository;
         this.passwordEncoder = passwordEncoder;
+        this.secretCipher = secretCipher;
+    }
+
+    /** Secret complet déchiffré d'une clé (pour ré-affichage au propriétaire) ; null si non récupérable. */
+    public String secretClair(ApiKeyEntity entity) {
+        if (entity == null || entity.getKeySecretEnc() == null || entity.getKeySecretEnc().isBlank()) {
+            return null; // clé héritée (créée avant le stockage chiffré) : rien à ré-afficher
+        }
+        try {
+            return secretCipher.dechiffrer(entity.getKeySecretEnc());
+        } catch (RuntimeException e) {
+            return null; // valeur illisible : on n'affiche rien plutôt que de faire échouer la vue
+        }
     }
 
     /** Secret complet d'une clé — n'existe qu'en mémoire, le temps de le renvoyer une fois au dev. */
@@ -67,7 +83,7 @@ public class ApiKeyService {
                     }
                     String secret = jeton(32);
                     ApiKeyEntity entity = ApiKeyEntity.nouveau(UUID.randomUUID(), developerId, entrepriseId,
-                            passwordEncoder.encode(secret), name);
+                            passwordEncoder.encode(secret), secretCipher.chiffrer(secret), name);
                     return repository.save(entity)
                             .map(saved -> new CleApiCreee(saved.getId(), secret, saved.getName(),
                                     saved.getEntrepriseId()));

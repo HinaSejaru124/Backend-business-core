@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
+import com.yowyob.businesscore.domain.port.out.OrganisationAccessible;
 import com.yowyob.businesscore.domain.port.out.OrganisationProvisionnee;
 import com.yowyob.businesscore.domain.port.out.PersisterEntreprise;
 import com.yowyob.businesscore.domain.shared.CycleVie;
@@ -139,6 +140,18 @@ public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
     }
 
     @Override
+    public Mono<List<OrganisationAccessible>> listerOrganisations() {
+        return kernel.get("/api/organizations", OrgItem[].class)
+                .map(items -> java.util.Arrays.stream(items)
+                        .map(o -> new OrganisationAccessible(
+                                o.id().toString(), o.code(),
+                                o.longName() != null ? o.longName() : o.shortName(),
+                                List.of()))
+                        .toList())
+                .defaultIfEmpty(List.of());
+    }
+
+    @Override
     public Mono<Void> souscrireServices(UUID organizationId) {
         return resoudreOrdreServices()
                 .flatMapMany(ordered -> Flux.fromIterable(ordered)
@@ -234,6 +247,10 @@ public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
 
 /** Agence kernel (mappe {@code AgencyResponse}) : on n'en retient que l'id et le statut de siège. */
 record AgenceItem(UUID id, boolean isHeadquarter) {
+}
+
+/** Organisation kernel (mappe {@code GET /api/organizations}) : on n'en retient que l'essentiel. */
+record OrgItem(UUID id, String code, String shortName, String longName, String governanceStatus) {
 }
 
 /** Corps d'onboarding d'un business actor (seul {@code name} est requis côté kernel). */

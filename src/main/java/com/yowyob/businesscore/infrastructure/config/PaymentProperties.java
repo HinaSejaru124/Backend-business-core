@@ -17,6 +17,8 @@ public record PaymentProperties(
         String clientId,
         String provider,
         String method,
+        /** Fournisseur utilisé pour le paiement par carte (la passerelle expose MYCOOLPAY et STRIPE). */
+        String providerCarte,
         String currency,
         String serviceCodePrefix,
         String callbackBaseUrl
@@ -31,6 +33,9 @@ public record PaymentProperties(
         }
         if (method == null || method.isBlank()) {
             method = "MOBILE_MONEY";
+        }
+        if (providerCarte == null || providerCarte.isBlank()) {
+            providerCarte = "STRIPE";
         }
         if (currency == null || currency.isBlank()) {
             currency = "XAF";

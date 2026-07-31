@@ -177,23 +177,35 @@ public class KernelClient {
         }
         WebClient.RequestHeadersSpec<?> finalSpec = (body != null) ? spec.bodyValue(body) : spec;
         long debut = System.currentTimeMillis();
-        return BusinessContextHolder.currentTenantId()
-                .flatMap(notreTenant -> finalSpec.retrieve()
+        return BusinessContextHolder.currentContext()
+                .map(java.util.Optional::of)
+                .defaultIfEmpty(java.util.Optional.empty())
+                .flatMap(ctxOpt -> finalSpec.retrieve()
                         .bodyToMono(Object.class)
                         .transform(this::resilience)
-                        .doOnSuccess(corps -> journaliser(notreTenant, method, path, 200, debut))
+                        .doOnSuccess(corps -> journaliser(ctxOpt, method, path, 200, debut))
                         .doOnError(WebClientResponseException.class,
-                                ex -> journaliser(notreTenant, method, path, ex.getStatusCode().value(), debut))
+                                ex -> journaliser(ctxOpt, method, path, ex.getStatusCode().value(), debut))
                         .flatMap(corps -> convertirReponse(corps, type)));
     }
 
     /** Journal détaillé des appels sortants vers Kernel (catégorie KNL_CORE, onglet Audit / Requêtes). */
-    private void journaliser(java.util.Optional<UUID> notreTenant, HttpMethod method, String path,
+    private void journaliser(java.util.Optional<BusinessContext> ctxOpt, HttpMethod method, String path,
                              int statutHttp, long debut) {
-        // Kernel n'est jamais appelé en flux design-time (cf. DOCUMENTATION-REQUETES.md) : un appel
-        // KNL_CORE est toujours déclenché par une action runtime déjà facturée côté BUSINESS_CORE.
-        notreTenant.ifPresent(tenant -> requeteLogWriter.enregistrerAsync(
-                tenant, "KNL_CORE", method.name(), path, statutHttp, System.currentTimeMillis() - debut, true));
+        // Appel SORTANT de Business Core vers la plateforme sous-jacente : tracé pour l'audit, mais
+        // JAMAIS facturé au développeur.
+        //
+        // Deux raisons. (1) L'hypothèse d'origine — « Kernel n'est jamais appelé en design-time » — est
+        // fausse : le changement de forfait depuis la console déclenche POST /api/payments/orders, qui
+        // se retrouvait facturé au développeur alors qu'aucune application ne tournait. (2) Même en
+        // runtime, ces appels sont la conséquence interne d'UNE requête entrante déjà facturée par
+        // UsageTrackingWebFilter : les compter à nouveau facturerait plusieurs fois le même acte métier.
+        //
+        // Règle unique : seule la consommation de l'API par une application authentifiée par clé API est
+        // facturable.
+        ctxOpt.ifPresent(ctx -> requeteLogWriter.enregistrerAsync(
+                ctx.tenantId(), ctx.businessId(), "KNL_CORE", method.name(), path,
+                statutHttp, System.currentTimeMillis() - debut, false));
     }
 
     private <T> Mono<T> convertirReponse(Object corps, Class<T> type) {

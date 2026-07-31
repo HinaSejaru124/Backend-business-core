@@ -62,7 +62,7 @@ class PlanServiceTest {
     @Test
     @DisplayName("changer exige le numéro mobile money du payeur")
     void changer_exige_payer_reference() {
-        StepVerifier.create(service.changer(devId, "PRO", "  "))
+        StepVerifier.create(service.changer(devId, "PRO", "  ", null))
                 .expectErrorMatches(e -> e instanceof ProblemException pe
                         && "PAYER_REFERENCE_MANQUANT".equals(pe.getExtensions().get("violatedRule")))
                 .verify();
@@ -76,7 +76,7 @@ class PlanServiceTest {
                 new ResultatPaiement(ResultatPaiement.Statut.EN_ATTENTE, "https://pay", "order-1")));
         when(changeRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
-        StepVerifier.create(service.changer(devId, "PRO", "692162333"))
+        StepVerifier.create(service.changer(devId, "PRO", "692162333", null))
                 .assertNext(r -> {
                     assertThat(r.statut()).isEqualTo("EN_ATTENTE");
                     assertThat(r.plan()).isEqualTo("FREE"); // plan inchangé tant que non finalisé

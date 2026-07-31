@@ -36,6 +36,10 @@ public class ApiKeyEntity implements Persistable<UUID> {
     @Column("key_hash")
     private String keyHash;
 
+    /** Secret complet CHIFFRÉ (AES-GCM) pour ré-affichage au propriétaire ; null pour les clés héritées. */
+    @Column("key_secret_enc")
+    private String keySecretEnc;
+
     private String name;
 
     private String status;
@@ -52,12 +56,14 @@ public class ApiKeyEntity implements Persistable<UUID> {
     public ApiKeyEntity() {
     }
 
-    public static ApiKeyEntity nouveau(UUID id, UUID developerId, UUID entrepriseId, String keyHash, String name) {
+    public static ApiKeyEntity nouveau(UUID id, UUID developerId, UUID entrepriseId, String keyHash,
+                                       String keySecretEnc, String name) {
         ApiKeyEntity e = new ApiKeyEntity();
         e.id = id;
         e.developerId = developerId;
         e.entrepriseId = entrepriseId;
         e.keyHash = keyHash;
+        e.keySecretEnc = keySecretEnc;
         e.name = (name == null || name.isBlank()) ? "Default" : name;
         e.status = STATUT_ACTIVE;
         e.createdAt = Instant.now();
@@ -85,6 +91,10 @@ public class ApiKeyEntity implements Persistable<UUID> {
 
     public String getKeyHash() {
         return keyHash;
+    }
+
+    public String getKeySecretEnc() {
+        return keySecretEnc;
     }
 
     public String getName() {

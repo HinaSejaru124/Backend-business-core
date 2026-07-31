@@ -44,7 +44,8 @@ public class PlanService {
     /** Statut d'une demande de changement de plan dont le paiement n'est pas encore finalisé. */
     private static final String STATUT_EN_ATTENTE = PaiementPort.ResultatPaiement.Statut.EN_ATTENTE.name();
 
-    public Mono<ResultatUpgrade> changer(UUID developerId, String planCibleBrut, String payerReference) {
+    public Mono<ResultatUpgrade> changer(UUID developerId, String planCibleBrut, String payerReference,
+                                         String modeBrut) {
         if (planCibleBrut == null || planCibleBrut.isBlank()) {
             return Mono.error(ProblemException.badRequest("Le plan cible est obligatoire.")
                     .violatedRule("PLAN_CIBLE_MANQUANT"));
@@ -53,7 +54,10 @@ public class PlanService {
             return Mono.error(ProblemException.badRequest("Plan inconnu : " + planCibleBrut)
                     .violatedRule("PLAN_INCONNU"));
         }
-        if (payerReference == null || payerReference.isBlank()) {
+        // Le numéro du payeur n'a de sens qu'en mobile money : par carte, le porteur saisit ses
+        // coordonnées sur la page sécurisée de la passerelle, jamais chez nous.
+        PaiementPort.ModePaiement mode = PaiementPort.ModePaiement.depuis(modeBrut);
+        if (mode.exigePayerReference() && (payerReference == null || payerReference.isBlank())) {
             return Mono.error(ProblemException.badRequest("Le numéro mobile money du payeur est obligatoire.")
                     .violatedRule("PAYER_REFERENCE_MANQUANT"));
         }
@@ -68,7 +72,8 @@ public class PlanService {
                                 .violatedRule("PLAN_INCHANGE"));
                     }
                     PaiementPort.DemandePaiement demande = new PaiementPort.DemandePaiement(developerId, actuel,
-                            cible, catalogue.prixMensuel(cible), catalogue.devise(cible), payerReference.trim());
+                            cible, catalogue.prixMensuel(cible), catalogue.devise(cible),
+                            payerReference == null ? null : payerReference.trim(), mode);
                     return paiement.demanderPaiement(demande)
                             .flatMap(resultat -> appliquer(account, actuel, cible, resultat));
                 });

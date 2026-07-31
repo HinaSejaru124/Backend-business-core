@@ -2,6 +2,7 @@ package com.yowyob.businesscore.application.usecase.access;
 
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountEntity;
 import com.yowyob.businesscore.adapter.out.persistence.developer.DeveloperAccountRepository;
+import com.yowyob.businesscore.application.billing.PlanCatalogue;
 import com.yowyob.businesscore.application.error.ProblemException;
 import com.yowyob.businesscore.domain.port.in.ApiKeyEmise;
 import com.yowyob.businesscore.domain.port.in.RegistrationUseCase;
@@ -38,8 +39,15 @@ public class RegistrationService implements RegistrationUseCase {
     @Override
     public Mono<ApiKeyEmise> inscrire(String firstName, String lastName,
                                       String email, String password,
-                                      String planCode) {
-        String plan = (planCode == null || planCode.isBlank()) ? "FREE" : planCode;
+                                      String entreprise) {
+        // Tout nouveau compte démarre sur le plan gratuit, sans exception. Le plan ne peut être changé
+        // que par PlanService.changer/finaliser, qui n'active un plan payant que sur un paiement
+        // réellement CONFIRME par la passerelle. Auparavant l'inscription reprenait un `planCode` fourni
+        // par le client : n'importe qui pouvait s'octroyer PRO ou ENTERPRISE gratuitement en le
+        // choisissant dans le formulaire (ou en forgeant la requête). Le champ a été retiré du contrat
+        // REST ; ne jamais le réintroduire ici — un plan payant ne s'obtient que par paiement.
+        String plan = PlanCatalogue.PLAN_DEFAUT;
+        String entrepriseNettoyee = entreprise == null ? null : entreprise.trim();
 
         return repository.findByEmail(email)
                 .flatMap(existant -> Mono.<ApiKeyEmise>error(ProblemException.conflict(
@@ -55,6 +63,10 @@ public class RegistrationService implements RegistrationUseCase {
                                     null,
                                     null,
                                     plan);
+                            // Nom de l'entreprise mémorisé dès l'inscription ; l'organisation kernel elle-même
+                            // est provisionnée au premier appel authentifié (POST /v1/enterprise/status),
+                            // l'onboarding kernel exigeant un compte déjà vérifié.
+                            entity.setEntrepriseNom(entrepriseNettoyee);
                             return repository.save(entity)
                                     .onErrorMap(DuplicateKeyException.class, ex -> ProblemException.conflict(
                                             "Un compte existe déjà avec l'adresse " + email + ". Connectez-vous plutôt.")

@@ -52,21 +52,20 @@ public class EntrepriseController {
 
     @Operation(summary = "Créer une application",
             description = """
-                    Instancie un Type Métier à une version donnée. Si `organizationId` est fourni, l'application
-                    se rattache à cette organisation kernel existante (aucune organisation créée). Sinon,
-                    provisionne automatiquement une nouvelle organisation kernel (actor → org → approve →
-                    services → agence principale).""")
+                    Instancie un Type Métier à une version donnée, au sein de l'entreprise du développeur
+                    (une seule organisation kernel par développeur — cf. GET/POST /v1/enterprise). Échoue en
+                    422 (ENTREPRISE_NON_DEFINIE) si aucune entreprise n'a encore été choisie.""")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Application créée"),
             @ApiResponse(responseCode = "404", description = "Version de type introuvable"),
-            @ApiResponse(responseCode = "422", description = "Données invalides")
+            @ApiResponse(responseCode = "422", description = "Données invalides, ou entreprise non définie")
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<EntrepriseResponse> creer(@Valid @RequestBody CreerEntrepriseRequest requete) {
         return BusinessContextHolder.currentContext()
                 .flatMap(ctx -> entrepriseService.creer(
-                        requete.typeId(), requete.versionNumber(), requete.nom(), requete.organizationId(), ctx))
+                        requete.typeId(), requete.versionNumber(), requete.nom(), ctx))
                 .map(EntrepriseResponse::depuis);
     }
 

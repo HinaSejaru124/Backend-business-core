@@ -9,6 +9,8 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
+import java.util.UUID;
+
 /**
  * Journalise les requêtes <b>design-time</b> (JWT du développeur/titulaire — console, ou une
  * application tierce qui rejoue ce JWT) dans {@code requete_log}, catégorie {@code BUSINESS_CORE},
@@ -64,13 +66,52 @@ public class DesignTimeAuditWebFilter implements WebFilter {
             return Mono.empty();
         }
         HttpStatusCode statut = exchange.getResponse().getStatusCode();
+        // Attribution à une application (pour l'onglet Audit) : en-tête X-BC-Application-Id, ou segment
+        // de /v1/applications/{id}/… . Sert UNIQUEMENT à savoir de quelle application parle la ligne.
+        UUID applicationId = resoudreApplicationId(exchange);
+        // JAMAIS facturable. Ce filtre ne voit que le design-time (JWT) : console du développeur ou
+        // modélisation. La facturation ne concerne que la consommation runtime de l'API par une
+        // application authentifiée par clé API (cf. UsageTrackingWebFilter, seul à écrire facturable=true).
+        //
+        // Auparavant le drapeau valait `applicationId != null` : ouvrir un onglet de sa propre console
+        // (GET /v1/applications/{id}/profile, /api-keys, /contract, /config, /actors…) était compté comme
+        // une requête facturable. Le quota du développeur se consommait donc pendant qu'il naviguait,
+        // sans qu'aucune application ne tourne — symptôme constaté le 31/07/2026 (compteur qui monte
+        // alors que l'application de test était à l'arrêt).
         requeteLogWriter.enregistrerAsync(
-                ctx.tenantId(), CATEGORIE_BUSINESS_CORE,
+                ctx.tenantId(), applicationId, CATEGORIE_BUSINESS_CORE,
                 exchange.getRequest().getMethod().name(),
                 exchange.getRequest().getPath().value(),
                 statut != null ? statut.value() : 0,
                 System.currentTimeMillis() - debut,
                 false);
         return Mono.empty();
+    }
+
+    /** businessId de l'app concernée : en-tête X-BC-Application-Id sinon segment de /v1/applications/{id}/… . */
+    private static UUID resoudreApplicationId(ServerWebExchange exchange) {
+        String header = exchange.getRequest().getHeaders().getFirst("X-BC-Application-Id");
+        UUID depuisHeader = parseUuid(header);
+        if (depuisHeader != null) {
+            return depuisHeader;
+        }
+        String[] segments = exchange.getRequest().getPath().value().split("/");
+        for (int i = 0; i < segments.length - 1; i++) {
+            if (("applications".equals(segments[i]) || "businesses".equals(segments[i]))) {
+                return parseUuid(segments[i + 1]);
+            }
+        }
+        return null;
+    }
+
+    private static UUID parseUuid(String v) {
+        if (v == null || v.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(v.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }

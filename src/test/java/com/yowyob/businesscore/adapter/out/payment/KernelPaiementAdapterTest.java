@@ -5,6 +5,7 @@ import com.yowyob.businesscore.adapter.out.kernel.KernelClient;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelCredentialStore;
 import com.yowyob.businesscore.adapter.out.kernel.auth.KernelTokenService;
 import com.yowyob.businesscore.adapter.out.persistence.requestlog.RequeteLogWriter;
+import com.yowyob.businesscore.domain.port.out.PaiementPort;
 import com.yowyob.businesscore.domain.port.out.PaiementPort.DemandePaiement;
 import com.yowyob.businesscore.domain.port.out.PaiementPort.ResultatPaiement;
 import com.yowyob.businesscore.infrastructure.config.KernelProperties;
@@ -59,7 +60,7 @@ class KernelPaiementAdapterTest {
                 webClient, tokenService, credentialStore, JsonMapper.builder().build(),
                 mock(RequeteLogWriter.class), kProps);
 
-        PaymentProperties pProps = new PaymentProperties(null, null, null, null, null, null);
+        PaymentProperties pProps = new PaymentProperties(null, null, null, null, null, null, null);
         adapter = new KernelPaiementAdapter(kernel, pProps);
     }
 
@@ -83,7 +84,8 @@ class KernelPaiementAdapterTest {
                 .willReturn(okJson(ordreJson(orderId.toString(), "PENDING", redirect))));
 
         DemandePaiement demande = new DemandePaiement(
-                UUID.randomUUID(), "FREE", "PRO", 15000, "XAF", "692162333");
+                UUID.randomUUID(), "FREE", "PRO", 15000, "XAF", "692162333",
+                PaiementPort.ModePaiement.MOBILE_MONEY);
 
         StepVerifier.create(adapter.demanderPaiement(demande))
                 .expectNext(new ResultatPaiement(ResultatPaiement.Statut.EN_ATTENTE, redirect, orderId.toString()))
