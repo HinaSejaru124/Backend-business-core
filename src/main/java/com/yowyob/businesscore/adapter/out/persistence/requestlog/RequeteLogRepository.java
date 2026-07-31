@@ -31,15 +31,34 @@ public interface RequeteLogRepository extends ReactiveCrudRepository<RequeteLogE
 
     Mono<Long> countByTenantIdAndCategorie(UUID tenantId, String categorie);
 
+    /**
+     * Requêtes <b>facturables</b> d'un tenant, par catégorie.
+     *
+     * <p>À utiliser partout où l'on parle de consommation : {@code countByTenantIdAndCategorie} compte
+     * TOUTES les lignes de la catégorie, donc aussi la navigation du développeur dans sa console et les
+     * appels internes de la plateforme — qui ne sont facturés à personne. La console d'administration
+     * affichait ainsi des milliers de requêtes qu'aucune application n'avait émises, et un total
+     * incohérent avec ce que le développeur voit sur son propre tableau de bord.
+     */
+    @Query("""
+            SELECT COUNT(*) FROM requete_log
+            WHERE tenant_id = :tenantId AND categorie = :categorie AND facturable
+            """)
+    Mono<Long> countFacturablesParTenantEtCategorie(UUID tenantId, String categorie);
+
     /** Agrégat dashboard/admin : nombre d'erreurs (statut &gt;= 400) et temps de réponse moyen, sur une fenêtre. */
     record StatsRow(Long nbErreurs, Double dureeMoyenneMs) {
     }
 
+    /**
+     * Restreint aux requêtes <b>facturables</b> : le taux d'erreur de la plateforme doit refléter la
+     * qualité de service rendue aux applications, pas les 404 de navigation de la console.
+     */
     @Query("""
             SELECT COUNT(*) FILTER (WHERE statut_http >= 400) AS nb_erreurs,
                    AVG(duree_ms) AS duree_moyenne_ms
             FROM requete_log
-            WHERE tenant_id = :tenantId AND cree_le >= :depuis
+            WHERE tenant_id = :tenantId AND cree_le >= :depuis AND facturable
             """)
     Mono<StatsRow> statsParTenant(UUID tenantId, Instant depuis);
 

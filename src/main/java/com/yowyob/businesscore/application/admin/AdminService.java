@@ -167,11 +167,15 @@ public class AdminService {
                         UUID tenant = d.getKernelTenantId();
                         Mono<Long> nbEnt = dansTenant(tenant, entrepriseRepository.countByTenantId(tenant))
                                 .defaultIfEmpty(0L);
+                        // Consommation FACTURABLE uniquement : l'administrateur doit voir exactement ce
+                        // que le développeur voit sur son propre tableau de bord (la somme de tous les
+                        // développeurs, rien de plus). Compter toute la catégorie incluait la navigation
+                        // console et les appels internes — d'où des totaux sans rapport avec la réalité.
                         Mono<Long> nbBc = dansTenant(tenant,
-                                requeteLogRepository.countByTenantIdAndCategorie(tenant, "BUSINESS_CORE"))
+                                requeteLogRepository.countFacturablesParTenantEtCategorie(tenant, "BUSINESS_CORE"))
                                 .defaultIfEmpty(0L);
                         Mono<Long> nbKnl = dansTenant(tenant,
-                                requeteLogRepository.countByTenantIdAndCategorie(tenant, "KNL_CORE"))
+                                requeteLogRepository.countFacturablesParTenantEtCategorie(tenant, "KNL_CORE"))
                                 .defaultIfEmpty(0L);
                         Mono<Long> nbErreurs = dansTenant(tenant,
                                 requeteLogRepository.statsParTenant(tenant, depuisErreurs)
