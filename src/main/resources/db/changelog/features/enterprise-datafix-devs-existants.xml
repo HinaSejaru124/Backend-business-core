@@ -29,19 +29,19 @@
         <update tableName="developer_account">
             <column name="entreprise_nom" value="TechFast Technologies"/>
             <column name="entreprise_organization_id" value="b785cdd9-e680-4351-b631-44724c6c4b13"/>
-            <where>email = 'techlan500@gmail.com'</where>
+            <where>email = 'techlan500@gmail.com' AND entreprise_nom IS NULL</where>
         </update>
         <update tableName="developer_account">
             <column name="entreprise_nom" value="Kivu Digital Solutions"/>
-            <where>email = 'techlan50@gmail.com'</where>
+            <where>email = 'techlan50@gmail.com' AND entreprise_nom IS NULL</where>
         </update>
         <update tableName="developer_account">
             <column name="entreprise_nom" value="Sahel Software Works"/>
-            <where>email = 'pharmacore.test@yowyob-demo.com'</where>
+            <where>email = 'pharmacore.test@yowyob-demo.com' AND entreprise_nom IS NULL</where>
         </update>
         <update tableName="developer_account">
             <column name="entreprise_nom" value="Baobab IT Consulting"/>
-            <where>email = 'verify.develop2.test@yowyob-demo.com'</where>
+            <where>email = 'verify.develop2.test@yowyob-demo.com' AND entreprise_nom IS NULL</where>
         </update>
         <rollback>
             <update tableName="developer_account">
