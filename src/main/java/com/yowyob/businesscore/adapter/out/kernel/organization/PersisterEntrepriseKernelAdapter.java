@@ -88,8 +88,18 @@ public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
                 });
     }
 
-    /** Le kernel signale un acteur en attente de gouvernance par ce code d'erreur métier. */
+    /**
+     * Le kernel signale un acteur en attente de gouvernance par ce code d'erreur métier.
+     *
+     * <p>Les 4xx du kernel sont relayées telles quelles (cf. {@code KernelClient.relayerErreurTransport}) :
+     * le code d'erreur se trouve donc dans le <b>corps</b> de la réponse, pas dans {@code getMessage()}
+     * qui ne porte que la ligne de statut.
+     */
     private static boolean estActeurNonApprouve(Throwable ex) {
+        if (ex instanceof WebClientResponseException http) {
+            String corps = http.getResponseBodyAsString();
+            return corps != null && corps.contains("BUSINESS_ACTOR_NOT_APPROVED");
+        }
         String message = ex.getMessage();
         return message != null && message.contains("BUSINESS_ACTOR_NOT_APPROVED");
     }
