@@ -6,5 +6,10 @@ package com.yowyob.businesscore.domain.port.in;
  * vérifie son email, se connecte via JWT (identifiant stable exposé par {@code GET /v1/auth/me}), crée
  * une entreprise, puis émet une clé API pour cette entreprise.
  */
-public record ApiKeyEmise(String plan, String message) {
+/**
+ * @param identifiantConnexion adresse {@code @yowyob.com} à utiliser pour se connecter. Distincte de
+ *                             l'e-mail personnel saisi à l'inscription (qui sert à la vérification) :
+ *                             sans elle affichée, le développeur ne peut pas se connecter.
+ */
+public record ApiKeyEmise(String plan, String message, String identifiantConnexion) {
 }

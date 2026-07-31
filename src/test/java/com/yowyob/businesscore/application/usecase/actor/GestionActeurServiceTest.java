@@ -173,7 +173,7 @@ class GestionActeurServiceTest {
                 .thenReturn(Mono.just(new ResultatLogin(
                         "jwt", 900, List.of(), List.of(), null, actorIdApresSignUp.toString())));
         when(authentifier.signUp("jean@pharma.cm", "pw", "Jean", "Kamdem"))
-                .thenReturn(Mono.just(new SignUpResult("kernel-id", "tenant-id", "PENDING", "ok")));
+                .thenReturn(Mono.just(new SignUpResult("kernel-id", "tenant-id", "PENDING", "ok", "u@yowyob.com")));
         when(appliquerRoleTechnique.appliquer(eq(actorIdApresSignUp), eq("PHARMACIEN"))).thenReturn(Mono.empty());
 
         StepVerifier.create(service.inscrire(commandeInscription()))
@@ -193,7 +193,7 @@ class GestionActeurServiceTest {
         when(authentifier.login("jean@pharma.cm", "pw"))
                 .thenReturn(Mono.error(ProblemException.forbidden("Compte non vérifié")));
         when(authentifier.signUp("jean@pharma.cm", "pw", "Jean", "Kamdem"))
-                .thenReturn(Mono.just(new SignUpResult("kernel-id", "tenant-id", "PENDING", "ok")));
+                .thenReturn(Mono.just(new SignUpResult("kernel-id", "tenant-id", "PENDING", "ok", "u@yowyob.com")));
 
         StepVerifier.create(service.inscrire(commandeInscription()))
                 .expectErrorSatisfies(ex -> assertThat(((ProblemException) ex).getStatus().value()).isEqualTo(502))

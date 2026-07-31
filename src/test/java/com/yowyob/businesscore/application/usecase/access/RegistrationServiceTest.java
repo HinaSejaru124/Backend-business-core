@@ -37,7 +37,7 @@ class RegistrationServiceTest {
 
         when(repository.findByEmail("dev@example.com")).thenReturn(Mono.empty());
         when(authentifier.signUp("dev@example.com", "MotDePasse1!", "Ada", "Lovelace"))
-                .thenReturn(Mono.just(new SignUpResult("kernel-user-id", tenantId.toString(), "PENDING", "ok")));
+                .thenReturn(Mono.just(new SignUpResult("kernel-user-id", tenantId.toString(), "PENDING", "ok", "u@yowyob.com")));
         when(repository.save(any())).thenAnswer(inv -> {
             DeveloperAccountEntity e = inv.getArgument(0);
             e.setId(developerId);
@@ -64,7 +64,7 @@ class RegistrationServiceTest {
         RegistrationService service = new RegistrationService(repository, authentifier);
         when(repository.findByEmail(any())).thenReturn(Mono.empty());
         when(authentifier.signUp(any(), any(), any(), any()))
-                .thenReturn(Mono.just(new SignUpResult("id", null, "PENDING", "ok")));
+                .thenReturn(Mono.just(new SignUpResult("id", null, "PENDING", "ok", "u@yowyob.com")));
         when(repository.save(any())).thenAnswer(inv -> {
             DeveloperAccountEntity e = inv.getArgument(0);
             e.setId(UUID.randomUUID());
@@ -88,7 +88,7 @@ class RegistrationServiceTest {
         RegistrationService service = new RegistrationService(repository, authentifier);
         when(repository.findByEmail(any())).thenReturn(Mono.empty());
         when(authentifier.signUp(any(), any(), any(), any()))
-                .thenReturn(Mono.just(new SignUpResult("id", null, "PENDING", "ok")));
+                .thenReturn(Mono.just(new SignUpResult("id", null, "PENDING", "ok", "u@yowyob.com")));
         when(repository.save(any())).thenAnswer(inv -> {
             DeveloperAccountEntity e = inv.getArgument(0);
             e.setId(UUID.randomUUID());

@@ -359,6 +359,8 @@ private Mono<ResultatLogin> versResultat(Map<?, ?> corps) {
                 texte(data.get("id")),
                 texte(data.get("tenantId")),
                 texte(data.get("status")),
-                message);
+                message,
+                // `yowyobEmail` est l'identifiant de connexion réel ; on ne le jette plus.
+                texte(data.get("yowyobEmail")));
     }
 }

@@ -70,11 +70,26 @@ public class RegistrationService implements RegistrationUseCase {
                             return repository.save(entity)
                                     .onErrorMap(DuplicateKeyException.class, ex -> ProblemException.conflict(
                                             "Un compte existe déjà avec l'adresse " + email + ". Connectez-vous plutôt.")
-                                            .violatedRule("EMAIL_DEJA_UTILISE"));
+                                            .violatedRule("EMAIL_DEJA_UTILISE"))
+                                    .thenReturn(signUpResult);
                         })
-                        .map(account -> new ApiKeyEmise(plan,
-                                "Compte créé. Vérifiez votre email, connectez-vous via POST /v1/auth/login, "
-                                        + "créez une application puis une clé API pour cette application."))));
+                        // L'identifiant de connexion est une adresse @yowyob.com générée par la plateforme
+                        // d'identité : l'e-mail personnel ne permet PAS de se connecter (il sert à la
+                        // vérification et à la récupération). Le développeur ne peut pas le deviner, il
+                        // faut donc le lui donner explicitement — sinon il reste bloqué au login.
+                        .map(signUpResult -> new ApiKeyEmise(plan,
+                                messageBienvenue(signUpResult.identifiantConnexion()),
+                                signUpResult.identifiantConnexion()))));
+    }
+
+    private static String messageBienvenue(String identifiantConnexion) {
+        String base = "Compte créé. Vérifiez votre e-mail pour activer le compte";
+        if (identifiantConnexion == null || identifiantConnexion.isBlank()) {
+            return base + ", puis connectez-vous et créez votre première application.";
+        }
+        return base + ", puis connectez-vous avec l'identifiant " + identifiantConnexion
+                + " et le mot de passe choisi. Conservez cet identifiant : votre adresse personnelle ne "
+                + "permet pas de vous connecter.";
     }
 
     private static UUID parseUuid(String valeur) {

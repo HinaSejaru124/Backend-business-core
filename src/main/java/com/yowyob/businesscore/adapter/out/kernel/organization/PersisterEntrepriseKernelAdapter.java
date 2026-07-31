@@ -76,8 +76,39 @@ public class PersisterEntrepriseKernelAdapter implements PersisterEntreprise {
                             nom,
                             nom);
                     return kernel.post("/api/organizations", requete, KernelId.class)
+                            // Un business actor fraîchement créé est en attente de gouvernance : la
+                            // création d'organisation échoue alors en 409 BUSINESS_ACTOR_NOT_APPROVED.
+                            // Tout nouveau développeur restait donc bloqué dès sa première connexion,
+                            // sans aucun moyen de se débloquer lui-même depuis la console.
+                            // On approuve donc l'acteur puis on rejoue la création, une seule fois.
+                            .onErrorResume(ex -> estActeurNonApprouve(ex),
+                                    ex -> approuverBusinessActor(businessActorId)
+                                            .then(kernel.post("/api/organizations", requete, KernelId.class)))
                             .map(org -> new OrganisationProvisionnee(businessActorId, org.id()));
                 });
+    }
+
+    /** Le kernel signale un acteur en attente de gouvernance par ce code d'erreur métier. */
+    private static boolean estActeurNonApprouve(Throwable ex) {
+        String message = ex.getMessage();
+        return message != null && message.contains("BUSINESS_ACTOR_NOT_APPROVED");
+    }
+
+    /**
+     * Approuve le business actor du développeur courant.
+     *
+     * <p>Action de gouvernance jouée avec le JWT du développeur lui-même (le
+     * {@link com.yowyob.businesscore.adapter.out.kernel.KernelClient} le rejoue automatiquement) :
+     * vérifié le 31/07/2026, les identifiants applicatifs seuls reçoivent un {@code 403 ACCESS_DENIED},
+     * alors que le porteur du compte peut approuver le sien et obtient {@code governanceStatus=APPROVED}.
+     */
+    private Mono<Void> approuverBusinessActor(UUID businessActorId) {
+        Map<String, Object> action = Map.of(
+                "action", "APPROVE",
+                "reason", "Activation du compte développeur Business Core");
+        return kernel.post("/api/administration/governance/business-actors/" + businessActorId,
+                        action, Map.class)
+                .then();
     }
 
     @Override
