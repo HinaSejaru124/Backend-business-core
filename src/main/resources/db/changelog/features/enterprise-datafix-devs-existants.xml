@@ -26,6 +26,16 @@
       à leur prochaine connexion (GET /v1/enterprise/status), exactement comme un nouveau développeur.
     -->
     <changeSet id="enterprise-datafix-001-devs-existants" author="claude">
+        <!--
+          Ce changeset a été affiné après sa première application (ajout de « AND entreprise_nom IS NULL »
+          pour ne jamais écraser une valeur déjà saisie). Une base l'ayant appliqué dans sa version
+          initiale refuse alors de démarrer : « changesets check sum ... was X but is now Y ».
+
+          `validCheckSum: ANY` lève ce blocage sans danger ici : l'opération est un simple rattrapage de
+          données, idempotent et sans effet sur une base à jour. Sans cela, tout environnement ayant
+          appliqué la version précédente — dont la production — serait immobilisé au démarrage.
+        -->
+        <validCheckSum>ANY</validCheckSum>
         <update tableName="developer_account">
             <column name="entreprise_nom" value="TechFast Technologies"/>
             <column name="entreprise_organization_id" value="b785cdd9-e680-4351-b631-44724c6c4b13"/>

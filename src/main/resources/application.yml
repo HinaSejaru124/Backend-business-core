@@ -73,7 +73,14 @@ businesscore:
   # Administrateurs de la plateforme Business Core (console admin). Un développeur dont l'e-mail figure
   # ici obtient l'accès admin après connexion normale — cf. AdminAccess. Vide = aucun admin.
   admin:
-    emails: ${BC_ADMIN_EMAILS:}
+    # Administrateurs de la plateforme. La valeur par défaut n'est PAS vide, volontairement :
+    # le fichier .env est déposé manuellement sur le serveur et n'a pas été mis à jour lorsque la
+    # console d'administration a été ajoutée. Avec un défaut vide, la variable absente signifiait
+    # « aucun administrateur » — en production, le compte admin se connectait donc comme un simple
+    # développeur (constaté le 01/08/2026). Le défaut ci-dessous garantit un accès administrateur
+    # identique en local et en production, sans dépendre du fichier serveur.
+    # BC_ADMIN_EMAILS reste prioritaire et permet d'ajouter ou de remplacer des administrateurs.
+    emails: ${BC_ADMIN_EMAILS:migueladmin@yowyob.com,njikitchoubiamiguelalan@gmail.com}
   # Passerelle de paiement Kernel Core (mobile money MyCoolPay) pour l'upgrade de plan.
   # callback-base-url : page console de retour après paiement (elle ajoute ?payment=<id> pour finaliser).
   # Les prix des plans (businesscore.billing.plans.*.prix-mensuel) doivent rester >= 100 XAF : le mobile

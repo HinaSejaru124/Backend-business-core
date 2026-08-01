@@ -89,4 +89,35 @@
         </addColumn>
     </changeSet>
 
+    <!--
+      billing-005 : répare les forfaits payants dont le prix est resté à zéro.
+
+      La colonne `prix_mensuel` a pour défaut 0 et les lignes de `plan_pricing` RECOUVRENT la
+      configuration (cf. PlanPricingStore.run) : une base créée sans prix explicite se retrouve donc
+      avec des forfaits payants à 0, quels que soient les prix de application.yml. C'est ce qui a été
+      constaté en production le 01/08/2026 — PRO et ENTERPRISE affichés à 0.
+
+      Conséquence directe : la commande de paiement partait avec un montant nul, que la passerelle
+      mobile money refuse (montant minimum 100 XAF), d'où l'impossibilité de changer de forfait.
+
+      On ne corrige QUE les forfaits payants standard restés à zéro : FREE doit rester gratuit, et un
+      prix déjà fixé par l'administrateur n'est jamais écrasé (clause `prix_mensuel = 0`).
+    -->
+    <changeSet id="billing-005-reparer-prix-forfaits-payants" author="billing">
+        <update tableName="plan_pricing">
+            <column name="prix_mensuel" valueNumeric="15000"/>
+            <where>code = 'PRO' AND prix_mensuel = 0</where>
+        </update>
+        <update tableName="plan_pricing">
+            <column name="prix_mensuel" valueNumeric="75000"/>
+            <where>code = 'ENTERPRISE' AND prix_mensuel = 0</where>
+        </update>
+        <rollback>
+            <update tableName="plan_pricing">
+                <column name="prix_mensuel" valueNumeric="0"/>
+                <where>code IN ('PRO', 'ENTERPRISE')</where>
+            </update>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

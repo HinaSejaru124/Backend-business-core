@@ -44,6 +44,9 @@ public class PlanService {
     /** Statut d'une demande de changement de plan dont le paiement n'est pas encore finalisé. */
     private static final String STATUT_EN_ATTENTE = PaiementPort.ResultatPaiement.Statut.EN_ATTENTE.name();
 
+    /** Montant minimal accepté par la passerelle mobile money : en dessous, elle refuse la transaction. */
+    private static final long MONTANT_MINIMUM = 100L;
+
     public Mono<ResultatUpgrade> changer(UUID developerId, String planCibleBrut, String payerReference,
                                          String modeBrut) {
         if (planCibleBrut == null || planCibleBrut.isBlank()) {
@@ -70,6 +73,19 @@ public class PlanService {
                     if (cible.equals(actuel)) {
                         return Mono.error(ProblemException.conflict("Vous êtes déjà sur le plan " + cible + ".")
                                 .violatedRule("PLAN_INCHANGE"));
+                    }
+                    // Garde-fou sur le montant. La passerelle mobile money refuse les micro-montants
+                    // (minimum 100 XAF) et répond par un 400 opaque : un forfait payant dont le prix
+                    // n'a pas été fixé par l'administrateur produisait donc une erreur incompréhensible
+                    // pour le développeur. On échoue ici, avec un message qui désigne la vraie cause.
+                    long montant = catalogue.prixMensuel(cible);
+                    if (montant < MONTANT_MINIMUM) {
+                        return Mono.error(ProblemException.unprocessable(
+                                "Le forfait " + cible + " n'a pas de tarif valide (" + montant + " "
+                                        + catalogue.devise(cible) + "). L'administrateur de la plateforme doit "
+                                        + "lui attribuer un prix d'au moins " + MONTANT_MINIMUM + " "
+                                        + catalogue.devise(cible) + " avant qu'il puisse être souscrit.")
+                                .violatedRule("TARIF_FORFAIT_INVALIDE"));
                     }
                     PaiementPort.DemandePaiement demande = new PaiementPort.DemandePaiement(developerId, actuel,
                             cible, catalogue.prixMensuel(cible), catalogue.devise(cible),
